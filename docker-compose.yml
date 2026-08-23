@@ -1,0 +1,3 @@
+# Reserved for local dependencies introduced by future tickets.
+# RTI-VS1-001 intentionally defines no services.
+services: {}
