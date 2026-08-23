@@ -2,7 +2,7 @@
 
 Monorepo oficial de la Plataforma Refleja Tu Interior.
 
-Este repositorio fue inicializado para **RTI-VS1-001 — Bootstrap Monorepo**. En este punto contiene solamente la estructura base: las aplicaciones, la infraestructura y la funcionalidad se incorporarán en tickets posteriores.
+Este repositorio fue inicializado para **RTI-VS1-001 — Bootstrap Monorepo**. La aplicación backend fue inicializada posteriormente mediante **RTI-VS1-002 — Bootstrap Spring Boot API**, sin lógica de negocio ni persistencia implementada.
 
 ## Estructura del repositorio
 
@@ -10,7 +10,7 @@ Este repositorio fue inicializado para **RTI-VS1-001 — Bootstrap Monorepo**. E
 refleja-platform/
 ├── apps/
 │   ├── web/                 # Reservado para la aplicación web
-│   └── api/                 # Reservado para la API
+│   └── api/                 # Aplicación backend Spring Boot
 ├── infra/                   # Reservado para infraestructura como código
 ├── docs/
 │   ├── adr/                 # Índice de decisiones arquitectónicas
@@ -20,7 +20,19 @@ refleja-platform/
 └── README.md
 ```
 
-Los directorios reservados contienen únicamente marcadores para que Git conserve la estructura. `docker-compose.yml` no define servicios todavía.
+Los directorios que continúan reservados contienen únicamente marcadores para que Git conserve la estructura. `docker-compose.yml` no define servicios todavía.
+
+## Backend API
+
+La API vive en `apps/api`, utiliza Java 21 y Maven, y contiene únicamente el arranque técnico requerido por RTI-VS1-002.
+
+```text
+cd apps/api
+mvn clean verify
+mvn spring-boot:run
+```
+
+Al ejecutar la aplicación, el único endpoint operativo requerido en este ticket es `GET /actuator/health`.
 
 ## Documentación y decisiones arquitectónicas
 
@@ -34,11 +46,9 @@ Todas las implementaciones futuras deberán respetar las decisiones aceptadas. C
 
 Todavía no existen:
 
-- aplicaciones frontend o backend inicializadas;
-- código de negocio o módulos de dominio;
-- dependencias de aplicación;
-- migraciones o modelos de persistencia;
-- endpoints REST;
-- configuración de autenticación, autorización o resolución de tenant;
+- aplicación frontend inicializada;
+- lógica de negocio, servicios, casos de uso o controladores de dominio;
+- entidades, repositorios, migraciones o esquema de base de datos;
+- autenticación, autorización o resolución de tenant;
 - infraestructura AWS;
 - pipelines de CI/CD.
