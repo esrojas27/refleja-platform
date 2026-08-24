@@ -1,0 +1,11 @@
+CREATE ROLE rti_app
+    LOGIN
+    PASSWORD 'rti_app_test'
+    NOSUPERUSER
+    NOCREATEDB
+    NOCREATEROLE
+    NOINHERIT
+    NOREPLICATION
+    NOBYPASSRLS;
+
+GRANT CONNECT ON DATABASE refleja_tu_interior_test TO rti_app;

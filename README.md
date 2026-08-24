@@ -2,7 +2,7 @@
 
 Monorepo oficial de la Plataforma Refleja Tu Interior.
 
-El repositorio contiene los bootstraps técnicos iniciales del backend, el frontend y el entorno local de persistencia, sin lógica de negocio.
+El repositorio contiene los bootstraps técnicos iniciales del backend, el frontend y el entorno local de persistencia. RTI-VS1-005 añade exclusivamente el modelo inicial de persistencia, sin APIs ni lógica de negocio.
 
 ## Estructura del repositorio
 
@@ -10,7 +10,7 @@ El repositorio contiene los bootstraps técnicos iniciales del backend, el front
 refleja-platform/
 ├── apps/
 │   ├── web/                 # Aplicación web Next.js
-│   └── api/                 # Aplicación backend Spring Boot
+│   └── api/                 # Aplicación backend Spring Boot y migraciones Flyway
 ├── infra/
 │   └── postgres/init/       # Bootstrap técnico de roles y schema locales
 ├── docs/
@@ -72,7 +72,22 @@ docker compose down
 
 `docker compose down` conserva el volumen. Para reinicializar voluntariamente una base local, usa `docker compose down --volumes`; esta operación elimina los datos locales del volumen.
 
-Durante la primera inicialización, `infra/postgres/init/01-create-rti-database-roles.sh` crea los roles separados `rti_migrator` y `rti_app`, y crea el schema `rti` bajo propiedad del migrador. El rol de runtime recibe únicamente acceso al schema; las migraciones futuras deberán conceder de forma explícita los permisos requeridos sobre cada objeto.
+Durante la primera inicialización, `infra/postgres/init/01-create-rti-database-roles.sh` crea los roles separados `rti_migrator` y `rti_app`, y crea el schema `rti` bajo propiedad del migrador. El rol de runtime recibe permisos DML explícitos sobre las seis tablas iniciales mediante Flyway, pero no puede crear objetos en el schema.
+
+### Modelo inicial de persistencia
+
+La migración de RTI-VS1-005 crea exactamente estas tablas de negocio en `rti`:
+
+- `users`
+- `organizations`
+- `organization_memberships`
+- `membership_roles`
+- `programs`
+- `enrollments`
+
+Los identificadores son UUID; Hibernate genera UUIDv7 antes del `INSERT`. Los estados se almacenan por nombre simbólico y se restringen en PostgreSQL. Las referencias entre módulos se representan en JPA como UUID escalares, mientras que las claves foráneas compuestas aseguran que programas, membresías y enrollments pertenezcan a la misma organización. Las entidades y repositorios son detalles internos de persistencia de los módulos `identity`, `organization`, `program` y `participation`.
+
+No se implementan todavía resolución de tenant, RLS para estas tablas operativas, autenticación, autorización, APIs ni comportamiento de negocio.
 
 ### Iniciar la API contra PostgreSQL local
 
@@ -105,13 +120,11 @@ Set-Location apps/api
 mvn clean verify
 ```
 
-La prueba de integración inicia su propio contenedor efímero `postgres:18` mediante Testcontainers. No usa H2 ni depende del PostgreSQL iniciado por Docker Compose. La prueba comprueba la conexión de Spring Boot, la versión mayor 18, la existencia de `rti`, la migración registrada por Flyway, el modo `ddl-auto=validate` y que no se hayan creado tablas de negocio.
+Las pruebas inician un contenedor efímero `postgres:18` mediante Testcontainers. No usan H2 ni dependen del PostgreSQL iniciado por Docker Compose. Verifican migraciones desde una base vacía, roles separados, permisos de runtime, validación de Hibernate, repositorios, UUIDv7 y restricciones de unicidad, integridad referencial y consistencia entre tenants.
 
 ## Backend API
 
-La API vive en `apps/api`, utiliza Java 21 y Maven, y conserva únicamente el arranque técnico requerido por los tickets de bootstrap.
-
-El único endpoint operativo actual es `GET /actuator/health`. No existen todavía APIs de negocio.
+La API vive en `apps/api`, utiliza Java 21 y Maven. El único endpoint operativo actual es `GET /actuator/health`; no existen todavía APIs de negocio.
 
 ## Documentación y decisiones arquitectónicas
 
@@ -126,7 +139,7 @@ Todas las implementaciones futuras deberán respetar las decisiones aceptadas. C
 Todavía no existen:
 
 - lógica de negocio, servicios, casos de uso o controladores de dominio;
-- entidades, repositorios o tablas de dominio;
+- endpoints REST de negocio;
 - autenticación, autorización o resolución de tenant;
 - infraestructura AWS;
 - pipelines de CI/CD.
