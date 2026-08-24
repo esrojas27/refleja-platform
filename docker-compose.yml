@@ -1,3 +1,24 @@
-# Reserved for local dependencies introduced by future tickets.
-# RTI-VS1-001 intentionally defines no services.
-services: {}
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-refleja_tu_interior}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?Set POSTGRES_SUPERUSER_PASSWORD in .env}
+      RTI_MIGRATOR_PASSWORD: ${RTI_MIGRATOR_PASSWORD:?Set RTI_MIGRATOR_PASSWORD in .env}
+      RTI_APP_PASSWORD: ${RTI_APP_PASSWORD:?Set RTI_APP_PASSWORD in .env}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./infra/postgres/init/01-create-rti-database-roles.sh:/docker-entrypoint-initdb.d/01-create-rti-database-roles.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

@@ -3,11 +3,27 @@ spring:
     name: refleja-tu-interior-api
   autoconfigure:
     exclude:
-      - org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration
-      - org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration
       - org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/refleja_tu_interior}
+    username: ${DB_USERNAME:rti_app}
+    password: ${DB_PASSWORD}
+  flyway:
+    enabled: true
+    url: ${DB_MIGRATION_URL:jdbc:postgresql://localhost:5432/refleja_tu_interior}
+    user: ${DB_MIGRATION_USERNAME:rti_migrator}
+    password: ${DB_MIGRATION_PASSWORD}
+    locations: classpath:db/migration
+    default-schema: rti
+    schemas: rti
+    create-schemas: true
   jpa:
     open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: rti
 
 management:
   endpoints:
