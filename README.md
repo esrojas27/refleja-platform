@@ -2,14 +2,14 @@
 
 Monorepo oficial de la Plataforma Refleja Tu Interior.
 
-Este repositorio fue inicializado para **RTI-VS1-001 — Bootstrap Monorepo**. La aplicación backend fue inicializada posteriormente mediante **RTI-VS1-002 — Bootstrap Spring Boot API**, sin lógica de negocio ni persistencia implementada.
+El repositorio contiene los bootstraps técnicos iniciales del backend y del frontend, sin lógica de negocio ni persistencia implementada.
 
 ## Estructura del repositorio
 
 ```text
 refleja-platform/
 ├── apps/
-│   ├── web/                 # Reservado para la aplicación web
+│   ├── web/                 # Aplicación web Next.js
 │   └── api/                 # Aplicación backend Spring Boot
 ├── infra/                   # Reservado para infraestructura como código
 ├── docs/
@@ -22,6 +22,22 @@ refleja-platform/
 
 Los directorios que continúan reservados contienen únicamente marcadores para que Git conserve la estructura. `docker-compose.yml` no define servicios todavía.
 
+## Frontend web
+
+La aplicación web vive en `apps/web` y utiliza Next.js, React, TypeScript, App Router, Tailwind CSS y shadcn/ui.
+
+```text
+cd apps/web
+npm install
+npm run dev
+npm run lint
+npm test
+npm run build
+npm run test:e2e
+```
+
+RTI-VS1-003 incluye únicamente las rutas `/` y `/login`, más una estructura de layout para contenido autenticado futuro. No implementa autenticación ni dashboard.
+
 ## Backend API
 
 La API vive en `apps/api`, utiliza Java 21 y Maven, y contiene únicamente el arranque técnico requerido por RTI-VS1-002.
@@ -32,7 +48,7 @@ mvn clean verify
 mvn spring-boot:run
 ```
 
-Al ejecutar la aplicación, el único endpoint operativo requerido en este ticket es `GET /actuator/health`.
+Al ejecutar la aplicación, el único endpoint operativo requerido en ese ticket es `GET /actuator/health`.
 
 ## Documentación y decisiones arquitectónicas
 
@@ -46,7 +62,6 @@ Todas las implementaciones futuras deberán respetar las decisiones aceptadas. C
 
 Todavía no existen:
 
-- aplicación frontend inicializada;
 - lógica de negocio, servicios, casos de uso o controladores de dominio;
 - entidades, repositorios, migraciones o esquema de base de datos;
 - autenticación, autorización o resolución de tenant;
