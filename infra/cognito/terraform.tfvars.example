@@ -1,0 +1,10 @@
+aws_region           = "us-east-1"
+cognito_domain_prefix = "replace-with-a-globally-unique-rti-development-prefix"
+
+callback_urls = [
+  "http://localhost:3000/account",
+]
+
+logout_urls = [
+  "http://localhost:3000/login",
+]

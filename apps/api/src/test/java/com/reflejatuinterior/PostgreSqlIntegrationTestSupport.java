@@ -13,6 +13,9 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 @SpringBootTest
 public abstract class PostgreSqlIntegrationTestSupport {
 
+    protected static final String TEST_COGNITO_ISSUER = "https://issuer.example.test";
+    protected static final String TEST_COGNITO_CLIENT_ID = "test-client-id";
+
     private static final String RUNTIME_USERNAME = "rti_app";
     private static final String RUNTIME_PASSWORD = "rti_app_test";
 
@@ -28,13 +31,18 @@ public abstract class PostgreSqlIntegrationTestSupport {
     }
 
     @DynamicPropertySource
-    static void databaseProperties(DynamicPropertyRegistry registry) {
+    static void applicationProperties(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
         registry.add("spring.datasource.username", () -> RUNTIME_USERNAME);
         registry.add("spring.datasource.password", () -> RUNTIME_PASSWORD);
         registry.add("spring.flyway.url", POSTGRES::getJdbcUrl);
         registry.add("spring.flyway.user", POSTGRES::getUsername);
         registry.add("spring.flyway.password", POSTGRES::getPassword);
+        registry.add("app.security.cognito.issuer-uri", () -> TEST_COGNITO_ISSUER);
+        registry.add(
+                "app.security.cognito.jwk-set-uri",
+                () -> TEST_COGNITO_ISSUER + "/.well-known/jwks.json");
+        registry.add("app.security.cognito.app-client-id", () -> TEST_COGNITO_CLIENT_ID);
     }
 
     @Autowired

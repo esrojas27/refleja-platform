@@ -15,6 +15,7 @@ Thumbs.db
 # Logs and test output
 *.log
 coverage/
+.local/
 
 # Frontend build and dependency output
 node_modules/

@@ -15,11 +15,26 @@ test("home page renders responsively", async ({ page }) => {
   ).toBe(true);
 });
 
-test("login route renders without an authentication form", async ({ page }) => {
+test("login route delegates credentials to Cognito", async ({ page }) => {
   await page.goto("/login");
 
   await expect(
     page.getByRole("heading", { level: 1, name: "Iniciar sesión" }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Continuar con Cognito" }),
+  ).toBeVisible();
   await expect(page.locator("form")).toHaveCount(0);
+  await expect(page.getByText(/registr/i)).toHaveCount(0);
+});
+
+test("authenticated route structure renders the minimal account page", async ({
+  page,
+}) => {
+  await page.goto("/account");
+
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Cuenta" }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cerrar sesión" })).toBeVisible();
 });
