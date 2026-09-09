@@ -19,20 +19,24 @@ Este archivo registra el punto de continuación; no reemplaza los tickets ni los
   prueban disponibilidad, no autenticación real. Configuración y comandos en el
   [README raíz](../../README.md#arranque-local-con-un-comando).
 - **008–013:** pendientes; no se implementan como parte de esta publicación.
+- **Primer operador:** mecanismo administrativo implementado y aplicado localmente
+  con aprobación expresa: organización operadora real, membresía activa y rol
+  `CONSULTANT` acotado. [Procedimiento y evidencia](first-operator-bootstrap.md).
 
 ## Antes de comenzar el 008
 
-Revisar y preparar el mecanismo controlado del primer operador de la sección 14
-del backlog. Para aceptar el 007 se creó, con autorización expresa y `sub`
-verificado en Cognito, un usuario interno local `ACTIVE` sin membresías ni roles.
-Ese registro permite consultar su perfil, pero **no autoriza crear organizaciones**
-y no es un bootstrap reproducible del primer operador.
+El mecanismo controlado del primer operador de la sección 14 del backlog ya está
+preparado. Utiliza el usuario interno `ACTIVE` previamente verificado y agrega
+exclusivamente la organización operadora `Refleja Tu Interior`, su membresía activa
+y `CONSULTANT`. No hay registro público, roles en Cognito Groups ni endpoint de
+bootstrap. Una repetición no duplica datos ni restaura permisos revocados.
 
-El mecanismo pendiente debe habilitar al operador de desarrollo de forma explícita
-y limitada, sin registro público, sin usar Cognito Groups como fuente de roles y
-sin introducir una puerta de acceso productiva. El backlog no exige otro ADR para
-este punto; cualquier decisión no cubierta por los ADR debe revisarse antes de
-implementarla. No se ha implementado dicho mecanismo ni iniciado el 008.
+El usuario confirmó visualmente el contexto actualizado en `/account`: organización
+operadora activa y rol `CONSULTANT`, coincidentes con `/me`. El 008 debe implementar
+y probar su política de creación autorizada y la
+membresía administrativa correspondiente. Este bootstrap no concede acceso a otras
+organizaciones ni reemplaza esa política. Cualquier decisión no cubierta por los
+ADR y el ticket requiere revisión antes de implementarla.
 
 El arranque lento de Next.js queda como mejora operativa separada: se observó una
 advertencia de lentitud del sistema de archivos, sin una causa física confirmada.
@@ -85,9 +89,12 @@ El [acta del 007](rti-vs1-007-acceptance.md) registra 38 pruebas backend,
 17 frontend, lint/build y 3 smoke tests de navegador sobre el build de producción,
 además de la aceptación manual con Cognito real. Los fallos de arranque de las
 primeras ejecuciones están documentados, sin desactivar comprobaciones.
-La última repetición backend previa a publicar falló por memoria nativa de la JVM,
-incluso con heap limitado; las 38 pruebas corresponden a la ejecución aprobada
-anterior. Repetir con memoria disponible antes del próximo incremento.
+La repetición backend previa a publicar falló por memoria nativa de la JVM.
+Después, durante el bootstrap del primer operador, `mvn.cmd verify` volvió a
+completar las **38 pruebas sin fallos ni omisiones**, con límites temporales de
+heap y procesadores para esa ejecución; no se modificó la configuración del
+proyecto. Las pruebas y comandos del bootstrap están en su
+[guía operativa](first-operator-bootstrap.md).
 
 ## Evidencia histórica de la publicación inicial del 006 (`d99d033`)
 

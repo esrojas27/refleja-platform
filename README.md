@@ -127,9 +127,12 @@ se aprovisionó un único usuario expresamente autorizado, después de verificar
 `sub` en Cognito: UUIDv7, estado `ACTIVE`, versión inicial `0` y sin membresías ni
 roles. Ese dato local no se distribuye en Git ni en migraciones. En una instalación
 vacía `/me` devolverá `403` hasta provisionar una identidad interna válida.
-Esto **no** resuelve el mecanismo del primer operador autorizado para crear
-organizaciones: es el prerrequisito pendiente antes del 008, documentado en el
-[plan de implementación](docs/architecture/implementation-plan.md).
+Posteriormente se preparó y aplicó localmente el [bootstrap del primer operador](docs/architecture/first-operator-bootstrap.md):
+organización operadora real `Refleja Tu Interior`, membresía `ACTIVE` y rol
+`CONSULTANT` limitado a esa organización. El comando administrativo es explícito,
+simula por defecto y requiere una identidad interna existente y verificada en
+Cognito de desarrollo. No crea usuarios, no concede permisos globales ni implementa
+el flujo de creación de organizaciones del 008.
 
 Contrato, pruebas y límites completos: [acta del 007](docs/architecture/rti-vs1-007-acceptance.md).
 
@@ -246,7 +249,6 @@ Todas las implementaciones futuras deberán respetar las decisiones aceptadas. C
 Todavía no existen:
 
 - flujos de negocio de organizaciones, programas o participación;
-- mecanismo del primer operador autorizado para crear organizaciones;
 - aislamiento RLS del ticket 012 (no sustituye los controles backend exigidos antes);
 - APIs de organizaciones, programas o participación;
 - registro público o administración de usuarios;
