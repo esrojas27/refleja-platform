@@ -3,6 +3,7 @@ package com.reflejatuinterior.identity.api;
 import java.util.UUID;
 
 import com.reflejatuinterior.identity.application.IdentityContextService;
+import com.reflejatuinterior.identity.application.OrganizationCreationPolicy;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
@@ -28,9 +29,11 @@ import org.springframework.web.bind.annotation.RestController;
         bearerFormat = "JWT")
 final class MeController {
     private final IdentityContextService identityContext;
+    private final OrganizationCreationPolicy creationPolicy;
 
-    MeController(IdentityContextService identityContext) {
+    MeController(IdentityContextService identityContext, OrganizationCreationPolicy creationPolicy) {
         this.identityContext = identityContext;
+        this.creationPolicy = creationPolicy;
     }
 
     @GetMapping
@@ -49,8 +52,9 @@ final class MeController {
             @AuthenticationPrincipal Jwt jwt,
             @Parameter(description = "Optional organization UUID; never trusted without active membership")
             @RequestParam(required = false) UUID organizationId) {
+        var principal = identityContext.resolve(jwt.getSubject(), organizationId);
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
                 .header("X-Request-ID", UUID.randomUUID().toString())
-                .body(MeResponse.from(identityContext.resolve(jwt.getSubject(), organizationId)));
+                .body(MeResponse.from(principal, creationPolicy.allows(principal)));
     }
 }

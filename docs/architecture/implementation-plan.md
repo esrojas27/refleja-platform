@@ -18,12 +18,15 @@ Este archivo registra el punto de continuación; no reemplaza los tickets ni los
 - **Entorno local:** `dev.cmd` inicia PostgreSQL, API y web. Sus comprobaciones
   prueban disponibilidad, no autenticación real. Configuración y comandos en el
   [README raíz](../../README.md#arranque-local-con-un-comando).
-- **008–013:** pendientes; no se implementan como parte de esta publicación.
+- **008:** cerrado para desarrollo local. Pruebas automáticas correctas y usuario
+  confirma creación de organización, aparición en su cuenta y selección con
+  CONSULTANT. [Acta y procedimiento](rti-vs1-008-acceptance.md).
+- **009–013:** pendientes; no iniciados.
 - **Primer operador:** mecanismo administrativo implementado y aplicado localmente
   con aprobación expresa: organización operadora real, membresía activa y rol
   `CONSULTANT` acotado. [Procedimiento y evidencia](first-operator-bootstrap.md).
 
-## Antes de comenzar el 008
+## Primer operador y política del 008
 
 El mecanismo controlado del primer operador de la sección 14 del backlog ya está
 preparado. Utiliza el usuario interno `ACTIVE` previamente verificado y agrega
@@ -32,11 +35,11 @@ y `CONSULTANT`. No hay registro público, roles en Cognito Groups ni endpoint de
 bootstrap. Una repetición no duplica datos ni restaura permisos revocados.
 
 El usuario confirmó visualmente el contexto actualizado en `/account`: organización
-operadora activa y rol `CONSULTANT`, coincidentes con `/me`. El 008 debe implementar
-y probar su política de creación autorizada y la
-membresía administrativa correspondiente. Este bootstrap no concede acceso a otras
-organizaciones ni reemplaza esa política. Cualquier decisión no cubierta por los
-ADR y el ticket requiere revisión antes de implementarla.
+operadora activa y rol `CONSULTANT`, coincidentes con `/me`. Después aprobó limitar
+la creación de organizaciones a consultores activos de esa organización operadora
+y asignar al creador una membresía activa con `CONSULTANT` en la nueva organización.
+El 008 aplica esa política usando el UUID configurado en el backend, sin confiar
+en nombres o permisos enviados por el navegador. No habilita acceso a otros tenants.
 
 El arranque lento de Next.js queda como mejora operativa separada: se observó una
 advertencia de lentitud del sistema de archivos, sin una causa física confirmada.
@@ -45,18 +48,19 @@ advertencia de lentitud del sistema de archivos, sin una causa física confirmad
 
 | Orden | Ticket | Resultado esperado |
 | --- | --- | --- |
-| 1 | **008 — Create Organization End-to-End** | Formulario funcional, creación autorizada y organización visible en UI. Requiere el primer operador. |
-| 2 | **009 — Create Program End-to-End** | Crear, listar y consultar programas de una organización autorizada; estado inicial DRAFT. |
-| 3 | **010 — Enroll and Invite Collaborator** | Inscribir e invitar al colaborador; membresía, rol y enrollment según el ticket. |
-| 4 | **011 — Collaborator My Programs** | El colaborador inicia sesión y ve exclusivamente sus programas asignados. |
-| 5 | **012 — Tenant Isolation + RLS Hardening** | RLS en tablas aplicables y pruebas PostgreSQL de aislamiento entre organizaciones. |
-| 6 | **013 — End-to-End Test + CI Gate** | Automatizar el journey completo y su puerta de validación en CI. |
+| 1 | **009 — Create Program End-to-End** | Crear, listar y consultar programas de una organización autorizada; estado inicial DRAFT. |
+| 2 | **010 — Enroll and Invite Collaborator** | Inscribir e invitar al colaborador; membresía, rol y enrollment según el ticket. |
+| 3 | **011 — Collaborator My Programs** | El colaborador inicia sesión y ve exclusivamente sus programas asignados. |
+| 4 | **012 — Tenant Isolation + RLS Hardening** | RLS en tablas aplicables y pruebas PostgreSQL de aislamiento entre organizaciones. |
+| 5 | **013 — End-to-End Test + CI Gate** | Automatizar el journey completo y su puerta de validación en CI. |
 
 ## Distancia al MVP validable
 
 La referencia concreta aprobada es **VS1 / V0.1.0**, no el producto completo.
-La base técnica 001–007 está lista, pero todavía no existe el recorrido empresarial.
-Siete tickets cerrados no equivalen a un porcentaje de avance del producto.
+La base técnica 001–007 está lista. La primera operación empresarial, crear una
+organización (008), está implementada y aceptada manualmente. Todavía
+no existe el recorrido de programas y colaboradores.
+Ocho tickets cerrados no equivalen a un porcentaje de avance del producto.
 
 - **Después del 008:** primera operación visible de negocio, crear una organización.
 - **Después del 009:** demostración del flujo organización → programa.

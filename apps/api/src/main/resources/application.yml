@@ -27,6 +27,7 @@ spring:
 
 app:
   security:
+    operator-organization-id: ${OPERATOR_ORGANIZATION_ID:}
     cognito:
       issuer-uri: ${COGNITO_ISSUER_URI}
       jwk-set-uri: ${COGNITO_JWK_SET_URI}

@@ -291,6 +291,7 @@ async function main() {
       DB_MIGRATION_URL: dbUrl, DB_MIGRATION_USERNAME: 'rti_migrator', DB_MIGRATION_PASSWORD: backend.RTI_MIGRATOR_PASSWORD,
       COGNITO_ISSUER_URI: backend.COGNITO_ISSUER_URI, COGNITO_JWK_SET_URI: backend.COGNITO_JWK_SET_URI,
       COGNITO_APP_CLIENT_ID: backend.COGNITO_APP_CLIENT_ID, CORS_ALLOWED_ORIGINS: auth.origin,
+      OPERATOR_ORGANIZATION_ID: backend.OPERATOR_ORGANIZATION_ID || '',
       SERVER_ADDRESS: '127.0.0.1', SERVER_PORT: String(apiPort) };
     const api = launch(...packageCommand('mvn', ['spring-boot:run']), { cwd: path.join(root, 'apps', 'api'), env: apiEnv, log: path.join(logDir, 'api.log') });
     await waitFor('API /actuator/health', () => httpReady(`${apiOrigin}/actuator/health`, 200, true), startupSeconds * 1000, api);

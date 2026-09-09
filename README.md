@@ -2,7 +2,7 @@
 
 Monorepo oficial de la Plataforma Refleja Tu Interior.
 
-El repositorio contiene la base técnica inicial (001–005), la autenticación de desarrollo con Amazon Cognito (006) y el contexto de usuario interno, organizaciones y roles de PostgreSQL (007). Todavía no existen flujos de creación de organizaciones, programas ni inscripción de colaboradores.
+El repositorio contiene la base técnica inicial (001–005), la autenticación de desarrollo con Amazon Cognito (006), el contexto interno de usuario y roles (007) y la creación de organizaciones (008, validado automática y manualmente para desarrollo local). Todavía no existen flujos de programas ni inscripción de colaboradores.
 
 ## Estructura del repositorio
 
@@ -136,6 +136,27 @@ el flujo de creación de organizaciones del 008.
 
 Contrato, pruebas y límites completos: [acta del 007](docs/architecture/rti-vs1-007-acceptance.md).
 
+## Crear una organización (008)
+
+Configura en el `.env` raíz `OPERATOR_ORGANIZATION_ID` con el UUID de la organización
+operadora real verificado al terminar el bootstrap. No uses su nombre ni el UUID
+de una empresa cliente. Sin ese valor, el backend deniega la creación; un UUID
+malformado impide arrancar. Es configuración administrativa del backend, no un
+rol global ni un valor confiado al navegador.
+
+Reinicia `dev.cmd`, inicia sesión y pulsa **Comprobar sesión** en `/account`.
+Un usuario activo con membresía activa y `CONSULTANT` en la organización operadora
+verá **Crear organización**, que abre `/organizations/new`. El formulario solicita
+nombre y zona horaria IANA. La API crea en una transacción la organización
+`ACTIVE`, la membresía activa del creador y su rol `CONSULTANT`; devuelve
+`201`, UUIDv7 y versión inicial `0`. La organización aparece en el resultado
+y en `/me` al volver a consultar la cuenta.
+
+`canCreateOrganizations` en `/me` orienta la UI; el POST vuelve a autorizar desde
+PostgreSQL. No altera los roles del tenant seleccionado ni concede acceso a
+organizaciones ajenas. La política aprobada, matriz de permisos, verificaciones
+y pasos de aceptación están en el [acta del 008](docs/architecture/rti-vs1-008-acceptance.md).
+
 ## Persistencia local
 
 RTI-VS1-004 utiliza la imagen oficial `postgres:18` mediante Docker Compose. El entorno es exclusivamente de desarrollo y conserva los datos en el volumen nombrado `postgres_data`; ese volumen no forma parte del repositorio.
@@ -221,7 +242,7 @@ Invoke-RestMethod http://localhost:8080/actuator/health
 Invoke-WebRequest http://localhost:8080/api/v1/me -SkipHttpErrorCheck
 ```
 
-El health check es público y `/api/v1/me` responde `401` sin un Access Token válido. Las demás rutas se deniegan por defecto. Spring Boot ejecuta Flyway al iniciar. Hibernate usa `ddl-auto=validate` y `spring.jpa.open-in-view` permanece deshabilitado.
+El health check es público y `/api/v1/me` responde `401` sin un Access Token válido. El POST de organizaciones también requiere autenticación y su política específica. Las rutas no habilitadas explícitamente se deniegan por defecto. Spring Boot ejecuta Flyway al iniciar. Hibernate usa `ddl-auto=validate` y `spring.jpa.open-in-view` permanece deshabilitado.
 
 ### Pruebas de integración
 
@@ -234,7 +255,7 @@ Las pruebas inician un contenedor efímero `postgres:18` mediante Testcontainers
 
 ## Backend API
 
-La API vive en `apps/api`, utiliza Java 21 y Maven. Sus endpoints operativos actuales son `GET /actuator/health` y `GET /api/v1/me`; este último devuelve el perfil y contexto interno autorizado. La resolución usa un modelo de lectura JDBC permitido por ADR-004. Cada módulo consulta sus propias tablas y `identity` obtiene nombres/estados de organizaciones mediante la API pública `OrganizationDirectory`, sin acceder a su infraestructura.
+La API vive en `apps/api`, utiliza Java 21 y Maven. Sus endpoints actuales son `GET /actuator/health`, `GET /api/v1/me` y `POST /api/v1/organizations`. La resolución de contexto usa un modelo de lectura JDBC permitido por ADR-004; las escrituras de organizaciones y membresías utilizan JPA. Cada módulo accede a sus propias tablas. `identity` orquesta la creación y concesión de acceso mediante la API pública `OrganizationRegistration`, conservando la dirección de dependencia hacia `organization`.
 
 ## Documentación y decisiones arquitectónicas
 
@@ -248,9 +269,9 @@ Todas las implementaciones futuras deberán respetar las decisiones aceptadas. C
 
 Todavía no existen:
 
-- flujos de negocio de organizaciones, programas o participación;
+- flujos de programas o participación, ni edición o administración general de organizaciones;
 - aislamiento RLS del ticket 012 (no sustituye los controles backend exigidos antes);
-- APIs de organizaciones, programas o participación;
+- APIs de programas o participación;
 - registro público o administración de usuarios;
 - infraestructura AWS distinta del Cognito de desarrollo de RTI-VS1-006;
 - pipelines de CI/CD.

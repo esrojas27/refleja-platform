@@ -6,6 +6,7 @@ export type CurrentIdentity = {
   organizations: { id: string; name: string; roles: string[] }[];
   activeOrganizationId: string | null;
   roles: string[];
+  canCreateOrganizations?: boolean;
 };
 
 export class IdentityRequestError extends Error {

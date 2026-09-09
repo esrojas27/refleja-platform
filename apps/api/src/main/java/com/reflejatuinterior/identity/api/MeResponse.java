@@ -7,14 +7,15 @@ import java.util.UUID;
 import com.reflejatuinterior.identity.domain.AuthenticatedPrincipal;
 
 public record MeResponse(String cognitoSubject, UserResponse user,
-                         List<OrganizationResponse> organizations, UUID activeOrganizationId, Set<String> roles) {
-    static MeResponse from(AuthenticatedPrincipal principal) {
+                         List<OrganizationResponse> organizations, UUID activeOrganizationId, Set<String> roles,
+                         boolean canCreateOrganizations) {
+    static MeResponse from(AuthenticatedPrincipal principal, boolean canCreateOrganizations) {
         var user = principal.user();
         return new MeResponse(principal.cognitoSubject(),
                 new UserResponse(user.id(), user.email(), user.firstName(), user.lastName()),
                 principal.organizations().stream().map(org ->
                         new OrganizationResponse(org.id(), org.name(), org.roles())).toList(),
-                principal.activeOrganizationId(), principal.roles());
+                principal.activeOrganizationId(), principal.roles(), canCreateOrganizations);
     }
 
     public record UserResponse(UUID id, String email, String firstName, String lastName) {
