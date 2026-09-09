@@ -2,7 +2,7 @@
 
 Monorepo oficial de la Plataforma Refleja Tu Interior.
 
-El repositorio contiene los bootstraps técnicos iniciales del backend, el frontend y el entorno local de persistencia. RTI-VS1-005 añadió el modelo inicial de persistencia; RTI-VS1-006 añade exclusivamente la autenticación de desarrollo con Amazon Cognito, sin autorización de negocio ni resolución de tenant.
+El repositorio contiene la base técnica inicial (001–005), la autenticación de desarrollo con Amazon Cognito (006) y el contexto de usuario interno, organizaciones y roles de PostgreSQL (007). Todavía no existen flujos de creación de organizaciones, programas ni inscripción de colaboradores.
 
 ## Estructura del repositorio
 
@@ -16,7 +16,7 @@ refleja-platform/
 │   └── postgres/init/       # Bootstrap técnico de roles y schema locales
 ├── docs/
 │   ├── adr/                 # Índice de decisiones arquitectónicas
-│   └── architecture/        # Documentación de arquitectura futura
+│   └── architecture/        # Plan incremental y actas de aceptación
 ├── docker-compose.yml       # PostgreSQL local para desarrollo
 ├── .env.example             # Variables locales de ejemplo, sin secretos reales
 ├── .gitignore
@@ -91,7 +91,7 @@ npm run build
 npm run test:e2e
 ```
 
-Las rutas `/`, `/login` y `/account` son intencionalmente mínimas. `/login` inicia Authorization Code + PKCE y `/account` permite comprobar la sesión y cerrarla. No existe registro público, dashboard, autorización de negocio ni resolución de tenant. La ruta agrupada del frontend es una estructura de UX, no una frontera de seguridad.
+Las rutas `/`, `/login` y `/account` son intencionalmente mínimas. `/login` inicia Authorization Code + PKCE y `/account` permite consultar el perfil interno, seleccionar una organización disponible y cerrar la sesión. Los roles mostrados proceden del backend; no habilitan operaciones de negocio todavía inexistentes. No hay registro público ni dashboard. La ruta agrupada del frontend es una estructura de UX, no una frontera de seguridad.
 
 ## Autenticación de desarrollo
 
@@ -103,13 +103,46 @@ El flujo implementado es:
 2. Cognito vuelve a `/account`; la aplicación nunca recibe una contraseña.
 3. El frontend obtiene el Access Token de la sesión y lo envía como Bearer token.
 4. Spring Security valida la firma RS256, el emisor, la vigencia, `token_use=access`, `client_id` y `sub`.
-5. `GET /api/v1/me` devuelve únicamente `cognitoSubject`; no aprovisiona usuarios ni consulta membresías.
+5. `GET /api/v1/me` resuelve `sub` a un usuario interno `ACTIVE` y consulta sus membresías y roles en PostgreSQL; no aprovisiona usuarios automáticamente.
 
 Después de aplicar Terraform, copia sus salidas no secretas a las variables Cognito documentadas en `.env.example`. El Access Token —no el ID token— es el artefacto aceptado por la API. No registres tokens, códigos OAuth ni credenciales.
+
+### Contexto de usuario y organizaciones (007)
+
+`GET /api/v1/me` conserva `cognitoSubject` y agrega `user` (`id`, `email`,
+`firstName`, `lastName`), `organizations` (`id`, `name`, `roles`),
+`activeOrganizationId` y los `roles` de esa organización activa.
+
+- Sin token válido: `401`. Sin usuario interno o con estado distinto de `ACTIVE`: `403`.
+- Usuario activo sin organizaciones: `200`, lista vacía, organización activa nula y ningún rol.
+- Sólo se ofrecen organizaciones `ACTIVE` con membresía `ACTIVE` del usuario.
+- Una organización disponible se selecciona automáticamente; con varias, se elige
+  mediante `GET /api/v1/me?organizationId=<uuid>`, validado de nuevo por el backend.
+- Organización ajena, inactiva o no disponible: `404`; identificador inválido: `400`.
+- No se suman roles entre organizaciones ni se persiste la selección. Cada consulta
+  relee los permisos; Cognito Groups y el navegador no son fuentes de autorización.
+
+Un login correcto en Cognito no crea la fila de `rti.users`. Para la aceptación local
+se aprovisionó un único usuario expresamente autorizado, después de verificar su
+`sub` en Cognito: UUIDv7, estado `ACTIVE`, versión inicial `0` y sin membresías ni
+roles. Ese dato local no se distribuye en Git ni en migraciones. En una instalación
+vacía `/me` devolverá `403` hasta provisionar una identidad interna válida.
+Esto **no** resuelve el mecanismo del primer operador autorizado para crear
+organizaciones: es el prerrequisito pendiente antes del 008, documentado en el
+[plan de implementación](docs/architecture/implementation-plan.md).
+
+Contrato, pruebas y límites completos: [acta del 007](docs/architecture/rti-vs1-007-acceptance.md).
 
 ## Persistencia local
 
 RTI-VS1-004 utiliza la imagen oficial `postgres:18` mediante Docker Compose. El entorno es exclusivamente de desarrollo y conserva los datos en el volumen nombrado `postgres_data`; ese volumen no forma parte del repositorio.
+
+Para consultar desde un cliente gráfico, usa host `localhost`, el puerto devuelto
+por `docker compose port postgres 5432` (en la validación local: `55432`), base
+`refleja_tu_interior`, usuario `rti_app` y el valor local de `RTI_APP_PASSWORD`.
+Las tablas están en el esquema `rti`. Este usuario tiene permisos de escritura:
+consultar datos no requiere editarlos. Cambiar `.env` no cambia la contraseña de
+un rol ya inicializado; no elimines el volumen para resolver errores de conexión.
 
 ### Prerrequisitos
 
@@ -156,7 +189,8 @@ La migración de RTI-VS1-005 crea exactamente estas tablas de negocio en `rti`:
 
 Los identificadores son UUID; Hibernate genera UUIDv7 antes del `INSERT`. Los estados se almacenan por nombre simbólico y se restringen en PostgreSQL. Las referencias entre módulos se representan en JPA como UUID escalares, mientras que las claves foráneas compuestas aseguran que programas, membresías y enrollments pertenezcan a la misma organización. Las entidades y repositorios son detalles internos de persistencia de los módulos `identity`, `organization`, `program` y `participation`.
 
-RTI-VS1-006 no modifica este esquema, no agrega migraciones y no aprovisiona filas de usuario.
+RTI-VS1-006 y 007 no modifican este esquema ni agregan migraciones. El aprovisionamiento
+manual autorizado para la aceptación del 007 es una operación local, no lógica de registro.
 
 ### Iniciar la API contra PostgreSQL local
 
@@ -197,7 +231,7 @@ Las pruebas inician un contenedor efímero `postgres:18` mediante Testcontainers
 
 ## Backend API
 
-La API vive en `apps/api`, utiliza Java 21 y Maven. Sus endpoints operativos actuales son `GET /actuator/health` y `GET /api/v1/me`; este último expone sólo el identificador externo autenticado y no contiene lógica de negocio.
+La API vive en `apps/api`, utiliza Java 21 y Maven. Sus endpoints operativos actuales son `GET /actuator/health` y `GET /api/v1/me`; este último devuelve el perfil y contexto interno autorizado. La resolución usa un modelo de lectura JDBC permitido por ADR-004. Cada módulo consulta sus propias tablas y `identity` obtiene nombres/estados de organizaciones mediante la API pública `OrganizationDirectory`, sin acceder a su infraestructura.
 
 ## Documentación y decisiones arquitectónicas
 
@@ -211,9 +245,12 @@ Todas las implementaciones futuras deberán respetar las decisiones aceptadas. C
 
 Todavía no existen:
 
-- lógica de negocio, servicios o casos de uso de producto;
-- autorización por roles o membresías y resolución de tenant;
+- flujos de negocio de organizaciones, programas o participación;
+- mecanismo del primer operador autorizado para crear organizaciones;
+- aislamiento RLS del ticket 012 (no sustituye los controles backend exigidos antes);
 - APIs de organizaciones, programas o participación;
 - registro público o administración de usuarios;
 - infraestructura AWS distinta del Cognito de desarrollo de RTI-VS1-006;
 - pipelines de CI/CD.
+
+Estado y próximos hitos: [plan de implementación](docs/architecture/implementation-plan.md).

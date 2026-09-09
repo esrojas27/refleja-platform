@@ -2,6 +2,7 @@ package com.reflejatuinterior.identity.infrastructure.security;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -34,8 +35,10 @@ import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 
 @AutoConfigureMockMvc
+@Transactional
 @Import(CognitoAuthenticationIntegrationTests.JwtTestConfiguration.class)
 class CognitoAuthenticationIntegrationTests extends PostgreSqlIntegrationTestSupport {
 
@@ -50,14 +53,29 @@ class CognitoAuthenticationIntegrationTests extends PostgreSqlIntegrationTestSup
     @Test
     void rejectsAMissingAccessToken() throws Exception {
         mockMvc.perform(get("/api/v1/me"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, "Bearer"))
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"))
+                .andExpect(jsonPath("$.requestId").isNotEmpty());
     }
 
     @Test
     void rejectsAMalformedAccessToken() throws Exception {
         mockMvc.perform(get("/api/v1/me")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer not-a-jwt"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, "Bearer error=\"invalid_token\""))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"))
+                .andExpect(jsonPath("$.message").value("Authentication is required or the access token is invalid."))
+                .andExpect(jsonPath("$.requestId").isNotEmpty())
+                .andExpect(result -> {
+                    String requestId = result.getResponse().getHeader("X-Request-ID");
+                    org.junit.jupiter.api.Assertions.assertNotNull(requestId);
+                    java.util.UUID.fromString(requestId);
+                    org.junit.jupiter.api.Assertions.assertTrue(
+                            result.getResponse().getContentAsString().contains(requestId));
+                });
     }
 
     @Test
@@ -66,7 +84,55 @@ class CognitoAuthenticationIntegrationTests extends PostgreSqlIntegrationTestSup
 
         mockMvc.perform(get("/api/v1/me")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE, "Bearer error=\"invalid_token\""))
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"))
+                .andExpect(jsonPath("$.message").value("Authentication is required or the access token is invalid."));
+    }
+
+    @Test
+    void rejectsAnAccessTokenFromAnotherIssuer() throws Exception {
+        String token = signedToken(jwtEncoder, "https://other-issuer.example.test");
+        mockMvc.perform(get("/api/v1/me")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void rejectsAnAccessTokenSignedWithAnotherKey() throws Exception {
+        String token = signedToken(encoderFor(createKeyPair()), TEST_COGNITO_ISSUER);
+        mockMvc.perform(get("/api/v1/me")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void deniesUnlistedRoutesEvenWithAValidAccessToken() throws Exception {
+        String token = token("access", TEST_COGNITO_CLIENT_ID, "known-subject", 0, 300);
+        mockMvc.perform(get("/api/v1/not-enabled")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"))
+                .andExpect(jsonPath("$.message").value("Access is denied."))
+                .andExpect(jsonPath("$.requestId").isNotEmpty());
+    }
+
+    private String signedToken(JwtEncoder encoder, String issuer) {
+        Instant now = Instant.now();
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+                .issuer(issuer).subject("test-subject")
+                .issuedAt(now).expiresAt(now.plusSeconds(300))
+                .claim("token_use", "access").claim("client_id", TEST_COGNITO_CLIENT_ID)
+                .build();
+        return encoder.encode(JwtEncoderParameters.from(
+                JwsHeader.with(SignatureAlgorithm.RS256).build(), claims)).getTokenValue();
+    }
+
+    private static JwtEncoder encoderFor(KeyPair keyPair) {
+        RSAKey rsaKey = new RSAKey.Builder((RSAPublicKey) keyPair.getPublic())
+                .privateKey((RSAPrivateKey) keyPair.getPrivate())
+                .keyID("test-key").build();
+        return new NimbusJwtEncoder(new ImmutableJWKSet<SecurityContext>(new JWKSet(rsaKey)));
     }
 
     @Test
@@ -97,7 +163,10 @@ class CognitoAuthenticationIntegrationTests extends PostgreSqlIntegrationTestSup
     }
 
     @Test
-    void returnsOnlyTheCanonicalCognitoSubjectForAValidAccessToken() throws Exception {
+    void returnsTheCanonicalCognitoSubjectAndTheInternalUserForAValidAccessToken() throws Exception {
+        var userId = uuid7(700);
+        insertUser(userId);
+        jdbcTemplate.update("update rti.users set cognito_subject = ? where id = ?", "cognito-subject-123", userId);
         String token = token("access", TEST_COGNITO_CLIENT_ID, "cognito-subject-123", 0, 300);
 
         mockMvc.perform(get("/api/v1/me")
@@ -105,8 +174,10 @@ class CognitoAuthenticationIntegrationTests extends PostgreSqlIntegrationTestSup
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.cognitoSubject").value("cognito-subject-123"))
-                .andExpect(jsonPath("$.*").isArray())
-                .andExpect(jsonPath("$.*").value(org.hamcrest.Matchers.hasSize(1)));
+                .andExpect(jsonPath("$.user.id").value(userId.toString()))
+                .andExpect(jsonPath("$.organizations").isEmpty())
+                .andExpect(jsonPath("$.roles").isEmpty())
+                .andExpect(jsonPath("$.activeOrganizationId").value(org.hamcrest.Matchers.nullValue()));
     }
 
     @Test

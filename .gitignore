@@ -27,6 +27,8 @@ dist/
 target/
 
 # Terraform local state and cache
+*.tfvars
+*.tfvars.json
 .terraform/
 *.tfstate
 *.tfstate.*
