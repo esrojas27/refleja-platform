@@ -103,6 +103,10 @@ class ProgramJpaEntity {
         return startDate;
     }
 
+    String name() { return name; }
+    String description() { return description; }
+    LocalDate endDate() { return endDate; }
+
     long version() {
         return version;
     }

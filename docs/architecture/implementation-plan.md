@@ -21,7 +21,11 @@ Este archivo registra el punto de continuación; no reemplaza los tickets ni los
 - **008:** cerrado para desarrollo local. Pruebas automáticas correctas y usuario
   confirma creación de organización, aparición en su cuenta y selección con
   CONSULTANT. [Acta y procedimiento](rti-vs1-008-acceptance.md).
-- **009–013:** pendientes; no iniciados.
+- **009:** cerrado para desarrollo local. Creación, listado paginado y detalle de
+  programas verificados automáticamente; el usuario confirmó el recorrido manual.
+  [Contrato y procedimiento](rti-vs1-009-acceptance.md). El 008 quedó separado en
+  el commit `b45e0aa`, sin push, con worktree limpio antes de iniciar el 009.
+- **010–013:** pendientes; no iniciados.
 - **Primer operador:** mecanismo administrativo implementado y aplicado localmente
   con aprobación expresa: organización operadora real, membresía activa y rol
   `CONSULTANT` acotado. [Procedimiento y evidencia](first-operator-bootstrap.md).
@@ -48,19 +52,19 @@ advertencia de lentitud del sistema de archivos, sin una causa física confirmad
 
 | Orden | Ticket | Resultado esperado |
 | --- | --- | --- |
-| 1 | **009 — Create Program End-to-End** | Crear, listar y consultar programas de una organización autorizada; estado inicial DRAFT. |
-| 2 | **010 — Enroll and Invite Collaborator** | Inscribir e invitar al colaborador; membresía, rol y enrollment según el ticket. |
-| 3 | **011 — Collaborator My Programs** | El colaborador inicia sesión y ve exclusivamente sus programas asignados. |
-| 4 | **012 — Tenant Isolation + RLS Hardening** | RLS en tablas aplicables y pruebas PostgreSQL de aislamiento entre organizaciones. |
-| 5 | **013 — End-to-End Test + CI Gate** | Automatizar el journey completo y su puerta de validación en CI. |
+| 1 | **010 — Enroll and Invite Collaborator** | Inscribir e invitar al colaborador; membresía, rol y enrollment según el ticket. |
+| 2 | **011 — Collaborator My Programs** | El colaborador inicia sesión y ve exclusivamente sus programas asignados. |
+| 3 | **012 — Tenant Isolation + RLS Hardening** | RLS en tablas aplicables y pruebas PostgreSQL de aislamiento entre organizaciones. |
+| 4 | **013 — End-to-End Test + CI Gate** | Automatizar el journey completo y su puerta de validación en CI. |
 
 ## Distancia al MVP validable
 
 La referencia concreta aprobada es **VS1 / V0.1.0**, no el producto completo.
 La base técnica 001–007 está lista. La primera operación empresarial, crear una
-organización (008), está implementada y aceptada manualmente. Todavía
-no existe el recorrido de programas y colaboradores.
-Ocho tickets cerrados no equivalen a un porcentaje de avance del producto.
+organización (008), está implementada y aceptada manualmente. El recorrido
+de programas (009) está implementado y aceptado manualmente;
+el recorrido de colaboradores sigue pendiente.
+Nueve tickets cerrados no equivalen a un porcentaje de avance del producto.
 
 - **Después del 008:** primera operación visible de negocio, crear una organización.
 - **Después del 009:** demostración del flujo organización → programa.
@@ -88,6 +92,12 @@ criterios de aceptación. No posponer al 012 las garantías de seguridad exigida
 por los ADR para cada funcionalidad anterior.
 
 ## Evidencia de cierre actual
+
+El [acta del 009](rti-vs1-009-acceptance.md) registra 113 pruebas backend,
+47 frontend, 13 de scripts y 7 smoke tests Playwright correctos, además de lint,
+build y arranque. El usuario confirmó la validación manual del flujo de programas.
+El cierre del 009 se conserva en un commit independiente; el usuario autorizó
+su publicación junto con los commits locales previos antes de comenzar el 010.
 
 El [acta del 007](rti-vs1-007-acceptance.md) registra 38 pruebas backend,
 17 frontend, lint/build y 3 smoke tests de navegador sobre el build de producción,

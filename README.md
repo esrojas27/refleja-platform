@@ -2,7 +2,7 @@
 
 Monorepo oficial de la Plataforma Refleja Tu Interior.
 
-El repositorio contiene la base técnica inicial (001–005), la autenticación de desarrollo con Amazon Cognito (006), el contexto interno de usuario y roles (007) y la creación de organizaciones (008, validado automática y manualmente para desarrollo local). Todavía no existen flujos de programas ni inscripción de colaboradores.
+El repositorio contiene la base técnica inicial (001–005), autenticación con Cognito (006), contexto interno y roles (007), creación de organizaciones (008) y creación/listado/detalle de programas (009). Los incrementos 008 y 009 están verificados automática y manualmente para desarrollo local. Todavía no hay inscripción de colaboradores.
 
 ## Estructura del repositorio
 
@@ -78,6 +78,23 @@ de `.env` después de inicializar el volumen, debes sincronizar los roles existe
 el script no reinicializa ni elimina la base para resolver ese error.
 
 ## Frontend web
+
+### Programas — RTI-VS1-009
+
+En Cuenta, comprueba tu sesión y selecciona una organización. **Ver programas**
+abre su listado; **Crear programa** está disponible para CONSULTANT en esa
+organización. Introduce nombre, descripción opcional y fechas de inicio/fin.
+El programa se guarda como `DRAFT`; puedes volver al listado y abrir su detalle.
+No hay activación, edición, participantes ni dashboards en este incremento.
+
+API: `POST` y `GET /api/v1/organizations/{organizationId}/programs`, y
+`GET /api/v1/organizations/{organizationId}/programs/{programId}`. El listado
+usa `page=0&size=20`, máximo 100, y orden fijo por UUID descendente. El backend
+valida membresía, estado y roles en cada solicitud. Un UUID conocido no concede
+acceso; los recursos cross-tenant responden 404. No se necesitan variables,
+dependencias ni migraciones nuevas. [Contrato, pruebas y validación manual](docs/architecture/rti-vs1-009-acceptance.md).
+
+### Desarrollo y comprobaciones
 
 La aplicación web vive en `apps/web` y utiliza Next.js, React, TypeScript, App Router, Tailwind CSS y shadcn/ui. Amplify Auth actúa únicamente como cliente de Cognito.
 
