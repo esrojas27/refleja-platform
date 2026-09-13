@@ -26,7 +26,7 @@ async function cognitoLogin(page: Page, email: string, password: string) {
   // label lookup can remain bound to the hidden copy. Its field names are stable.
   await page.locator('input[name="username"]:visible').fill(email);
   await page.locator('input[name="password"]:visible').fill(password);
-  await page.getByRole("button", { name: /sign in/i }).click();
+  await page.locator('[name="signInSubmitButton"]:visible').click({ timeout: 15_000 });
   await page.waitForURL((url) => url.hostname === "localhost" && url.pathname === "/account", { timeout: 60_000 });
   await expect(page).toHaveURL((url) => !url.searchParams.has("code") && !url.searchParams.has("state"));
   await expect(page.getByRole("heading", { level: 1, name: "Cuenta" })).toBeVisible();
