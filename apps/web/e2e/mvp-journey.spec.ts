@@ -98,7 +98,7 @@ test.describe("@mvp RTI-VS1-013 authenticated vertical slice", () => {
     await page.waitForURL((url) => url.hostname === "localhost" && url.pathname === "/login", { timeout: 60_000 });
 
     await cognitoLogin(page, collaboratorEmail, collaboratorPassword);
-    await page.getByRole("link", { name: "Invitaciones" }).click();
+    await page.getByRole("main").getByRole("link", { name: "Invitaciones" }).click();
     const invitation = page.getByRole("listitem").filter({ hasText: programName });
     await expect(invitation).toContainText(organizationName);
     await invitation.getByRole("button", { name: "Aceptar invitación" }).click();
@@ -108,7 +108,7 @@ test.describe("@mvp RTI-VS1-013 authenticated vertical slice", () => {
     await page.getByRole("button", { name: "Comprobar sesión" }).click();
     await expect(page.getByText("Sesión autenticada.")).toBeVisible();
     await expect(page.getByText("Roles activos: COLLABORATOR")).toBeVisible();
-    await page.getByRole("link", { name: "Mis programas" }).click();
+    await page.getByRole("main").getByRole("link", { name: "Mis programas" }).click();
     await expect(page.getByRole("link", { name: programName })).toBeVisible();
     await expect(page.getByText(organizationName, { exact: true })).toBeVisible();
     await page.getByRole("link", { name: programName }).click();
