@@ -17,10 +17,16 @@ function credential(name: (typeof credentialNames)[number]) {
 async function cognitoLogin(page: Page, email: string, password: string) {
   await page.goto("/login");
   await page.getByRole("button", { name: "Continuar con Cognito" }).click();
-  await page.waitForURL((url) => url.hostname.endsWith(".amazoncognito.com"));
-  await page.getByLabel(/^Email$/i).fill(email);
-  await page.getByLabel(/^Password$/i).fill(password);
-  await page.getByRole("button", { name: /sign in/i }).click();
+  await page.waitForURL(
+    (url) => url.hostname.endsWith(".amazoncognito.com") && url.pathname === "/login",
+    { timeout: 60_000 },
+  );
+
+  // Cognito renders hidden and visible copies of the managed login form.
+  // Targeting the visible controls avoids waiting on the hidden duplicate.
+  await page.getByLabel(/^Email$/i).filter({ visible: true }).fill(email);
+  await page.getByLabel(/^Password$/i).filter({ visible: true }).fill(password);
+  await page.getByRole("button", { name: /sign in/i }).filter({ visible: true }).click();
   await page.waitForURL((url) => url.hostname === "localhost" && url.pathname === "/account", { timeout: 60_000 });
   await expect(page).toHaveURL((url) => !url.searchParams.has("code") && !url.searchParams.has("state"));
   await expect(page.getByRole("heading", { level: 1, name: "Cuenta" })).toBeVisible();
@@ -64,7 +70,8 @@ test.describe("@mvp RTI-VS1-013 authenticated vertical slice", () => {
     await page.getByRole("link", { name: "Volver a Cuenta" }).click();
     await page.getByRole("button", { name: "Comprobar sesión" }).click();
     await expect(page.getByText("Sesión autenticada.")).toBeVisible();
-    await page.getByLabel("Organización activa").selectOption({ label: organizationName });
+    await page.getByRole("combobox", { name: "Organización activa" }).click();
+    await page.getByRole("option", { name: organizationName, exact: true }).click();
     await expect(page.getByText("Roles activos: CONSULTANT")).toBeVisible();
     await page.getByRole("link", { name: "Ver programas" }).click();
 
