@@ -71,8 +71,12 @@ El rol debe llamarse `refleja-tu-interior-github-actions`, obtenerse mediante el
 proveedor OIDC de GitHub y limitar su confianza a:
 
 ```text
-repo:esrojas27/refleja-platform:environment:mvp-e2e
+repo:esrojas27@62344298/refleja-platform@1344197039:environment:mvp-e2e
 ```
+
+El repositorio usa el formato de sujeto inmutable de GitHub; la política IAM no
+debe utilizar el formato heredado basado únicamente en nombres. La audiencia se
+limita a `sts.amazonaws.com`.
 
 Permisos mínimos de la sesión: `cognito-idp:AdminGetUser` sobre el User Pool de
 desarrollo y `ses:SendEmail` desde la identidad SES aprobada. No se requieren

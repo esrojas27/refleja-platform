@@ -30,6 +30,12 @@ test('accepts one coherent development configuration without returning credentia
   assert.equal('RTI_E2E_CONSULTANT_PASSWORD' in result, false);
 });
 
+test('accepts the UUID text shape Cognito uses without imposing RFC variant bits', () => {
+  const environment = valid();
+  environment.RTI_E2E_CONSULTANT_SUBJECT = 'aaaaaaaa-bbbb-cccc-1ddd-eeeeeeeeeeee';
+  assert.doesNotThrow(() => validateMvpE2eEnvironment(environment));
+});
+
 test('reports every missing variable by name without exposing configured values', () => {
   const environment = valid();
   delete environment.RTI_E2E_CONSULTANT_PASSWORD;

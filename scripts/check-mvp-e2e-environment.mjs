@@ -17,7 +17,9 @@ export const requiredVariables = [
 ];
 
 const email = /^[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+$/;
-const subject = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+// Validate the canonical UUID text shape used by Cognito without imposing UUID
+// version or variant semantics on an identifier that consumers treat as opaque.
+const subject = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function validateMvpE2eEnvironment(environment) {
   const missing = requiredVariables.filter(name => !environment[name]?.trim());
@@ -29,8 +31,10 @@ export function validateMvpE2eEnvironment(environment) {
   const role = environment.RTI_E2E_AWS_ROLE_ARN;
   const domain = environment.RTI_E2E_COGNITO_DOMAIN;
   const client = environment.RTI_E2E_COGNITO_APP_CLIENT_ID;
-  const consultant = environment.RTI_E2E_CONSULTANT_EMAIL.toLowerCase();
-  const collaborator = environment.RTI_E2E_COLLABORATOR_EMAIL.toLowerCase();
+  const consultantSubject = environment.RTI_E2E_CONSULTANT_SUBJECT.trim();
+  const consultant = environment.RTI_E2E_CONSULTANT_EMAIL.trim().toLowerCase();
+  const collaborator = environment.RTI_E2E_COLLABORATOR_EMAIL.trim().toLowerCase();
+  const sender = environment.RTI_E2E_SES_FROM.trim().toLowerCase();
 
   if (!/^\d{12}$/.test(account) ||
       role !== `arn:aws:iam::${account}:role/refleja-tu-interior-github-actions` ||
@@ -40,8 +44,10 @@ export function validateMvpE2eEnvironment(environment) {
       !new RegExp(`^[a-z0-9-]+\\.auth\\.${region.replaceAll('-', '\\-')}\\.amazoncognito\\.com$`).test(domain)) {
     throw new Error('La cuenta, el rol OIDC o la configuración pública de Cognito no son coherentes.');
   }
-  if (!subject.test(environment.RTI_E2E_CONSULTANT_SUBJECT) || !email.test(consultant) ||
-      !email.test(collaborator) || !email.test(environment.RTI_E2E_SES_FROM) || consultant === collaborator) {
+  if (!subject.test(consultantSubject)) {
+    throw new Error('RTI_E2E_CONSULTANT_SUBJECT no tiene el formato entregado por Cognito.');
+  }
+  if (!email.test(consultant) || !email.test(collaborator) || !email.test(sender) || consultant === collaborator) {
     throw new Error('Las identidades E2E deben ser dos cuentas válidas y diferentes.');
   }
   if (environment.RTI_E2E_CONSULTANT_PASSWORD.length < 8 ||
