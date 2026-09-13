@@ -102,7 +102,7 @@ test.describe("@mvp RTI-VS1-013 authenticated vertical slice", () => {
     const invitation = page.getByRole("listitem").filter({ hasText: programName });
     await expect(invitation).toContainText(organizationName);
     await invitation.getByRole("button", { name: "Aceptar invitación" }).click();
-    await expect(page.getByRole("status")).toContainText("Invitación aceptada.");
+    await expect(page.getByRole("status").filter({ hasText: "Invitación aceptada." })).toBeVisible();
 
     await page.getByRole("link", { name: "Volver a Cuenta" }).click();
     await page.getByRole("button", { name: "Comprobar sesión" }).click();
