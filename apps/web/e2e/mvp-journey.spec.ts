@@ -22,11 +22,11 @@ async function cognitoLogin(page: Page, email: string, password: string) {
     { timeout: 60_000 },
   );
 
-  // Cognito renders hidden and visible copies of the managed login form.
-  // Targeting the visible controls avoids waiting on the hidden duplicate.
-  await page.getByLabel(/^Email$/i).filter({ visible: true }).fill(email);
-  await page.getByLabel(/^Password$/i).filter({ visible: true }).fill(password);
-  await page.getByRole("button", { name: /sign in/i }).filter({ visible: true }).click();
+  // Cognito duplicates form IDs across hidden and visible layout variants, so
+  // label lookup can remain bound to the hidden copy. Its field names are stable.
+  await page.locator('input[name="username"]:visible').fill(email);
+  await page.locator('input[name="password"]:visible').fill(password);
+  await page.getByRole("button", { name: /sign in/i }).click();
   await page.waitForURL((url) => url.hostname === "localhost" && url.pathname === "/account", { timeout: 60_000 });
   await expect(page).toHaveURL((url) => !url.searchParams.has("code") && !url.searchParams.has("state"));
   await expect(page.getByRole("heading", { level: 1, name: "Cuenta" })).toBeVisible();
