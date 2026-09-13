@@ -102,6 +102,9 @@ export function AccountSession() {
         </div>
       ) : null}
       <div className="mt-6 flex flex-wrap gap-3">
+        <Link href="/invitations" className="min-h-10 rounded-md border px-4 py-2 text-sm font-medium">
+          Invitaciones
+        </Link>
         {identity?.activeOrganizationId && identity.roles.some(role => ["CONSULTANT", "COMPANY_ADMIN", "LEADER"].includes(role)) && (
           <Link href={`/organizations/${encodeURIComponent(identity.activeOrganizationId)}/programs`} className="min-h-10 rounded-md border px-4 py-2 text-sm font-medium">
             Ver programas

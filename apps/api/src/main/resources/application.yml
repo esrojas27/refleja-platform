@@ -26,6 +26,12 @@ spring:
         default_schema: rti
 
 app:
+  invitations:
+    enabled: ${INVITATIONS_ENABLED:false}
+    aws-region: ${INVITATIONS_AWS_REGION:}
+    user-pool-id: ${INVITATIONS_COGNITO_USER_POOL_ID:}
+    ses-from: ${INVITATIONS_SES_FROM:}
+    web-base-url: ${INVITATIONS_WEB_BASE_URL:http://localhost:3000}
   security:
     operator-organization-id: ${OPERATOR_ORGANIZATION_ID:}
     cognito:

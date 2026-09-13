@@ -45,6 +45,12 @@ class ActuatorHealthSecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/api/v1/organizations/{organizationId}/programs").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/organizations/{organizationId}/programs",
                                 "/api/v1/organizations/{organizationId}/programs/{programId}").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/organizations/{organizationId}/programs/{programId}/enrollments",
+                                "/api/v1/invitations").authenticated()
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/v1/organizations/{organizationId}/programs/{programId}/enrollments",
+                                "/api/v1/organizations/{organizationId}/programs/{programId}/enrollments/{enrollmentId}/invitation-delivery",
+                                "/api/v1/invitations/{invitationId}/accept").authenticated()
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(resourceServer ->
                         resourceServer.jwt(Customizer.withDefaults())

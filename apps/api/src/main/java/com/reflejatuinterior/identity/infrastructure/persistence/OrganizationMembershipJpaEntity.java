@@ -86,4 +86,9 @@ class OrganizationMembershipJpaEntity {
     long version() {
         return version;
     }
+
+    UUID userId() { return userId; }
+    void acceptInvitation(Instant now) {
+        if (status == MembershipStatus.PENDING) { status = MembershipStatus.ACTIVE; joinedAt = now; }
+    }
 }

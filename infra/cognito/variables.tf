@@ -54,3 +54,25 @@ variable "logout_urls" {
     error_message = "logout_urls must contain at least one HTTPS or localhost URL."
   }
 }
+
+variable "ses_sender_email" {
+  description = "Optional email identity used by Cognito and the API for development invitations. It must be verified before enabling delivery."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.ses_sender_email == null || can(regex("^[^\\s<>@]+@[^\\s<>@]+\\.[^\\s<>@]+$", var.ses_sender_email))
+    error_message = "ses_sender_email must be null or a valid email address."
+  }
+}
+
+variable "enable_ses_delivery" {
+  description = "Configure Cognito to use the verified SES sender. Enable only after AWS reports the identity as verified."
+  type        = bool
+  default     = false
+
+  validation {
+    condition     = !var.enable_ses_delivery || var.ses_sender_email != null
+    error_message = "enable_ses_delivery requires ses_sender_email."
+  }
+}

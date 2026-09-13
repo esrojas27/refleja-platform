@@ -8,3 +8,8 @@ callback_urls = [
 logout_urls = [
   "http://localhost:3000/login",
 ]
+
+# First apply with the sender, verify AWS's email, then enable delivery and
+# apply a second reviewed plan.
+ses_sender_email    = "replace-with-a-verified-ses-email"
+enable_ses_delivery = false

@@ -43,6 +43,9 @@ class EnrollmentJpaEntity {
     @Column(name = "participant_membership_id", nullable = false)
     private UUID participantMembershipId;
 
+    @Column(name = "invitation_id")
+    private UUID invitationId;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private EnrollmentStatus status;
@@ -99,6 +102,22 @@ class EnrollmentJpaEntity {
 
     UUID organizationId() {
         return organizationId;
+    }
+
+    UUID programId() { return programId; }
+
+    UUID participantMembershipId() { return participantMembershipId; }
+
+    UUID invitationId() { return invitationId; }
+
+    void attachInvitation(UUID invitationId) { this.invitationId = invitationId; }
+
+    void activate() {
+        if (status != EnrollmentStatus.INVITED && status != EnrollmentStatus.ACTIVE) {
+            throw new com.reflejatuinterior.participation.application.EnrollmentConflict();
+        }
+        // Activation grants enrollment access, not program attendance or progress.
+        status = EnrollmentStatus.ACTIVE;
     }
 
     EnrollmentStatus status() {

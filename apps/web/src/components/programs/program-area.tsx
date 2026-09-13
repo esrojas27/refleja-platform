@@ -34,7 +34,7 @@ export function ProgramArea({ organizationId, mode, programId }: {
     {message && <p className="mt-4 text-sm" role="status">{message}</p>}
     {identity && (mode === "list" ? <ProgramList organizationId={organizationId} canCreate={canCreate} />
       : mode === "create" ? canCreate ? <CreateProgramForm organizationId={organizationId} /> : <p className="mt-4" role="status">No tienes permiso para crear programas.</p>
-      : programId ? <ProgramDetail organizationId={organizationId} programId={programId} /> : null)}
+      : programId ? <ProgramDetail organizationId={organizationId} programId={programId} canEnroll={canCreate} /> : null)}
     <nav aria-label="Navegación de programas" className="mt-6 flex flex-wrap gap-4 text-sm">
       <Link href="/account" className="underline">Volver a Cuenta</Link>
       {mode !== "list" && <Link href={programsPath(organizationId)} className="underline">Ver programas</Link>}
@@ -87,7 +87,7 @@ function ProgramValues({ program }: { program: Program }) {
   </dl>;
 }
 
-function ProgramDetail({ organizationId, programId }: { organizationId: string; programId: string }) {
+function ProgramDetail({ organizationId, programId, canEnroll }: { organizationId: string; programId: string; canEnroll: boolean }) {
   const [program, setProgram] = useState<Program>();
   const [message, setMessage] = useState("Cargando programa…");
   useEffect(() => {
@@ -97,7 +97,10 @@ function ProgramDetail({ organizationId, programId }: { organizationId: string; 
     }).catch(error => { if (!controller.signal.aborted) setMessage(programErrorMessage(error)); });
     return () => controller.abort();
   }, [organizationId, programId]);
-  return <>{message && <p className="mt-4" role="status">{message}</p>}{program && <ProgramValues program={program} />}</>;
+  return <>{message && <p className="mt-4" role="status">{message}</p>}{program && <>
+    <ProgramValues program={program} />
+    {canEnroll && <Link href={`${programsPath(organizationId)}/${encodeURIComponent(programId)}/enrollments`} className={`${button} mt-4 inline-block`}>Colaboradores del programa</Link>}
+  </>}</>;
 }
 
 export function CreateProgramForm({ organizationId }: { organizationId: string }) {
@@ -135,7 +138,7 @@ export function CreateProgramForm({ organizationId }: { organizationId: string }
     } finally { submitting.current = false; if (!controller.signal.aborted) setPending(false); }
   }
   return <div className="mt-4">
-    <p className="text-sm text-muted-foreground">El programa se creará en DRAFT. Todavía no se inscriben participantes ni se activa el programa.</p>
+    <p className="text-sm text-muted-foreground">El programa se creará en DRAFT. Esta operación no activa el programa.</p>
     {message && <p className="mt-4" role="status">{message}</p>}
     {created ? <><ProgramValues program={created} /><Link className="mt-4 inline-block underline" href={`${programsPath(organizationId)}/${created.id}`}>Consultar programa creado</Link></>
       : <form className="mt-4 space-y-4" aria-label="Crear programa" onSubmit={submit} noValidate>

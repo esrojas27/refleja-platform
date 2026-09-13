@@ -86,4 +86,11 @@ class UserJpaEntity {
     long version() {
         return version;
     }
+
+    String cognitoSubject() { return cognitoSubject; }
+    String email() { return email; }
+    String emailNormalized() { return emailNormalized; }
+    String firstName() { return firstName; }
+    String lastName() { return lastName; }
+    void acceptInvitation() { if (status == UserStatus.INVITED) status = UserStatus.ACTIVE; }
 }

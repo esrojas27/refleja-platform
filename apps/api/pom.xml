@@ -21,6 +21,7 @@
         <java.version>21</java.version>
         <spring-modulith.version>2.1.0</spring-modulith.version>
         <springdoc-openapi.version>3.1.0</springdoc-openapi.version>
+        <aws-sdk.version>2.49.3</aws-sdk.version>
     </properties>
 
     <dependencyManagement>
@@ -36,6 +37,38 @@
     </dependencyManagement>
 
     <dependencies>
+        <!-- AWS modules are not managed by the approved Boot/Modulith BOMs. -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId><artifactId>cognitoidentityprovider</artifactId><version>${aws-sdk.version}</version>
+            <exclusions>
+                <exclusion><groupId>software.amazon.awssdk</groupId><artifactId>apache-client</artifactId></exclusion>
+                <exclusion><groupId>software.amazon.awssdk</groupId><artifactId>netty-nio-client</artifactId></exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId><artifactId>sesv2</artifactId><version>${aws-sdk.version}</version>
+            <exclusions>
+                <exclusion><groupId>software.amazon.awssdk</groupId><artifactId>apache-client</artifactId></exclusion>
+                <exclusion><groupId>software.amazon.awssdk</groupId><artifactId>netty-nio-client</artifactId></exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId><artifactId>url-connection-client</artifactId><version>${aws-sdk.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId><artifactId>sso</artifactId><version>${aws-sdk.version}</version>
+            <exclusions>
+                <exclusion><groupId>software.amazon.awssdk</groupId><artifactId>apache-client</artifactId></exclusion>
+                <exclusion><groupId>software.amazon.awssdk</groupId><artifactId>netty-nio-client</artifactId></exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId><artifactId>ssooidc</artifactId><version>${aws-sdk.version}</version>
+            <exclusions>
+                <exclusion><groupId>software.amazon.awssdk</groupId><artifactId>apache-client</artifactId></exclusion>
+                <exclusion><groupId>software.amazon.awssdk</groupId><artifactId>netty-nio-client</artifactId></exclusion>
+            </exclusions>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc</artifactId>

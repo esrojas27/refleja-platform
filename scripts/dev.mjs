@@ -66,6 +66,27 @@ export function authenticationEnvironment(backend, frontend) {
   return { publicEnv: result, origin: callback.origin, port: Number(callback.port || 80) };
 }
 
+export function invitationEnvironment(backend, frontend) {
+  const enabled = String(backend.INVITATIONS_ENABLED || 'false').toLowerCase() === 'true';
+  if (!enabled) return { INVITATIONS_ENABLED: 'false' };
+  const required = ['INVITATIONS_AWS_REGION', 'INVITATIONS_COGNITO_USER_POOL_ID',
+    'INVITATIONS_SES_FROM', 'INVITATIONS_WEB_BASE_URL'];
+  for (const key of required) {
+    if (!configured(backend[key])) throw new Error(`Configura ${key} en .env antes de habilitar invitaciones.`);
+  }
+  const webBase = new URL(backend.INVITATIONS_WEB_BASE_URL);
+  const signIn = new URL(frontend.NEXT_PUBLIC_COGNITO_REDIRECT_SIGN_IN);
+  if (webBase.origin !== signIn.origin || webBase.pathname !== '/' || webBase.search || webBase.hash) {
+    throw new Error('INVITATIONS_WEB_BASE_URL debe ser el origen exacto configurado para la web.');
+  }
+  if (backend.INVITATIONS_COGNITO_USER_POOL_ID !== frontend.NEXT_PUBLIC_COGNITO_USER_POOL_ID ||
+      !backend.COGNITO_ISSUER_URI.endsWith(`/${backend.INVITATIONS_COGNITO_USER_POOL_ID}`)) {
+    throw new Error('El User Pool de invitaciones no coincide con autenticacion.');
+  }
+  return Object.fromEntries(['INVITATIONS_ENABLED', ...required, 'AWS_PROFILE']
+    .filter(key => backend[key]).map(key => [key, backend[key]]));
+}
+
 export async function portAvailable(port) {
   // Windows can allow overlapping binds. Check live listeners as well as binds.
   for (const host of ['127.0.0.1', '::1']) {
@@ -287,11 +308,13 @@ async function main() {
     const apiPort = await selectPort(Number(backend.SERVER_PORT || 8080), [8081, 8082, 8083]);
     const apiOrigin = `http://localhost:${apiPort}`;
     const dbUrl = `jdbc:postgresql://127.0.0.1:${dbPort}/${dbName}`;
+    const invitations = invitationEnvironment(backend, auth.publicEnv);
     const apiEnv = { ...process.env, DB_URL: dbUrl, DB_USERNAME: 'rti_app', DB_PASSWORD: backend.RTI_APP_PASSWORD,
       DB_MIGRATION_URL: dbUrl, DB_MIGRATION_USERNAME: 'rti_migrator', DB_MIGRATION_PASSWORD: backend.RTI_MIGRATOR_PASSWORD,
       COGNITO_ISSUER_URI: backend.COGNITO_ISSUER_URI, COGNITO_JWK_SET_URI: backend.COGNITO_JWK_SET_URI,
       COGNITO_APP_CLIENT_ID: backend.COGNITO_APP_CLIENT_ID, CORS_ALLOWED_ORIGINS: auth.origin,
       OPERATOR_ORGANIZATION_ID: backend.OPERATOR_ORGANIZATION_ID || '',
+      ...invitations,
       SERVER_ADDRESS: '127.0.0.1', SERVER_PORT: String(apiPort) };
     const api = launch(...packageCommand('mvn', ['spring-boot:run']), { cwd: path.join(root, 'apps', 'api'), env: apiEnv, log: path.join(logDir, 'api.log') });
     await waitFor('API /actuator/health', () => httpReady(`${apiOrigin}/actuator/health`, 200, true), startupSeconds * 1000, api);

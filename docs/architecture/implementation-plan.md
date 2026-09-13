@@ -5,7 +5,7 @@ La secuencia y los criterios de aceptación oficiales están en el
 Este archivo registra el punto de continuación; no reemplaza los tickets ni los
 [ADR aceptados](../adr/README.md).
 
-## Estado al 2026-09-08
+## Estado al 2026-09-12
 
 - **001–005:** implementaciones registradas en Git: monorepo, API, web,
   PostgreSQL/Flyway y modelo inicial de persistencia.
@@ -25,7 +25,11 @@ Este archivo registra el punto de continuación; no reemplaza los tickets ni los
   programas verificados automáticamente; el usuario confirmó el recorrido manual.
   [Contrato y procedimiento](rti-vs1-009-acceptance.md). El 008 quedó separado en
   el commit `b45e0aa`, sin push, con worktree limpio antes de iniciar el 009.
-- **010–013:** pendientes; no iniciados.
+- **010:** cerrado para desarrollo local. Se validaron con Cognito/SES reales el
+  alta, los dos correos, login inicial, aceptación y activación del colaborador. La
+  prueba real permitió corregir el contrato `AdminCreateUser RESEND` para pools con
+  email como username. Pendiente únicamente su commit de cierre.
+- **011–013:** pendientes; no iniciados.
 - **Primer operador:** mecanismo administrativo implementado y aplicado localmente
   con aprobación expresa: organización operadora real, membresía activa y rol
   `CONSULTANT` acotado. [Procedimiento y evidencia](first-operator-bootstrap.md).
@@ -52,7 +56,7 @@ advertencia de lentitud del sistema de archivos, sin una causa física confirmad
 
 | Orden | Ticket | Resultado esperado |
 | --- | --- | --- |
-| 1 | **010 — Enroll and Invite Collaborator** | Inscribir e invitar al colaborador; membresía, rol y enrollment según el ticket. |
+| 1 | **Publicar cierre 010** | Guardar el incremento validado en un commit exclusivo; no mezclar el 011. |
 | 2 | **011 — Collaborator My Programs** | El colaborador inicia sesión y ve exclusivamente sus programas asignados. |
 | 3 | **012 — Tenant Isolation + RLS Hardening** | RLS en tablas aplicables y pruebas PostgreSQL de aislamiento entre organizaciones. |
 | 4 | **013 — End-to-End Test + CI Gate** | Automatizar el journey completo y su puerta de validación en CI. |
@@ -63,8 +67,9 @@ La referencia concreta aprobada es **VS1 / V0.1.0**, no el producto completo.
 La base técnica 001–007 está lista. La primera operación empresarial, crear una
 organización (008), está implementada y aceptada manualmente. El recorrido
 de programas (009) está implementado y aceptado manualmente;
-el recorrido de colaboradores sigue pendiente.
-Nueve tickets cerrados no equivalen a un porcentaje de avance del producto.
+el registro, entrega y aceptación de invitaciones está implementado y validado
+contra Cognito/SES reales.
+Diez tickets cerrados no equivalen a un porcentaje de avance del producto.
 
 - **Después del 008:** primera operación visible de negocio, crear una organización.
 - **Después del 009:** demostración del flujo organización → programa.
@@ -92,6 +97,13 @@ criterios de aceptación. No posponer al 012 las garantías de seguridad exigida
 por los ADR para cada funcionalidad anterior.
 
 ## Evidencia de cierre actual
+
+Para el 010: 153 pruebas backend, 76 frontend, 6 del lanzador y 9 smoke tests
+Playwright correctos; lint, build de producción y `terraform validate` correctos.
+Se verificaron remitente y destinatario SES, se aplicó la configuración AWS sin
+reemplazar Cognito y se confirmó el journey completo con un colaborador distinto:
+correos recibidos, login inicial, aceptación, estados `ACTIVE` y `/me` con rol
+`COLLABORATOR`. Los cambios permanecen sin commit y no se ha iniciado el 011.
 
 El [acta del 009](rti-vs1-009-acceptance.md) registra 113 pruebas backend,
 47 frontend, 13 de scripts y 7 smoke tests Playwright correctos, además de lint,

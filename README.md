@@ -2,7 +2,10 @@
 
 Monorepo oficial de la Plataforma Refleja Tu Interior.
 
-El repositorio contiene la base técnica inicial (001–005), autenticación con Cognito (006), contexto interno y roles (007), creación de organizaciones (008) y creación/listado/detalle de programas (009). Los incrementos 008 y 009 están verificados automática y manualmente para desarrollo local. Todavía no hay inscripción de colaboradores.
+El repositorio contiene la base técnica inicial (001–005), autenticación con Cognito
+(006), contexto interno y roles (007), creación de organizaciones (008) y programas
+(009). La inscripción e invitación de colaboradores (010) está cerrada para
+desarrollo local después de validar el recorrido completo con Cognito y SES reales.
 
 ## Estructura del repositorio
 
@@ -85,7 +88,8 @@ En Cuenta, comprueba tu sesión y selecciona una organización. **Ver programas*
 abre su listado; **Crear programa** está disponible para CONSULTANT en esa
 organización. Introduce nombre, descripción opcional y fechas de inicio/fin.
 El programa se guarda como `DRAFT`; puedes volver al listado y abrir su detalle.
-No hay activación, edición, participantes ni dashboards en este incremento.
+No hay activación, edición ni dashboards en este incremento. La administración de
+colaboradores se implementa separadamente en el 010.
 
 API: `POST` y `GET /api/v1/organizations/{organizationId}/programs`, y
 `GET /api/v1/organizations/{organizationId}/programs/{programId}`. El listado
@@ -93,6 +97,26 @@ usa `page=0&size=20`, máximo 100, y orden fijo por UUID descendente. El backend
 valida membresía, estado y roles en cada solicitud. Un UUID conocido no concede
 acceso; los recursos cross-tenant responden 404. No se necesitan variables,
 dependencias ni migraciones nuevas. [Contrato, pruebas y validación manual](docs/architecture/rti-vs1-009-acceptance.md).
+
+### Colaboradores e invitaciones — RTI-VS1-010
+
+Un `CONSULTANT` activo puede abrir **Colaboradores** desde el detalle de un programa,
+registrar nombre, apellido y correo, consultar las inscripciones y reintentar una
+entrega fallida. La creación guarda una invitación de siete días y usa la identidad
+real de Cognito; no genera contraseñas propias ni las guarda en PostgreSQL.
+
+El colaborador inicia sesión con Cognito y entra a `/invitations`. Sólo puede listar
+y aceptar invitaciones asociadas a su propio `sub`. Al aceptar una invitación vigente,
+el usuario, la membresía y la inscripción pasan a `ACTIVE`. Una identidad suspendida,
+una membresía revocada o una inscripción no disponible no se reactiva implícitamente.
+
+La integración externa permanece deshabilitada por defecto con
+`INVITATIONS_ENABLED=false`; sólo se habilita en un entorno después de verificar el
+remitente SES. En el sandbox de SES también debe verificarse el destinatario de
+prueba. `SENT` indica aceptación de la solicitud por SES, no entrega ni lectura.
+Configuración: [Cognito/SES](infra/cognito/README.md#correo-de-invitaciones-rti-vs1-010).
+Contrato, seguridad, evidencia automática y recorrido manual:
+[acta del 010](docs/architecture/rti-vs1-010-acceptance.md).
 
 ### Desarrollo y comprobaciones
 
@@ -108,7 +132,11 @@ npm run build
 npm run test:e2e
 ```
 
-Las rutas `/`, `/login` y `/account` son intencionalmente mínimas. `/login` inicia Authorization Code + PKCE y `/account` permite consultar el perfil interno, seleccionar una organización disponible y cerrar la sesión. Los roles mostrados proceden del backend; no habilitan operaciones de negocio todavía inexistentes. No hay registro público ni dashboard. La ruta agrupada del frontend es una estructura de UX, no una frontera de seguridad.
+Las rutas `/`, `/login`, `/account` y `/invitations` son intencionalmente mínimas.
+`/login` inicia Authorization Code + PKCE y `/account` permite consultar el perfil
+interno, seleccionar una organización disponible y cerrar la sesión. Los roles
+mostrados proceden del backend. No hay registro público ni dashboard. La ruta
+agrupada del frontend es una estructura de UX, no una frontera de seguridad.
 
 ## Autenticación de desarrollo
 
@@ -215,7 +243,11 @@ docker compose down
 
 `docker compose down` conserva el volumen. Para reinicializar voluntariamente una base local, usa `docker compose down --volumes`; esta operación elimina los datos locales del volumen.
 
-Durante la primera inicialización, `infra/postgres/init/01-create-rti-database-roles.sh` crea los roles separados `rti_migrator` y `rti_app`, y crea el schema `rti` bajo propiedad del migrador. El rol de runtime recibe permisos DML explícitos sobre las seis tablas iniciales mediante Flyway, pero no puede crear objetos en el schema.
+Durante la primera inicialización, `infra/postgres/init/01-create-rti-database-roles.sh`
+crea los roles separados `rti_migrator` y `rti_app`, y crea el schema `rti` bajo
+propiedad del migrador. El rol de runtime recibe permisos DML explícitos mediante
+Flyway, pero no puede crear objetos en el schema. Para `user_invitations` sólo
+recibe lectura, inserción y actualización; no recibe borrado.
 
 ### Modelo inicial de persistencia
 
@@ -227,6 +259,10 @@ La migración de RTI-VS1-005 crea exactamente estas tablas de negocio en `rti`:
 - `membership_roles`
 - `programs`
 - `enrollments`
+
+RTI-VS1-010 agrega `user_invitations` y la referencia opcional desde `enrollments`.
+La invitación conserva estado, vencimiento y resultado operativo de entrega; no
+almacena contraseñas, códigos OAuth ni tokens de aceptación.
 
 Los identificadores son UUID; Hibernate genera UUIDv7 antes del `INSERT`. Los estados se almacenan por nombre simbólico y se restringen en PostgreSQL. Las referencias entre módulos se representan en JPA como UUID escalares, mientras que las claves foráneas compuestas aseguran que programas, membresías y enrollments pertenezcan a la misma organización. Las entidades y repositorios son detalles internos de persistencia de los módulos `identity`, `organization`, `program` y `participation`.
 
@@ -272,7 +308,13 @@ Las pruebas inician un contenedor efímero `postgres:18` mediante Testcontainers
 
 ## Backend API
 
-La API vive en `apps/api`, utiliza Java 21 y Maven. Sus endpoints actuales son `GET /actuator/health`, `GET /api/v1/me` y `POST /api/v1/organizations`. La resolución de contexto usa un modelo de lectura JDBC permitido por ADR-004; las escrituras de organizaciones y membresías utilizan JPA. Cada módulo accede a sus propias tablas. `identity` orquesta la creación y concesión de acceso mediante la API pública `OrganizationRegistration`, conservando la dirección de dependencia hacia `organization`.
+La API vive en `apps/api`, utiliza Java 21 y Maven. Además de health, identidad,
+organizaciones y programas, expone las operaciones del 010 bajo
+`/api/v1/organizations/{organizationId}/programs/{programId}/enrollments` y
+`/api/v1/invitations`. La resolución de contexto usa el modelo de lectura JDBC
+permitido por ADR-004; las escrituras usan JPA dentro del módulo propietario.
+`identity` orquesta el aprovisionamiento externo y la concesión de acceso mediante
+APIs públicas de módulo, sin exponer repositorios entre módulos.
 
 ## Documentación y decisiones arquitectónicas
 
@@ -286,11 +328,16 @@ Todas las implementaciones futuras deberán respetar las decisiones aceptadas. C
 
 Todavía no existen:
 
-- flujos de programas o participación, ni edición o administración general de organizaciones;
+- la vista del colaborador con sus programas, correspondiente al 011;
+- edición o administración general de organizaciones y programas;
 - aislamiento RLS del ticket 012 (no sustituye los controles backend exigidos antes);
-- APIs de programas o participación;
 - registro público o administración de usuarios;
-- infraestructura AWS distinta del Cognito de desarrollo de RTI-VS1-006;
+- infraestructura de hosting para web, API o PostgreSQL;
 - pipelines de CI/CD.
+
+La integración Cognito/SES del 010 se aplicó y probó en desarrollo con correo real.
+Continúan pendientes para un uso externo el remitente corporativo, la autenticación
+del dominio, la salida de SES sandbox y la revisión de entregabilidad. El estado
+exacto y la distancia al MVP se mantienen en el plan.
 
 Estado y próximos hitos: [plan de implementación](docs/architecture/implementation-plan.md).

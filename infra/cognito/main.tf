@@ -10,6 +10,11 @@ provider "aws" {
   }
 }
 
+resource "aws_sesv2_email_identity" "invitation_sender" {
+  count          = var.ses_sender_email == null ? 0 : 1
+  email_identity = var.ses_sender_email
+}
+
 resource "aws_cognito_user_pool" "development" {
   name = "${var.resource_prefix}-development"
 
@@ -25,6 +30,14 @@ resource "aws_cognito_user_pool" "development" {
     allow_admin_create_user_only = true
   }
 
+  dynamic "email_configuration" {
+    for_each = var.enable_ses_delivery ? [var.ses_sender_email] : []
+    content {
+      email_sending_account = "DEVELOPER"
+      from_email_address    = email_configuration.value
+      source_arn            = aws_sesv2_email_identity.invitation_sender[0].arn
+    }
+  }
 }
 
 resource "aws_cognito_user_pool_client" "web" {

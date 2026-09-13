@@ -1,0 +1,11 @@
+import { expect, test } from "@playwright/test";
+
+test("invitation route is responsive and requires the invited Cognito account", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 667 });
+  await page.goto("/invitations");
+  await expect(page.getByRole("heading", { name: "Invitaciones", exact: true })).toBeVisible();
+  await expect(page.getByRole("status")).toContainText("Tu sesión no está disponible");
+  await expect(page.getByRole("link", { name: "Volver a Cuenta" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Aceptar invitación" })).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
