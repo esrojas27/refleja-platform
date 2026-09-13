@@ -32,8 +32,8 @@ ejecución manual. Expone tres checks:
 
 - **Backend gate:** Java 21, compilación Maven, pruebas unitarias, arquitectura,
   integración con PostgreSQL real y aislamiento tenant.
-- **Frontend gate:** scripts del repositorio, ESLint, Vitest/RTL, build Next.js y
-  smoke tests Playwright sin sesión.
+- **Frontend gate:** Node 22.22.2, scripts del repositorio, ESLint, Vitest/RTL,
+  build Next.js y smoke tests Playwright sin sesión.
 - **MVP E2E gate:** espera los dos gates anteriores; levanta PostgreSQL 18 en un
   volumen desechable, aplica Flyway, siembra sólo el operador técnico, inicia API
   y web y ejecuta el journey real.
