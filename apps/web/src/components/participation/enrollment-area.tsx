@@ -6,7 +6,7 @@ import { fetchCurrentIdentity, IdentityRequestError, type CurrentIdentity } from
 import { createEnrollment, listEnrollments, retryInvitationDelivery, deliveryMessage, participationErrorMessage,
   ParticipationRequestError, type Enrollment, type EnrollmentInput, type PageResult } from "@/lib/participation/participation-api";
 
-const button = "min-h-10 rounded-md border px-4 py-2 text-sm disabled:opacity-50";
+const button = "rti-button-secondary";
 
 export function EnrollmentArea({ organizationId, programId }: { organizationId: string; programId: string }) {
   // Remount state and abort requests when the route context changes.
@@ -47,23 +47,26 @@ function EnrollmentContent({ organizationId, programId }: { organizationId: stri
     if (saved) setNotice(`Registro guardado: ${saved.status}. ${saved.invitation ? deliveryMessage(saved.invitation.deliveryStatus) : "No hay invitación asociada."}`);
     setPage(nextPage); setAttempt(value => value + 1);
   }
-  return <section className="w-full max-w-3xl rounded-xl border bg-background p-5 shadow-sm sm:p-8">
-    <h1 className="text-2xl font-semibold">Colaboradores del programa</h1>
-    <p className="mt-2 text-sm text-muted-foreground">Registra al colaborador y envía su invitación. El acceso se activa cuando la acepta con su cuenta de Cognito.</p>
-    {notice && <p className="mt-4 text-sm" role="status">{notice}</p>}
-    {message && <p className="mt-4 text-sm" role="status">{message}</p>}
-    {identity && result && <div className="mt-5 space-y-6">
-      <EnrollmentForm organizationId={organizationId} programId={programId} onSaved={saved => refresh(0, saved)} />
+  return <section className="rti-surface mx-auto w-full max-w-6xl p-6 sm:p-8 lg:p-10">
+    <p className="rti-kicker">Gestión del programa</p>
+    <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Colaboradores del programa</h1>
+    <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">Registra al colaborador y envía su invitación. El acceso se activa cuando la acepta con su cuenta de Cognito.</p>
+    {notice && <p className="mt-5 rounded-2xl border border-accent bg-accent/60 px-4 py-3 text-sm" role="status">{notice}</p>}
+    {message && <p className="mt-5 rounded-2xl bg-muted/60 px-4 py-3 text-sm" role="status">{message}</p>}
+    {identity && result && <div className="mt-7 grid gap-8 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+      <div className="rounded-2xl border border-border/70 bg-background/70 p-5 sm:p-6">
+        <EnrollmentForm organizationId={organizationId} programId={programId} onSaved={saved => refresh(0, saved)} />
+      </div>
       <section aria-labelledby="enrollment-list-title">
-        <h2 id="enrollment-list-title" className="text-lg font-medium">Colaboradores registrados</h2>
-        <ul className="mt-3 space-y-3">{result.items.map(enrollment => <li key={enrollment.id} className="space-y-2 break-words rounded-md border p-4">
-          <p className="font-medium">{[enrollment.participant.firstName, enrollment.participant.lastName].filter(Boolean).join(" ") || enrollment.participant.email}</p>
-          <p className="break-all text-sm">{enrollment.participant.email}</p>
-          <p className="text-sm">Inscripción: {enrollment.status}{enrollment.invitation ? ` · Invitación: ${enrollment.invitation.status}` : ""}</p>
-          {enrollment.invitation && <p className="text-sm">Vence: {enrollment.invitation.expiresAt}</p>}
+        <h2 id="enrollment-list-title" className="text-xl font-semibold">Colaboradores registrados</h2>
+        <ul className="mt-4 space-y-3">{result.items.map(enrollment => <li key={enrollment.id} className="space-y-2 break-words rounded-2xl border border-border/70 bg-background/70 p-5">
+          <p className="font-semibold">{[enrollment.participant.firstName, enrollment.participant.lastName].filter(Boolean).join(" ") || enrollment.participant.email}</p>
+          <p className="break-all text-sm text-muted-foreground">{enrollment.participant.email}</p>
+          <p className="text-sm text-muted-foreground">Inscripción: {enrollment.status}{enrollment.invitation ? ` · Invitación: ${enrollment.invitation.status}` : ""}</p>
+          {enrollment.invitation && <p className="text-sm text-muted-foreground">Vence: {enrollment.invitation.expiresAt}</p>}
           <DeliveryAction enrollment={enrollment} onSaved={saved => refresh(page, saved)} />
         </li>)}</ul>
-        <p className="mt-4 text-sm">{result.totalElements} colaboradores · Página {result.page + 1} de {Math.max(1, result.totalPages)}</p>
+        <p className="mt-4 text-sm text-muted-foreground">{result.totalElements} colaboradores · Página {result.page + 1} de {Math.max(1, result.totalPages)}</p>
         <div className="mt-3 flex flex-wrap gap-3">
           <button className={button} disabled={pending || page === 0} onClick={() => refresh(page - 1)}>Anterior</button>
           <button className={button} disabled={pending || page + 1 >= result.totalPages} onClick={() => refresh(page + 1)}>Siguiente</button>
@@ -71,10 +74,10 @@ function EnrollmentContent({ organizationId, programId }: { organizationId: stri
       </section>
     </div>}
     <button className={`${button} mt-4`} disabled={pending} onClick={() => refresh()}>Actualizar listado</button>
-    <nav aria-label="Navegación de colaboradores" className="mt-6 flex flex-wrap gap-4 text-sm">
-      <Link href={`/organizations/${encodeURIComponent(organizationId)}/programs/${encodeURIComponent(programId)}`} className="underline">Volver al programa</Link>
-      <Link href="/account" className="underline">Volver a Cuenta</Link>
-      {!identity && <Link href="/login" className="underline">Iniciar sesión</Link>}
+    <nav aria-label="Navegación de colaboradores" className="mt-8 flex flex-wrap gap-4 border-t border-border/70 pt-6 text-sm">
+      <Link href={`/organizations/${encodeURIComponent(organizationId)}/programs/${encodeURIComponent(programId)}`} className="rti-link">Volver al programa</Link>
+      <Link href="/account" className="rti-link">Volver a Cuenta</Link>
+      {!identity && <Link href="/login" className="rti-link">Iniciar sesión</Link>}
     </nav>
   </section>;
 }
@@ -115,19 +118,22 @@ export function EnrollmentForm({ organizationId, programId, onSaved }: {
       setMessage(uncertain ? "No se pudo confirmar el resultado. Actualiza el listado antes de repetir el registro." : participationErrorMessage(failure));
     } finally { submitting.current = false; if (!controller.signal.aborted) setPending(false); }
   }
-  return <form onSubmit={submit} noValidate aria-label="Registrar colaborador" className="space-y-4">
-    <h2 className="text-lg font-medium">Registrar colaborador</h2>
-    {message && <p role="status" className="text-sm">{message}</p>}
+  return <form onSubmit={submit} noValidate aria-label="Registrar colaborador" className="space-y-5">
+    <div>
+      <p className="rti-kicker">Nueva invitación</p>
+      <h2 className="mt-2 text-xl font-semibold">Registrar colaborador</h2>
+    </div>
+    {message && <p role="status" className="rounded-xl bg-muted/60 px-3 py-2 text-sm">{message}</p>}
     {([["email", "Correo electrónico"], ["firstName", "Nombre"], ["lastName", "Apellido"]] as const).map(([field, label]) => <div key={field}>
       <label htmlFor={`enrollment-${field}`} className="block text-sm font-medium">{label}</label>
       <input id={`enrollment-${field}`} type={field === "email" ? "email" : "text"} required
         maxLength={field === "email" ? 254 : 100} autoComplete="off" value={input[field]}
         onChange={event => setInput({ ...input, [field]: event.target.value })} disabled={pending || blocked}
         aria-invalid={fields.includes(field)} aria-describedby={fields.includes(field) ? `enrollment-${field}-error` : undefined}
-        className="mt-1 min-h-10 w-full min-w-0 rounded-md border px-3 py-2" />
+        className="rti-field" />
       {fields.includes(field) && <p id={`enrollment-${field}-error`} className="text-sm text-destructive">Revisa este campo.</p>}
     </div>)}
-    <button className={button} disabled={pending || blocked}>{pending ? "Registrando…" : "Registrar e invitar"}</button>
+    <button className="rti-button-primary w-full sm:w-auto" disabled={pending || blocked}>{pending ? "Registrando…" : "Registrar e invitar"}</button>
   </form>;
 }
 

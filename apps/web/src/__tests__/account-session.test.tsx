@@ -83,10 +83,13 @@ describe("Account session", () => {
     render(<AccountSession />);
     fireEvent.click(screen.getByRole("button", { name: "Comprobar sesión" }));
     const select = await screen.findByRole("combobox", { name: "Organización activa" });
-    expect((select as HTMLSelectElement).value).toBe("");
+    expect(select.textContent).toContain("Selecciona una organización");
     expect(screen.queryByText(/Roles activos:/)).toBeNull();
     fetchCurrentIdentity.mockResolvedValueOnce({ ...multiple, activeOrganizationId: "org-b", roles: ["CONSULTANT"] });
-    fireEvent.change(select, { target: { value: "org-b" } });
+    fireEvent.click(select);
+    const organization = await screen.findByRole("option", { name: "Organization B" });
+    fireEvent.pointerDown(organization, { pointerType: "mouse" });
+    fireEvent.click(organization);
     expect(await screen.findByText("Roles activos: CONSULTANT")).toBeDefined();
     expect(fetchCurrentIdentity).toHaveBeenLastCalledWith("org-b", expect.any(AbortSignal));
     expect(screen.queryByText(/Roles activos:.*COLLABORATOR/)).toBeNull();

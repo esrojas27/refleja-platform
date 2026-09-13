@@ -6,7 +6,7 @@ import { fetchCurrentIdentity, IdentityRequestError, type CurrentIdentity } from
 import { createProgram, getProgram, listPrograms, programsPath, programErrorMessage, ProgramRequestError,
   type Program, type ProgramInput, type ProgramPage } from "@/lib/programs/program-api";
 
-const button = "min-h-10 rounded-md border px-4 py-2 text-sm disabled:opacity-50";
+const button = "rti-button-secondary";
 
 export function ProgramArea({ organizationId, mode, programId }: {
   organizationId: string; mode: "list" | "create" | "detail"; programId?: string;
@@ -28,17 +28,18 @@ export function ProgramArea({ organizationId, mode, programId }: {
     return () => controller.abort();
   }, [organizationId]);
   const canCreate = identity?.roles.includes("CONSULTANT") === true;
-  return <section className="w-full max-w-3xl rounded-xl border bg-background p-5 shadow-sm sm:p-8">
-    <h1 className="text-2xl font-semibold">{mode === "create" ? "Crear programa" : mode === "detail" ? "Detalle del programa" : "Programas"}</h1>
-    {identity && <p className="mt-2 break-words text-sm text-muted-foreground">Organización: {identity.organizations.find(org => org.id === organizationId)?.name}</p>}
-    {message && <p className="mt-4 text-sm" role="status">{message}</p>}
+  return <section className="rti-surface mx-auto w-full max-w-5xl p-6 sm:p-8 lg:p-10">
+    <p className="rti-kicker">Espacio del consultor</p>
+    <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">{mode === "create" ? "Crear programa" : mode === "detail" ? "Detalle del programa" : "Programas"}</h1>
+    {identity && <p className="mt-3 break-words text-sm text-muted-foreground">Organización: <span className="font-semibold text-foreground">{identity.organizations.find(org => org.id === organizationId)?.name}</span></p>}
+    {message && <p className="mt-5 rounded-2xl border border-border/70 bg-muted/60 px-4 py-3 text-sm" role="status">{message}</p>}
     {identity && (mode === "list" ? <ProgramList organizationId={organizationId} canCreate={canCreate} />
       : mode === "create" ? canCreate ? <CreateProgramForm organizationId={organizationId} /> : <p className="mt-4" role="status">No tienes permiso para crear programas.</p>
       : programId ? <ProgramDetail organizationId={organizationId} programId={programId} canEnroll={canCreate} /> : null)}
-    <nav aria-label="Navegación de programas" className="mt-6 flex flex-wrap gap-4 text-sm">
-      <Link href="/account" className="underline">Volver a Cuenta</Link>
-      {mode !== "list" && <Link href={programsPath(organizationId)} className="underline">Ver programas</Link>}
-      {!identity && <Link href="/login" className="underline">Iniciar sesión</Link>}
+    <nav aria-label="Navegación de programas" className="mt-8 flex flex-wrap gap-4 border-t border-border/70 pt-6 text-sm">
+      <Link href="/account" className="rti-link">Volver a Cuenta</Link>
+      {mode !== "list" && <Link href={programsPath(organizationId)} className="rti-link">Ver programas</Link>}
+      {!identity && <Link href="/login" className="rti-link">Iniciar sesión</Link>}
     </nav>
   </section>;
 }
@@ -58,15 +59,16 @@ function ProgramList({ organizationId, canCreate }: { organizationId: string; ca
     return () => controller.abort();
   }, [organizationId, page, attempt]);
   function load(nextPage: number) { setResult(undefined); setPending(true); setMessage("Cargando programas…"); setPage(nextPage); setAttempt(value => value + 1); }
-  return <div className="mt-5 space-y-4">
-    {canCreate && <Link href={`${programsPath(organizationId)}/new`} className={`${button} inline-block`}>Crear programa</Link>}
-    {message && <p role="status">{message}</p>}
+  return <div className="mt-7 space-y-5">
+    {canCreate && <Link href={`${programsPath(organizationId)}/new`} className="rti-button-primary">Crear programa</Link>}
+    {message && <p role="status" className="rounded-2xl bg-muted/60 px-4 py-3 text-sm">{message}</p>}
     {result && <>
-      <ul className="space-y-3">{result.items.map(program => <li key={program.id} className="rounded-md border p-4">
-        <Link href={`${programsPath(organizationId)}/${program.id}`} className="break-words font-medium underline">{program.name}</Link>
-        <p className="mt-1 text-sm">{program.status} · {program.startDate ?? "Sin fecha"} — {program.endDate ?? "Sin fecha"}</p>
+      <ul className="grid gap-4 sm:grid-cols-2">{result.items.map(program => <li key={program.id} className="rounded-2xl border border-border/70 bg-background/70 p-5 transition-colors hover:border-primary/30">
+        <p className="rti-kicker">{program.status}</p>
+        <Link href={`${programsPath(organizationId)}/${program.id}`} className="rti-link mt-3 inline-block break-words text-lg">{program.name}</Link>
+        <p className="mt-3 text-sm text-muted-foreground">{program.startDate ?? "Sin fecha"} — {program.endDate ?? "Sin fecha"}</p>
       </li>)}</ul>
-      <p className="text-sm">{result.totalElements} programas · Página {result.page + 1} de {Math.max(1, result.totalPages)}</p>
+      <p className="text-sm text-muted-foreground">{result.totalElements} programas · Página {result.page + 1} de {Math.max(1, result.totalPages)}</p>
       <div className="flex flex-wrap gap-3">
         <button className={button} disabled={pending || page === 0} onClick={() => load(page - 1)}>Anterior</button>
         <button className={button} disabled={pending || page + 1 >= result.totalPages} onClick={() => load(page + 1)}>Siguiente</button>
@@ -77,7 +79,7 @@ function ProgramList({ organizationId, canCreate }: { organizationId: string; ca
 }
 
 function ProgramValues({ program }: { program: Program }) {
-  return <dl className="mt-4 space-y-2 break-words">
+  return <dl className="mt-6 grid gap-x-8 gap-y-2 break-words rounded-2xl border border-border/70 bg-background/70 p-5 sm:grid-cols-[auto_1fr]">
     <dt className="font-medium">Nombre</dt><dd>{program.name}</dd>
     <dt className="font-medium">Descripción</dt><dd className="whitespace-pre-wrap">{program.description || "Sin descripción"}</dd>
     <dt className="font-medium">Estado</dt><dd>{program.status}</dd>
@@ -97,9 +99,9 @@ function ProgramDetail({ organizationId, programId, canEnroll }: { organizationI
     }).catch(error => { if (!controller.signal.aborted) setMessage(programErrorMessage(error)); });
     return () => controller.abort();
   }, [organizationId, programId]);
-  return <>{message && <p className="mt-4" role="status">{message}</p>}{program && <>
+  return <>{message && <p className="mt-5 rounded-2xl bg-muted/60 px-4 py-3 text-sm" role="status">{message}</p>}{program && <>
     <ProgramValues program={program} />
-    {canEnroll && <Link href={`${programsPath(organizationId)}/${encodeURIComponent(programId)}/enrollments`} className={`${button} mt-4 inline-block`}>Colaboradores del programa</Link>}
+    {canEnroll && <Link href={`${programsPath(organizationId)}/${encodeURIComponent(programId)}/enrollments`} className="rti-button-primary mt-5">Colaboradores del programa</Link>}
   </>}</>;
 }
 
@@ -137,25 +139,25 @@ export function CreateProgramForm({ organizationId }: { organizationId: string }
       setMessage(uncertain ? "No se pudo confirmar el resultado. Revisa el listado antes de repetir la creación." : programErrorMessage(failure));
     } finally { submitting.current = false; if (!controller.signal.aborted) setPending(false); }
   }
-  return <div className="mt-4">
+  return <div className="mt-6">
     <p className="text-sm text-muted-foreground">El programa se creará en DRAFT. Esta operación no activa el programa.</p>
-    {message && <p className="mt-4" role="status">{message}</p>}
-    {created ? <><ProgramValues program={created} /><Link className="mt-4 inline-block underline" href={`${programsPath(organizationId)}/${created.id}`}>Consultar programa creado</Link></>
-      : <form className="mt-4 space-y-4" aria-label="Crear programa" onSubmit={submit} noValidate>
+    {message && <p className="mt-4 rounded-2xl bg-muted/60 px-4 py-3 text-sm" role="status">{message}</p>}
+    {created ? <><ProgramValues program={created} /><Link className="rti-link mt-5 inline-block" href={`${programsPath(organizationId)}/${created.id}`}>Consultar programa creado</Link></>
+      : <form className="mt-6 space-y-5" aria-label="Crear programa" onSubmit={submit} noValidate>
         {([['name', 'Nombre'], ['description', 'Descripción (opcional)'], ['startDate', 'Fecha de inicio'], ['endDate', 'Fecha de fin']] as const).map(([field, label]) =>
           <div key={field}>
             <label htmlFor={`program-${field}`} className="block text-sm font-medium">{label}</label>
             {field === "description" ? <textarea id={`program-${field}`} rows={4} maxLength={10000} value={input[field]}
               onChange={e => setInput({ ...input, [field]: e.target.value })} disabled={pending || blocked}
               aria-invalid={fields.includes(field)} aria-describedby={fields.includes(field) ? `${field}-error` : undefined}
-              className="mt-1 w-full rounded-md border px-3 py-2" />
+              className="rti-field" />
               : <input id={`program-${field}`} type={field === "name" ? "text" : "date"} required maxLength={field === "name" ? 255 : undefined}
                 value={input[field]} onChange={e => setInput({ ...input, [field]: e.target.value })} disabled={pending || blocked}
                 aria-invalid={fields.includes(field)} aria-describedby={fields.includes(field) ? `${field}-error` : undefined}
-                className="mt-1 min-h-10 w-full min-w-0 rounded-md border px-3 py-2" />}
+                className="rti-field" />}
             {fields.includes(field) && <p id={`${field}-error`} className="text-sm text-destructive">Revisa este campo.</p>}
           </div>)}
-        <button className={button} disabled={pending || blocked}>{pending ? "Creando…" : "Crear programa"}</button>
+        <button className="rti-button-primary" disabled={pending || blocked}>{pending ? "Creando…" : "Crear programa"}</button>
       </form>}
   </div>;
 }

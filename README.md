@@ -163,8 +163,11 @@ npm run build
 npm run test:e2e -- --grep-invert @mvp
 ```
 
-Las rutas `/`, `/login`, `/account`, `/invitations` y `/my-programs` son
-intencionalmente mínimas.
+Las rutas `/`, `/login`, `/account`, `/invitations` y `/my-programs` comparten
+una fundación visual responsive. El shell autenticado ofrece navegación a las
+áreas existentes, pero no sustituye la autorización del backend ni implica que
+exista un dashboard completo. El alcance y sus límites están documentados en la
+[fundación visual del producto](docs/architecture/product-ui-foundation.md).
 `/login` inicia Authorization Code + PKCE y `/account` permite consultar el perfil
 interno, seleccionar una organización disponible y cerrar la sesión. Los roles
 mostrados proceden del backend. No hay registro público ni dashboard. La ruta

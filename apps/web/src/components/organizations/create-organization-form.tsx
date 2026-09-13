@@ -72,43 +72,48 @@ export function CreateOrganizationForm() {
   }
 
   return (
-    <section className="w-full max-w-xl rounded-xl border bg-background p-6 shadow-sm sm:p-8">
-      <h1 className="text-2xl font-semibold">Crear organización</h1>
-      <p className="mt-2 text-sm text-muted-foreground">Datos básicos de la empresa. Tu acceso como consultor se asignará al crearla.</p>
-      <p className="mt-4 text-sm" role="status" aria-live="polite">{message}</p>
+    <section className="rti-surface mx-auto w-full max-w-3xl p-6 sm:p-8 lg:p-10">
+      <p className="rti-kicker">Configuración inicial</p>
+      <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Crear organización</h1>
+      <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">Datos básicos de la empresa. Tu acceso como consultor se asignará al crearla.</p>
+      {message && (
+        <p className="mt-5 rounded-2xl border border-border/70 bg-muted/60 px-4 py-3 text-sm" role="status" aria-live="polite">
+          {message}
+        </p>
+      )}
       {created ? (
-        <dl className="mt-4 space-y-2 break-words">
+        <dl className="mt-5 grid gap-x-8 gap-y-2 break-words rounded-2xl border border-border/70 bg-background/70 p-5 sm:grid-cols-[auto_1fr]">
           <dt className="font-medium">Organización</dt><dd>{created.name}</dd>
           <dt className="font-medium">Estado</dt><dd>{created.status}</dd>
           <dt className="font-medium">Zona horaria</dt><dd>{created.defaultTimeZone}</dd>
           <dt className="font-medium">Versión</dt><dd>{created.version}</dd>
         </dl>
       ) : allowed && !checking ? (
-        <form className="mt-4 space-y-4" onSubmit={submit} aria-label="Crear organización" noValidate>
+        <form className="mt-6 space-y-5" onSubmit={submit} aria-label="Crear organización" noValidate>
           <div>
             <label htmlFor="organization-name" className="block text-sm font-medium">Nombre</label>
             <input id="organization-name" value={name} onChange={e => setName(e.target.value)} required maxLength={255}
               disabled={pending || uncertain} aria-invalid={fields.includes("name")} aria-describedby={fields.includes("name") ? "name-error" : undefined}
-              className="mt-1 min-h-10 w-full rounded-md border px-3 py-2" />
+              className="rti-field" />
             {fields.includes("name") && <p id="name-error" className="text-sm text-destructive">Escribe un nombre válido de hasta 255 caracteres.</p>}
           </div>
           <div>
             <label htmlFor="organization-zone" className="block text-sm font-medium">Zona horaria</label>
             <input id="organization-zone" value={zone} onChange={e => setZone(e.target.value)} required maxLength={255}
               disabled={pending || uncertain} aria-invalid={fields.includes("defaultTimeZone")}
-              aria-describedby="zone-help" className="mt-1 min-h-10 w-full rounded-md border px-3 py-2" />
+              aria-describedby="zone-help" className="rti-field" />
             <p id="zone-help" className="mt-1 text-sm text-muted-foreground">{fields.includes("defaultTimeZone")
               ? "Introduce una zona horaria válida, por ejemplo America/Bogota."
               : "Identificador IANA, por ejemplo America/Bogota o Europe/Madrid."}</p>
           </div>
-          <button disabled={pending || uncertain} className="min-h-10 rounded-md bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50">
+          <button disabled={pending || uncertain} className="rti-button-primary">
             {pending ? "Creando…" : "Crear organización"}
           </button>
         </form>
       ) : null}
-      <div className="mt-6 flex flex-wrap gap-4 text-sm">
-        <Link href="/account" className="underline">Volver a Cuenta</Link>
-        {!checking && !allowed && <Link href="/login" className="underline">Ir a iniciar sesión</Link>}
+      <div className="mt-7 flex flex-wrap gap-4 border-t border-border/70 pt-6 text-sm">
+        <Link href="/account" className="rti-link">Volver a Cuenta</Link>
+        {!checking && !allowed && <Link href="/login" className="rti-link">Ir a iniciar sesión</Link>}
       </div>
     </section>
   );

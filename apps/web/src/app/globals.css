@@ -7,7 +7,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: Arial, Helvetica, sans-serif;
+  --font-sans: "Segoe UI", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -49,38 +49,38 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --background: oklch(0.985 0.009 73);
+  --foreground: oklch(0.24 0.025 28);
+  --card: oklch(0.998 0.004 73);
+  --card-foreground: oklch(0.24 0.025 28);
+  --popover: oklch(0.998 0.004 73);
+  --popover-foreground: oklch(0.24 0.025 28);
+  --primary: oklch(0.43 0.12 18);
+  --primary-foreground: oklch(0.985 0.006 70);
+  --secondary: oklch(0.94 0.025 75);
+  --secondary-foreground: oklch(0.31 0.04 28);
+  --muted: oklch(0.955 0.014 73);
+  --muted-foreground: oklch(0.5 0.035 38);
+  --accent: oklch(0.925 0.04 153);
+  --accent-foreground: oklch(0.31 0.055 153);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --border: oklch(0.88 0.025 65);
+  --input: oklch(0.86 0.025 65);
+  --ring: oklch(0.55 0.11 18);
+  --chart-1: oklch(0.58 0.13 18);
+  --chart-2: oklch(0.62 0.095 153);
+  --chart-3: oklch(0.7 0.12 76);
+  --chart-4: oklch(0.52 0.07 280);
+  --chart-5: oklch(0.64 0.11 34);
+  --radius: 0.85rem;
+  --sidebar: oklch(0.97 0.012 73);
+  --sidebar-foreground: oklch(0.24 0.025 28);
+  --sidebar-primary: oklch(0.43 0.12 18);
+  --sidebar-primary-foreground: oklch(0.985 0.006 70);
+  --sidebar-accent: oklch(0.925 0.04 153);
+  --sidebar-accent-foreground: oklch(0.31 0.055 153);
+  --sidebar-border: oklch(0.88 0.025 65);
+  --sidebar-ring: oklch(0.55 0.11 18);
 }
 
 .dark {
@@ -123,8 +123,44 @@
   }
   body {
     @apply bg-background text-foreground;
+    background-image:
+      radial-gradient(circle at 8% 4%, oklch(0.88 0.07 20 / 0.26), transparent 28rem),
+      radial-gradient(circle at 92% 14%, oklch(0.9 0.055 153 / 0.3), transparent 30rem);
+    background-attachment: fixed;
   }
   html {
     @apply font-sans;
+  }
+}
+
+@layer components {
+  .rti-surface {
+    @apply rounded-3xl border border-border/80 bg-card/95 shadow-xl shadow-primary/5;
+  }
+
+  .rti-kicker {
+    @apply text-xs font-semibold uppercase tracking-[0.16em] text-primary;
+  }
+
+  .rti-button,
+  .rti-button-primary,
+  .rti-button-secondary {
+    @apply inline-flex min-h-11 items-center justify-center rounded-xl border border-transparent px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .rti-button-primary {
+    @apply bg-primary text-primary-foreground shadow-sm hover:bg-primary/90;
+  }
+
+  .rti-button-secondary {
+    @apply border-border bg-card text-card-foreground hover:border-primary/25 hover:bg-secondary;
+  }
+
+  .rti-link {
+    @apply rounded-sm font-semibold text-primary underline decoration-primary/30 underline-offset-4 transition-colors hover:decoration-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring;
+  }
+
+  .rti-field {
+    @apply mt-1 min-h-11 w-full min-w-0 rounded-xl border border-input bg-background/80 px-3 py-2.5 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus:border-primary/60 focus:outline-none focus:ring-3 focus:ring-ring/15 disabled:cursor-not-allowed disabled:opacity-60;
   }
 }

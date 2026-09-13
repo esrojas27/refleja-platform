@@ -19,6 +19,12 @@ describe("Create organization", () => {
   afterEach(cleanup);
   beforeEach(() => { identity.mockReset(); create.mockReset(); identity.mockResolvedValue({ canCreateOrganizations: true }); });
 
+  it("removes the permission status surface when there is no message to show", async () => {
+    render(<CreateOrganizationForm />);
+    await screen.findByLabelText("Nombre");
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
   it("submits only the two fields and displays the returned organization", async () => {
     create.mockResolvedValue({ id: "org-new", name: "Empresa Real", status: "ACTIVE", defaultTimeZone: "Europe/Madrid", version: 0 });
     render(<CreateOrganizationForm />); await fill();

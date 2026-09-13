@@ -7,7 +7,7 @@ test("home page renders responsively", async ({ page }) => {
   await expect(
     page.getByRole("heading", { level: 1, name: "Refleja Tu Interior" }),
   ).toBeVisible();
-  await expect(page.getByText("Frontend preparado")).toBeVisible();
+  await expect(page.getByText("Una experiencia compartida")).toBeVisible();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
