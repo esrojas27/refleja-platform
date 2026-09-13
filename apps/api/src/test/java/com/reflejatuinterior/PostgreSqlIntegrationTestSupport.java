@@ -8,6 +8,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 @SpringBootTest
@@ -92,7 +93,16 @@ public abstract class PostgreSqlIntegrationTestSupport {
     }
 
     protected void insertProgram(UUID id, UUID organizationId) {
-        jdbcTemplate.update(
+        JdbcTemplate fixtureDatabase = jdbcTemplate;
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            jdbcTemplate.queryForObject(
+                    "select set_config('app.current_organization_id', ?, true)",
+                    String.class,
+                    organizationId.toString());
+        } else {
+            fixtureDatabase = migratorJdbcTemplate();
+        }
+        fixtureDatabase.update(
                 "insert into rti.programs "
                         + "(id, organization_id, name, status, created_at, updated_at, version) "
                         + "values (?, ?, ?, 'DRAFT', now(), now(), 0)",

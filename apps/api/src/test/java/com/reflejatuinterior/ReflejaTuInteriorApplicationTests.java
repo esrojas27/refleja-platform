@@ -11,7 +11,7 @@ import org.springframework.core.env.Environment;
 class ReflejaTuInteriorApplicationTests extends PostgreSqlIntegrationTestSupport {
 
     private static final List<String> MIGRATION_VERSIONS =
-            List.of("202608240151", "202608240337", "20260909010000");
+            List.of("202608240151", "202608240337", "20260909010000", "20260912010000");
 
     private static final List<String> BUSINESS_TABLES = List.of(
             "enrollments",

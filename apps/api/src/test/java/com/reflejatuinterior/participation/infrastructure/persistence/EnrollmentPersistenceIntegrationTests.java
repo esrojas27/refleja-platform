@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import com.reflejatuinterior.PostgreSqlIntegrationTestSupport;
+import com.reflejatuinterior.organization.OrganizationTenantContext;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,9 +20,13 @@ class EnrollmentPersistenceIntegrationTests extends PostgreSqlIntegrationTestSup
     @Autowired
     EnrollmentJpaRepository repository;
 
+    @Autowired
+    OrganizationTenantContext tenantContext;
+
     @Test
     void persistsAnEnrollmentWithScalarTenantReferences() {
         EnrollmentFixture fixture = insertEnrollmentFixture(300);
+        tenantContext.activate(fixture.organizationId());
 
         EnrollmentJpaEntity enrollment = repository.saveAndFlush(new EnrollmentJpaEntity(
                 fixture.organizationId(),
@@ -43,6 +48,7 @@ class EnrollmentPersistenceIntegrationTests extends PostgreSqlIntegrationTestSup
     @Test
     void rejectsADuplicateEnrollmentForTheSameTenantProgramAndParticipant() {
         EnrollmentFixture fixture = insertEnrollmentFixture(310);
+        tenantContext.activate(fixture.organizationId());
         repository.saveAndFlush(new EnrollmentJpaEntity(
                 fixture.organizationId(),
                 fixture.programId(),
@@ -73,6 +79,7 @@ class EnrollmentPersistenceIntegrationTests extends PostgreSqlIntegrationTestSup
         insertOrganization(organizationId);
         insertUser(userId);
         insertMembership(membershipId, organizationId, userId);
+        tenantContext.activate(organizationId);
 
         assertThatThrownBy(() -> repository.saveAndFlush(new EnrollmentJpaEntity(
                 organizationId,
@@ -98,6 +105,7 @@ class EnrollmentPersistenceIntegrationTests extends PostgreSqlIntegrationTestSup
         insertOrganization(otherOrganizationId);
         insertUser(otherUserId);
         insertMembership(otherMembershipId, otherOrganizationId, otherUserId);
+        tenantContext.activate(programOrganizationId);
 
         assertThatThrownBy(() -> repository.saveAndFlush(new EnrollmentJpaEntity(
                 programOrganizationId,

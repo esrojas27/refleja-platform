@@ -2,7 +2,6 @@ package com.reflejatuinterior.participation.application;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
 public interface Enrollments {
@@ -11,8 +10,9 @@ public interface Enrollments {
     Optional<Data> find(UUID organizationId, UUID programId, UUID enrollmentId);
     Optional<Data> findByInvitation(UUID organizationId, UUID invitationId);
     Data activate(UUID organizationId, UUID invitationId);
-    Page listOwned(Set<UUID> membershipIds, int page, int size);
-    Optional<Data> findOwned(Set<UUID> membershipIds, UUID programId);
+    long countOwned(UUID organizationId, UUID membershipId);
+    List<Data> listOwned(UUID organizationId, UUID membershipId, int offset, int limit);
+    Optional<Data> findOwned(UUID organizationId, UUID membershipId, UUID programId);
 
     record Data(UUID id, UUID organizationId, UUID programId, UUID membershipId, UUID invitationId, String status) {}
     record Page(List<Data> items, int page, int size, long totalElements, int totalPages) {

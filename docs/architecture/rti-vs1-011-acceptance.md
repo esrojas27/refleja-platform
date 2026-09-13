@@ -2,7 +2,7 @@
 
 Estado: **cerrado para desarrollo local**. La verificación automática y el
 recorrido manual con la cuenta colaboradora real fueron correctos.
-RTI-VS1-012 no ha comenzado.
+RTI-VS1-012 se documenta por separado en `rti-vs1-012-acceptance.md`.
 
 Se revisaron Product Definition, ADR-001 a ADR-005 y el ticket 011 del
 [documento canónico](https://docs.google.com/document/d/1vzpG5ZiD6uTD6jT9USe_R1rdhU7bN54Q38Ty3Udu-Ik/edit?tab=t.s1fvvog8kpix).
@@ -93,6 +93,6 @@ recorrido real fue aceptado por el usuario. El ticket queda cerrado para desarro
 local.
 
 No existe despliegue compartido de web, API o PostgreSQL; la prueba sigue siendo
-local con Cognito de desarrollo. RLS pertenece al 012 y el gate E2E/CI al 013. Los
-controles de identidad, persona y tenant del 011 ya están activos en el backend y
-no dependen de esos tickets futuros.
+local con Cognito de desarrollo. RLS quedó implementado en el 012 y el gate E2E/CI
+pertenece al 013. Los controles de identidad, persona y tenant del 011 ya están
+activos en el backend y no dependen del ticket futuro.

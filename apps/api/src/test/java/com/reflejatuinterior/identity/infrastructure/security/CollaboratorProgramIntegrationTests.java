@@ -82,6 +82,25 @@ class CollaboratorProgramIntegrationTests extends PostgreSqlIntegrationTestSuppo
     }
 
     @Test
+    void paginatesDeterministicallyAcrossAuthorizedOrganizations() throws Exception {
+        mvc.perform(get("/api/v1/me/programs").header("Authorization", accessToken)
+                        .param("page", "0").param("size", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].id").value(ownActive.toString()))
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.totalPages").value(2));
+        mvc.perform(get("/api/v1/me/programs").header("Authorization", accessToken)
+                        .param("page", "1").param("size", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].id").value(ownCompleted.toString()))
+                .andExpect(jsonPath("$.totalElements").value(2));
+        mvc.perform(get("/api/v1/me/programs").header("Authorization", accessToken)
+                        .param("page", "2").param("size", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items").isEmpty());
+    }
+
+    @Test
     void opensOwnBasicProgramAndHidesAnotherPersonsProgram() throws Exception {
         mvc.perform(get("/api/v1/me/programs/{programId}", ownActive).header("Authorization", accessToken))
                 .andExpect(status().isOk())
@@ -146,6 +165,8 @@ class CollaboratorProgramIntegrationTests extends PostgreSqlIntegrationTestSuppo
     }
 
     private void enrollment(UUID id, UUID organization, UUID program, UUID membership, String status) {
+        jdbcTemplate.queryForObject(
+                "select set_config('app.current_organization_id', ?, true)", String.class, organization.toString());
         jdbcTemplate.update("insert into rti.enrollments "
                         + "(id, organization_id, program_id, participant_membership_id, status, created_at, updated_at, version) "
                         + "values (?, ?, ?, ?, ?, now(), now(), 0)",

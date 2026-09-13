@@ -84,9 +84,9 @@ class EnrollmentInvitationIntegrationTests extends PostgreSqlIntegrationTestSupp
     @AfterEach void cleanup() {
         // This connection belongs exclusively to the disposable Testcontainers database.
         // Restrict deletion to this suite's two organizations and canonical test subjects.
-        jdbcTemplate.update("delete from rti.enrollments where organization_id in (?, ?)", organization, other);
+        migratorJdbcTemplate().update("delete from rti.enrollments where organization_id in (?, ?)", organization, other);
         migratorJdbcTemplate().update("delete from rti.user_invitations where organization_id in (?, ?)", organization, other);
-        jdbcTemplate.update("delete from rti.programs where organization_id in (?, ?)", organization, other);
+        migratorJdbcTemplate().update("delete from rti.programs where organization_id in (?, ?)", organization, other);
         jdbcTemplate.update("delete from rti.membership_roles where membership_id in "
                 + "(select id from rti.organization_memberships where organization_id in (?, ?))", organization, other);
         jdbcTemplate.update("delete from rti.organization_memberships where organization_id in (?, ?)", organization, other);
@@ -115,7 +115,7 @@ class EnrollmentInvitationIntegrationTests extends PostgreSqlIntegrationTestSupp
         assertThat(roles(membership(enrollment))).containsExactly("COLLABORATOR");
         assertThat(jdbcTemplate.queryForObject("select cognito_subject from rti.users where id=?", String.class, user(enrollment)))
                 .isEqualTo(SUBJECT);
-        assertThat(jdbcTemplate.queryForObject("select version from rti.enrollments where id=?", Long.class, id(enrollment))).isZero();
+        assertThat(migratorJdbcTemplate().queryForObject("select version from rti.enrollments where id=?", Long.class, id(enrollment))).isZero();
         mvc.perform(get("/api/v1/me").header("Authorization", token(SUBJECT))).andExpect(status().isForbidden());
         verify(gateway).sendWelcomeIfRequired(any());
         verify(gateway).sendInvitation(any());
@@ -261,9 +261,9 @@ class EnrollmentInvitationIntegrationTests extends PostgreSqlIntegrationTestSupp
     @Test void repeatedAcceptanceIsIdempotentButCannotRestoreARevokedMembership() throws Exception {
         var enrollment = enroll(EMAIL);
         accept(enrollment, SUBJECT).andExpect(status().isOk());
-        long version = jdbcTemplate.queryForObject("select version from rti.enrollments where id=?", Long.class, id(enrollment));
+        long version = migratorJdbcTemplate().queryForObject("select version from rti.enrollments where id=?", Long.class, id(enrollment));
         accept(enrollment, SUBJECT).andExpect(status().isOk());
-        assertThat(jdbcTemplate.queryForObject("select version from rti.enrollments where id=?", Long.class, id(enrollment))).isEqualTo(version);
+        assertThat(migratorJdbcTemplate().queryForObject("select version from rti.enrollments where id=?", Long.class, id(enrollment))).isEqualTo(version);
         jdbcTemplate.update("update rti.organization_memberships set status='REVOKED' where id=?", membership(enrollment));
         accept(enrollment, SUBJECT).andExpect(status().isConflict());
         assertState("organization_memberships", membership(enrollment), "REVOKED");
@@ -392,10 +392,12 @@ class EnrollmentInvitationIntegrationTests extends PostgreSqlIntegrationTestSupp
         assertState("user_invitations", invitation(enrollment), "PENDING");
     }
     private void assertState(String table, UUID id, String state) {
-        assertThat(jdbcTemplate.queryForObject("select status from rti." + table + " where id=?", String.class, id)).isEqualTo(state);
+        var database = "enrollments".equals(table) ? migratorJdbcTemplate() : jdbcTemplate;
+        assertThat(database.queryForObject("select status from rti." + table + " where id=?", String.class, id)).isEqualTo(state);
     }
     private long count(String table) {
-        return jdbcTemplate.queryForObject("select count(*) from rti." + table + " where organization_id in (?, ?)", Long.class, organization, other);
+        var database = "enrollments".equals(table) ? migratorJdbcTemplate() : jdbcTemplate;
+        return database.queryForObject("select count(*) from rti." + table + " where organization_id in (?, ?)", Long.class, organization, other);
     }
     private List<String> roles(UUID membership) {
         return jdbcTemplate.queryForList("select role from rti.membership_roles where membership_id=? order by role", String.class, membership);

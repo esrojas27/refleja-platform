@@ -1,14 +1,17 @@
 package com.reflejatuinterior.participation.application;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import com.reflejatuinterior.identity.CollaboratorInvitations;
 import com.reflejatuinterior.identity.CollaboratorAccess;
 import com.reflejatuinterior.identity.OrganizationAccess;
 import com.reflejatuinterior.organization.OrganizationDirectory;
+import com.reflejatuinterior.organization.OrganizationTenantContext;
 import com.reflejatuinterior.participation.domain.InvalidEnrollmentInput;
 import com.reflejatuinterior.participation.domain.NewCollaborator;
 import com.reflejatuinterior.program.ProgramDirectory;
@@ -29,13 +32,16 @@ public class EnrollmentService {
     private final CollaboratorInvitations invitations;
     private final CollaboratorAccess collaboratorAccess;
     private final Enrollments enrollments;
+    private final OrganizationTenantContext tenantContext;
     private final TransactionTemplate transactions;
 
     EnrollmentService(OrganizationAccess access, OrganizationDirectory organizations, ProgramDirectory programs,
                       CollaboratorInvitations invitations, CollaboratorAccess collaboratorAccess,
-                      Enrollments enrollments, PlatformTransactionManager transactionManager) {
+                      Enrollments enrollments, OrganizationTenantContext tenantContext,
+                      PlatformTransactionManager transactionManager) {
         this.access = access; this.organizations = organizations; this.programs = programs;
         this.invitations = invitations; this.collaboratorAccess = collaboratorAccess; this.enrollments = enrollments;
+        this.tenantContext = tenantContext;
         this.transactions = new TransactionTemplate(transactionManager);
     }
 
@@ -84,6 +90,7 @@ public class EnrollmentService {
         validatePage(page, size);
         var result = invitations.listOwned(subject, page, size);
         var items = result.items().stream().map(invitation -> {
+            tenantContext.activate(invitation.organizationId());
             var enrollment = enrollments.findByInvitation(invitation.organizationId(), invitation.id()).orElseThrow(EnrollmentNotFound::new);
             var organization = organizations.findSummaries(Set.of(invitation.organizationId())).stream()
                     .findFirst().orElseThrow(EnrollmentNotFound::new);
@@ -98,6 +105,7 @@ public class EnrollmentService {
     public AcceptanceResponse accept(String subject, UUID invitationId, String requestId) {
         // This endpoint intentionally permits INVITED users, but only for their own invitation.
         var owned = invitations.findOwned(subject, invitationId);
+        tenantContext.activate(owned.organizationId());
         var enrollment = enrollments.findByInvitation(owned.organizationId(), invitationId).orElseThrow(EnrollmentNotFound::new);
         var organization = organizations.findSummaries(Set.of(owned.organizationId())).stream()
                 .filter(o -> "ACTIVE".equals(o.status())).findFirst().orElseThrow(CollaboratorInvitations.Denied::new);
@@ -115,22 +123,51 @@ public class EnrollmentService {
     public MyProgramPage myPrograms(String subject, int page, int size, String requestId) {
         validatePage(page, size);
         var context = collaboratorContext(subject, requestId, null);
-        var memberships = context.memberships().stream()
-                .collect(java.util.stream.Collectors.toMap(CollaboratorAccess.Membership::id, java.util.function.Function.identity()));
-        var result = enrollments.listOwned(memberships.keySet(), page, size);
-        return new MyProgramPage(result.items().stream().map(item -> myProgram(item, memberships)).toList(),
-                page, size, result.totalElements(), result.totalPages());
+        var memberships = orderedMemberships(context);
+        var items = new ArrayList<MyProgramResponse>(size);
+        long skipped = (long) page * size;
+        long total = 0;
+
+        for (var membership : memberships) {
+            long tenantOffset = skipped;
+            int remaining = size - items.size();
+            tenantContext.activate(membership.organizationId());
+            long count = enrollments.countOwned(membership.organizationId(), membership.id());
+            TenantPrograms tenantPrograms;
+            if (remaining == 0 || tenantOffset >= count) {
+                tenantPrograms = new TenantPrograms(count, List.of());
+            } else {
+                var rows = enrollments.listOwned(
+                        membership.organizationId(), membership.id(), (int) tenantOffset, remaining);
+                tenantPrograms = new TenantPrograms(count, rows.stream()
+                        .map(row -> myProgram(row, membership)).toList());
+            }
+            total += tenantPrograms.total();
+            if (skipped >= tenantPrograms.total()) {
+                skipped -= tenantPrograms.total();
+            } else {
+                skipped = 0;
+                items.addAll(tenantPrograms.items());
+            }
+        }
+        long pages = total / size + (total % size == 0 ? 0 : 1);
+        return new MyProgramPage(items, page, size, total, (int) Math.min(Integer.MAX_VALUE, pages));
     }
 
     @Transactional(readOnly = true)
     public MyProgramResponse myProgram(String subject, UUID programId, String requestId) {
         var context = collaboratorContext(subject, requestId, programId);
-        var memberships = context.memberships().stream()
-                .collect(java.util.stream.Collectors.toMap(CollaboratorAccess.Membership::id, java.util.function.Function.identity()));
-        var enrollment = enrollments.findOwned(memberships.keySet(), programId).orElseThrow(() -> {
-            deniedProgram(context.userId(), programId, requestId); return new MyProgramNotFound();
-        });
-        return myProgram(enrollment, memberships);
+        for (var membership : orderedMemberships(context)) {
+            tenantContext.activate(membership.organizationId());
+            Optional<MyProgramResponse> found = enrollments.findOwned(
+                            membership.organizationId(), membership.id(), programId)
+                    .map(enrollment -> myProgram(enrollment, membership));
+            if (found.isPresent()) {
+                return found.get();
+            }
+        }
+        deniedProgram(context.userId(), programId, requestId);
+        throw new MyProgramNotFound();
     }
 
     private CollaboratorAccess.Context collaboratorContext(String subject, String requestId, UUID programId) {
@@ -142,16 +179,21 @@ public class EnrollmentService {
         }
     }
 
-    private MyProgramResponse myProgram(Enrollments.Data enrollment,
-                                        Map<UUID, CollaboratorAccess.Membership> memberships) {
-        var membership = memberships.get(enrollment.membershipId());
-        if (membership == null || !membership.organizationId().equals(enrollment.organizationId())) {
+    private MyProgramResponse myProgram(Enrollments.Data enrollment, CollaboratorAccess.Membership membership) {
+        if (!membership.id().equals(enrollment.membershipId())
+                || !membership.organizationId().equals(enrollment.organizationId())) {
             throw new MyProgramNotFound();
         }
         var program = programs.find(enrollment.organizationId(), enrollment.programId())
                 .orElseThrow(MyProgramNotFound::new);
         return new MyProgramResponse(program.id(), program.organizationId(), membership.organizationName(), program.name(),
                 program.description(), program.status(), program.startDate(), program.endDate(), program.version());
+    }
+
+    private static List<CollaboratorAccess.Membership> orderedMemberships(CollaboratorAccess.Context context) {
+        return context.memberships().stream()
+                .sorted(Comparator.comparing(CollaboratorAccess.Membership::organizationId))
+                .toList();
     }
 
     private static void deniedProgram(UUID actor, UUID programId, String requestId) {
@@ -174,6 +216,7 @@ public class EnrollmentService {
             deniedAudit(context.userId(), organizationId, programId, requestId);
             throw new OrganizationAccess.Denied();
         }
+        tenantContext.activate(context.organizationId());
         if (programs.find(context.organizationId(), programId).isEmpty()) {
             deniedAudit(context.userId(), organizationId, programId, requestId);
             throw new EnrollmentNotFound();
@@ -246,4 +289,5 @@ public class EnrollmentService {
     public record MyProgramPage(List<MyProgramResponse> items, int page, int size, long totalElements, int totalPages) {
         public MyProgramPage { items = List.copyOf(items); }
     }
+    private record TenantPrograms(long total, List<MyProgramResponse> items) {}
 }

@@ -7,6 +7,7 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 import com.reflejatuinterior.PostgreSqlIntegrationTestSupport;
+import com.reflejatuinterior.organization.OrganizationTenantContext;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +20,9 @@ class ProgramPersistenceIntegrationTests extends PostgreSqlIntegrationTestSuppor
     @Autowired
     ProgramJpaRepository repository;
 
+    @Autowired
+    OrganizationTenantContext tenantContext;
+
     @Test
     void persistsAProgramWithScalarTenantAndMembershipReferences() {
         UUID organizationId = uuid7(200);
@@ -27,6 +31,7 @@ class ProgramPersistenceIntegrationTests extends PostgreSqlIntegrationTestSuppor
         insertOrganization(organizationId);
         insertUser(userId);
         insertMembership(consultantMembershipId, organizationId, userId);
+        tenantContext.activate(organizationId);
 
         ProgramJpaEntity program = repository.saveAndFlush(new ProgramJpaEntity(
                 organizationId,
@@ -55,6 +60,7 @@ class ProgramPersistenceIntegrationTests extends PostgreSqlIntegrationTestSuppor
         insertOrganization(otherOrganizationId);
         insertUser(otherUserId);
         insertMembership(otherMembershipId, otherOrganizationId, otherUserId);
+        tenantContext.activate(programOrganizationId);
 
         assertThatThrownBy(() -> repository.saveAndFlush(new ProgramJpaEntity(
                 programOrganizationId,

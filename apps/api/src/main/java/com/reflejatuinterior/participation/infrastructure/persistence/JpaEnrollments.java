@@ -1,10 +1,12 @@
 package com.reflejatuinterior.participation.infrastructure.persistence;
 
+import java.util.List;
 import java.util.Set;
 import java.util.Optional;
 import java.util.UUID;
 import com.reflejatuinterior.participation.application.EnrollmentNotFound;
 import com.reflejatuinterior.participation.application.Enrollments;
+import jakarta.persistence.EntityManager;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
@@ -15,7 +17,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(propagation = Propagation.MANDATORY)
 class JpaEnrollments implements Enrollments {
     private final EnrollmentJpaRepository repository;
-    JpaEnrollments(EnrollmentJpaRepository repository) { this.repository = repository; }
+    private final EntityManager entityManager;
+    JpaEnrollments(EnrollmentJpaRepository repository, EntityManager entityManager) {
+        this.repository = repository;
+        this.entityManager = entityManager;
+    }
 
     @Override public Data create(UUID organizationId, UUID programId, UUID membershipId, UUID invitationId) {
         var entity = new EnrollmentJpaEntity(organizationId, programId, membershipId, EnrollmentStatus.INVITED,
@@ -45,17 +51,49 @@ class JpaEnrollments implements Enrollments {
         return data(repository.saveAndFlush(entity));
     }
 
-    @Override public Page listOwned(Set<UUID> membershipIds, int page, int size) {
-        var result = repository.findByParticipantMembershipIdInAndStatusIn(membershipIds,
-                Set.of(EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED),
-                PageRequest.of(page, size, Sort.by("id").descending()));
-        return new Page(result.getContent().stream().map(JpaEnrollments::data).toList(), page, size,
-                result.getTotalElements(), result.getTotalPages());
+    @Override public long countOwned(UUID organizationId, UUID membershipId) {
+        return entityManager.createQuery("""
+                select count(e) from EnrollmentJpaEntity e
+                where e.organizationId = :organizationId
+                  and e.participantMembershipId = :membershipId
+                  and e.status in :statuses
+                """, Long.class)
+                .setParameter("organizationId", organizationId)
+                .setParameter("membershipId", membershipId)
+                .setParameter("statuses", Set.of(EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED))
+                .getSingleResult();
     }
 
-    @Override public Optional<Data> findOwned(Set<UUID> membershipIds, UUID programId) {
-        return repository.findFirstByParticipantMembershipIdInAndProgramIdAndStatusIn(membershipIds, programId,
-                Set.of(EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED)).map(JpaEnrollments::data);
+    @Override public List<Data> listOwned(UUID organizationId, UUID membershipId, int offset, int limit) {
+        return entityManager.createQuery("""
+                select e from EnrollmentJpaEntity e
+                where e.organizationId = :organizationId
+                  and e.participantMembershipId = :membershipId
+                  and e.status in :statuses
+                order by e.id desc
+                """, EnrollmentJpaEntity.class)
+                .setParameter("organizationId", organizationId)
+                .setParameter("membershipId", membershipId)
+                .setParameter("statuses", Set.of(EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED))
+                .setFirstResult(offset)
+                .setMaxResults(limit)
+                .getResultList().stream().map(JpaEnrollments::data).toList();
+    }
+
+    @Override public Optional<Data> findOwned(UUID organizationId, UUID membershipId, UUID programId) {
+        return entityManager.createQuery("""
+                select e from EnrollmentJpaEntity e
+                where e.organizationId = :organizationId
+                  and e.participantMembershipId = :membershipId
+                  and e.programId = :programId
+                  and e.status in :statuses
+                """, EnrollmentJpaEntity.class)
+                .setParameter("organizationId", organizationId)
+                .setParameter("membershipId", membershipId)
+                .setParameter("programId", programId)
+                .setParameter("statuses", Set.of(EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED))
+                .setMaxResults(1)
+                .getResultStream().findFirst().map(JpaEnrollments::data);
     }
 
     private static Data data(EnrollmentJpaEntity e) {

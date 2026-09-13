@@ -3,6 +3,7 @@ package com.reflejatuinterior.program.application;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
+import com.reflejatuinterior.organization.OrganizationTenantContext;
 import com.reflejatuinterior.program.domain.InvalidProgramInput;
 import com.reflejatuinterior.program.domain.NewProgram;
 import org.slf4j.LoggerFactory;
@@ -15,12 +16,18 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 public class ProgramService {
     private final ProgramAccessPolicy policy;
     private final Programs programs;
-    ProgramService(ProgramAccessPolicy policy, Programs programs) { this.policy = policy; this.programs = programs; }
+    private final OrganizationTenantContext tenantContext;
+    ProgramService(ProgramAccessPolicy policy, Programs programs, OrganizationTenantContext tenantContext) {
+        this.policy = policy;
+        this.programs = programs;
+        this.tenantContext = tenantContext;
+    }
 
     @Transactional
     public ProgramData create(String subject, UUID organizationId, String name, String description,
                               LocalDate startDate, LocalDate endDate, String requestId) {
         var context = policy.authorize(subject, organizationId, true, requestId);
+        tenantContext.activate(context.organizationId());
         var created = programs.create(context.organizationId(), new NewProgram(name, description, startDate, endDate));
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override public void afterCommit() {
@@ -35,6 +42,7 @@ public class ProgramService {
     @Transactional(readOnly = true)
     public ProgramPage list(String subject, UUID organizationId, int page, int size, String requestId) {
         var context = policy.authorize(subject, organizationId, false, requestId);
+        tenantContext.activate(context.organizationId());
         if (page < 0) throw new InvalidProgramInput("page");
         if (size < 1 || size > 100) throw new InvalidProgramInput("size");
         if ((long) page * size > Integer.MAX_VALUE) throw new InvalidProgramInput("page");
@@ -44,6 +52,7 @@ public class ProgramService {
     @Transactional(readOnly = true)
     public ProgramData detail(String subject, UUID organizationId, UUID programId, String requestId) {
         var context = policy.authorize(subject, organizationId, false, requestId);
+        tenantContext.activate(context.organizationId());
         return programs.find(context.organizationId(), programId).orElseThrow(ProgramNotFound::new);
     }
 }

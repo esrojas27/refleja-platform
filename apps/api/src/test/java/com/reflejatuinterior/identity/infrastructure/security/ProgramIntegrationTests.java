@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.time.Instant;
 import java.util.UUID;
 import com.reflejatuinterior.PostgreSqlIntegrationTestSupport;
+import com.reflejatuinterior.organization.OrganizationTenantContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -30,6 +31,7 @@ class ProgramIntegrationTests extends PostgreSqlIntegrationTestSupport {
     @Autowired MockMvc mvc;
     @Autowired JwtEncoder encoder;
     @Autowired ObjectMapper json;
+    @Autowired OrganizationTenantContext tenantContext;
     private String bearer;
 
     @BeforeEach void setup() {
@@ -71,6 +73,7 @@ class ProgramIntegrationTests extends PostgreSqlIntegrationTestSupport {
         }
         list(other).andExpect(status().isNotFound());
         create(other, valid()).andExpect(status().isNotFound());
+        tenantContext.activate(other);
         assertThat(jdbcTemplate.queryForObject("select count(*) from rti.programs where organization_id=?", Long.class, other)).isEqualTo(1);
     }
 
@@ -128,6 +131,7 @@ class ProgramIntegrationTests extends PostgreSqlIntegrationTestSupport {
             "{\"name\":\" \",\"startDate\":\"2026-09-01\",\"endDate\":\"2026-12-01\"}"})
     void invalidInputDoesNotWrite(String input) throws Exception {
         create(organization, input).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+        tenantContext.activate(organization);
         assertThat(jdbcTemplate.queryForObject("select count(*) from rti.programs where organization_id=?", Long.class, organization)).isEqualTo(1);
     }
     @ParameterizedTest @ValueSource(strings = {"size=0", "size=101", "page=-1", "page=invalid", "page=2147483647&size=100"})
