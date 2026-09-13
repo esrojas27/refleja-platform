@@ -105,6 +105,11 @@ export function AccountSession() {
         <Link href="/invitations" className="min-h-10 rounded-md border px-4 py-2 text-sm font-medium">
           Invitaciones
         </Link>
+        {identity?.organizations.some(organization => organization.roles.includes("COLLABORATOR")) && (
+          <Link href="/my-programs" className="min-h-10 rounded-md border px-4 py-2 text-sm font-medium">
+            Mis programas
+          </Link>
+        )}
         {identity?.activeOrganizationId && identity.roles.some(role => ["CONSULTANT", "COMPANY_ADMIN", "LEADER"].includes(role)) && (
           <Link href={`/organizations/${encodeURIComponent(identity.activeOrganizationId)}/programs`} className="min-h-10 rounded-md border px-4 py-2 text-sm font-medium">
             Ver programas

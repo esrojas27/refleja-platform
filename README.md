@@ -6,6 +6,8 @@ El repositorio contiene la base técnica inicial (001–005), autenticación con
 (006), contexto interno y roles (007), creación de organizaciones (008) y programas
 (009). La inscripción e invitación de colaboradores (010) está cerrada para
 desarrollo local después de validar el recorrido completo con Cognito y SES reales.
+La vista de programas propios del colaborador (011) está cerrada para desarrollo
+local después de verificarla automáticamente y con la cuenta colaboradora real.
 
 ## Estructura del repositorio
 
@@ -118,6 +120,19 @@ Configuración: [Cognito/SES](infra/cognito/README.md#correo-de-invitaciones-rti
 Contrato, seguridad, evidencia automática y recorrido manual:
 [acta del 010](docs/architecture/rti-vs1-010-acceptance.md).
 
+### Mis programas — RTI-VS1-011
+
+Una cuenta con usuario, membresía y rol `COLLABORATOR` activos ve **Mis programas**
+en `/account`. `/my-programs` muestra únicamente programas respaldados por una
+inscripción propia `ACTIVE` o `COMPLETED`; cada elemento abre un detalle básico con
+nombre, organización, descripción, estado y fechas.
+
+API: `GET /api/v1/me/programs` y `GET /api/v1/me/programs/{programId}`. El backend
+resuelve la persona desde el `sub` del Access Token y no acepta un `participantId`
+ni un tenant elegido por el cliente. Programas de otra persona u organización se
+ocultan con 404. No se agregaron migraciones ni dependencias. Contrato, seguridad,
+pruebas y validación manual: [acta del 011](docs/architecture/rti-vs1-011-acceptance.md).
+
 ### Desarrollo y comprobaciones
 
 La aplicación web vive en `apps/web` y utiliza Next.js, React, TypeScript, App Router, Tailwind CSS y shadcn/ui. Amplify Auth actúa únicamente como cliente de Cognito.
@@ -132,7 +147,8 @@ npm run build
 npm run test:e2e
 ```
 
-Las rutas `/`, `/login`, `/account` y `/invitations` son intencionalmente mínimas.
+Las rutas `/`, `/login`, `/account`, `/invitations` y `/my-programs` son
+intencionalmente mínimas.
 `/login` inicia Authorization Code + PKCE y `/account` permite consultar el perfil
 interno, seleccionar una organización disponible y cerrar la sesión. Los roles
 mostrados proceden del backend. No hay registro público ni dashboard. La ruta
@@ -311,7 +327,8 @@ Las pruebas inician un contenedor efímero `postgres:18` mediante Testcontainers
 La API vive en `apps/api`, utiliza Java 21 y Maven. Además de health, identidad,
 organizaciones y programas, expone las operaciones del 010 bajo
 `/api/v1/organizations/{organizationId}/programs/{programId}/enrollments` y
-`/api/v1/invitations`. La resolución de contexto usa el modelo de lectura JDBC
+`/api/v1/invitations`, junto con la consulta propia del 011 bajo
+`/api/v1/me/programs`. La resolución de contexto usa el modelo de lectura JDBC
 permitido por ADR-004; las escrituras usan JPA dentro del módulo propietario.
 `identity` orquesta el aprovisionamiento externo y la concesión de acceso mediante
 APIs públicas de módulo, sin exponer repositorios entre módulos.
@@ -328,7 +345,7 @@ Todas las implementaciones futuras deberán respetar las decisiones aceptadas. C
 
 Todavía no existen:
 
-- la vista del colaborador con sus programas, correspondiente al 011;
+- sesiones, actividades, progreso o planes de acción dentro de los programas;
 - edición o administración general de organizaciones y programas;
 - aislamiento RLS del ticket 012 (no sustituye los controles backend exigidos antes);
 - registro público o administración de usuarios;

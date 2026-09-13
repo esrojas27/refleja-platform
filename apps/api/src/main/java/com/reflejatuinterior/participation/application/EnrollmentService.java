@@ -2,9 +2,11 @@ package com.reflejatuinterior.participation.application;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import com.reflejatuinterior.identity.CollaboratorInvitations;
+import com.reflejatuinterior.identity.CollaboratorAccess;
 import com.reflejatuinterior.identity.OrganizationAccess;
 import com.reflejatuinterior.organization.OrganizationDirectory;
 import com.reflejatuinterior.participation.domain.InvalidEnrollmentInput;
@@ -25,13 +27,15 @@ public class EnrollmentService {
     private final OrganizationDirectory organizations;
     private final ProgramDirectory programs;
     private final CollaboratorInvitations invitations;
+    private final CollaboratorAccess collaboratorAccess;
     private final Enrollments enrollments;
     private final TransactionTemplate transactions;
 
     EnrollmentService(OrganizationAccess access, OrganizationDirectory organizations, ProgramDirectory programs,
-                      CollaboratorInvitations invitations, Enrollments enrollments, PlatformTransactionManager transactionManager) {
+                      CollaboratorInvitations invitations, CollaboratorAccess collaboratorAccess,
+                      Enrollments enrollments, PlatformTransactionManager transactionManager) {
         this.access = access; this.organizations = organizations; this.programs = programs;
-        this.invitations = invitations; this.enrollments = enrollments;
+        this.invitations = invitations; this.collaboratorAccess = collaboratorAccess; this.enrollments = enrollments;
         this.transactions = new TransactionTemplate(transactionManager);
     }
 
@@ -105,6 +109,55 @@ public class EnrollmentService {
             auditAfterCommit("INVITATION_ACCEPTED", accepted.userId(), accepted.organizationId(), activated.id(), requestId);
         }
         return new AcceptanceResponse(accepted.id(), accepted.status(), activated.id(), activated.status());
+    }
+
+    @Transactional(readOnly = true)
+    public MyProgramPage myPrograms(String subject, int page, int size, String requestId) {
+        validatePage(page, size);
+        var context = collaboratorContext(subject, requestId, null);
+        var memberships = context.memberships().stream()
+                .collect(java.util.stream.Collectors.toMap(CollaboratorAccess.Membership::id, java.util.function.Function.identity()));
+        var result = enrollments.listOwned(memberships.keySet(), page, size);
+        return new MyProgramPage(result.items().stream().map(item -> myProgram(item, memberships)).toList(),
+                page, size, result.totalElements(), result.totalPages());
+    }
+
+    @Transactional(readOnly = true)
+    public MyProgramResponse myProgram(String subject, UUID programId, String requestId) {
+        var context = collaboratorContext(subject, requestId, programId);
+        var memberships = context.memberships().stream()
+                .collect(java.util.stream.Collectors.toMap(CollaboratorAccess.Membership::id, java.util.function.Function.identity()));
+        var enrollment = enrollments.findOwned(memberships.keySet(), programId).orElseThrow(() -> {
+            deniedProgram(context.userId(), programId, requestId); return new MyProgramNotFound();
+        });
+        return myProgram(enrollment, memberships);
+    }
+
+    private CollaboratorAccess.Context collaboratorContext(String subject, String requestId, UUID programId) {
+        try {
+            return collaboratorAccess.resolve(subject);
+        } catch (CollaboratorAccess.Denied exception) {
+            deniedProgram(null, programId, requestId);
+            throw exception;
+        }
+    }
+
+    private MyProgramResponse myProgram(Enrollments.Data enrollment,
+                                        Map<UUID, CollaboratorAccess.Membership> memberships) {
+        var membership = memberships.get(enrollment.membershipId());
+        if (membership == null || !membership.organizationId().equals(enrollment.organizationId())) {
+            throw new MyProgramNotFound();
+        }
+        var program = programs.find(enrollment.organizationId(), enrollment.programId())
+                .orElseThrow(MyProgramNotFound::new);
+        return new MyProgramResponse(program.id(), program.organizationId(), membership.organizationName(), program.name(),
+                program.description(), program.status(), program.startDate(), program.endDate(), program.version());
+    }
+
+    private static void deniedProgram(UUID actor, UUID programId, String requestId) {
+        LoggerFactory.getLogger(EnrollmentService.class).info(
+                "action=PROGRAM_ACCESS_DENIED actor={} resource=Program resourceId={} requestId={} timestamp={} result=DENIED",
+                actor, programId, requestId, Instant.now());
     }
 
     private OrganizationAccess.Context authorize(String subject, UUID organizationId, UUID programId, String requestId) {
@@ -187,4 +240,10 @@ public class EnrollmentService {
         public InvitationPage { items = List.copyOf(items); }
     }
     public record AcceptanceResponse(UUID invitationId, String status, UUID enrollmentId, String enrollmentStatus) {}
+    public record MyProgramResponse(UUID id, UUID organizationId, String organizationName, String name,
+                                    String description, String status, java.time.LocalDate startDate,
+                                    java.time.LocalDate endDate, long version) {}
+    public record MyProgramPage(List<MyProgramResponse> items, int page, int size, long totalElements, int totalPages) {
+        public MyProgramPage { items = List.copyOf(items); }
+    }
 }

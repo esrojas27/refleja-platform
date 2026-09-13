@@ -92,6 +92,15 @@ describe("Account session", () => {
     expect(screen.queryByText(/Roles activos:.*COLLABORATOR/)).toBeNull();
   });
 
+  it("offers self-service programs when any active organization has the collaborator role", async () => {
+    fetchCurrentIdentity.mockResolvedValue({ ...identity, organizations: [
+      { id: "org-a", name: "Organization A", roles: ["COLLABORATOR"] },
+    ], activeOrganizationId: "org-a", roles: ["COLLABORATOR"] });
+    render(<AccountSession />);
+    fireEvent.click(screen.getByRole("button", { name: "Comprobar sesión" }));
+    expect((await screen.findByRole("link", { name: "Mis programas" })).getAttribute("href")).toBe("/my-programs");
+  });
+
   it("does not restore identity when an in-flight request finishes after logout", async () => {
     let resolveIdentity!: (value: CurrentIdentity) => void;
     fetchCurrentIdentity.mockImplementationOnce(() => new Promise<CurrentIdentity>((resolve) => { resolveIdentity = resolve; }));

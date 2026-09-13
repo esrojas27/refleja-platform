@@ -15,6 +15,7 @@ class JpaProgramDirectory implements ProgramDirectory {
 
     @Override public Optional<Summary> find(UUID organizationId, UUID programId) {
         return programs.findByOrganizationIdAndId(organizationId, programId)
-                .map(p -> new Summary(p.id(), p.organizationId(), p.name()));
+                .map(p -> new Summary(p.id(), p.organizationId(), p.name(), p.description(), p.status().name(),
+                        p.startDate(), p.endDate(), p.version()));
     }
 }

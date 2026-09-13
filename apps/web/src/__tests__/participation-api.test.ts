@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { fetchAuthSession } from "aws-amplify/auth";
-import { acceptInvitation, createEnrollment, listEnrollments, listInvitations, retryInvitationDelivery,
-  ParticipationRequestError, deliveryMessage } from "@/lib/participation/participation-api";
+import { acceptInvitation, createEnrollment, getMyProgram, listEnrollments, listInvitations, listMyPrograms,
+  retryInvitationDelivery, ParticipationRequestError, deliveryMessage, myProgramsPath } from "@/lib/participation/participation-api";
 
 vi.mock("aws-amplify/auth", () => ({ fetchAuthSession: vi.fn() }));
 const input = { email: "participant@example.test", firstName: "Ana", lastName: "Prueba" };
@@ -38,6 +38,15 @@ it("accepts only with an explicit POST and no client identity fields", async () 
   const fetcher = vi.fn().mockResolvedValue(new Response("{}")); vi.stubGlobal("fetch", fetcher);
   await acceptInvitation("invite/a");
   expect(fetcher).toHaveBeenCalledWith("http://localhost:8082/api/v1/invitations/invite%2Fa/accept", expect.objectContaining({ method: "POST", body: undefined }));
+});
+it("lists and opens only self-service program paths without client identity fields", async () => {
+  const fetcher = vi.fn().mockImplementation(() => Promise.resolve(new Response("{}"))); vi.stubGlobal("fetch", fetcher);
+  await listMyPrograms(2); await getMyProgram("program/a");
+  expect(fetcher.mock.calls[0][0]).toBe("http://localhost:8082/api/v1/me/programs?page=2&size=20");
+  expect(fetcher.mock.calls[1][0]).toBe("http://localhost:8082/api/v1/me/programs/program%2Fa");
+  expect(fetcher.mock.calls[0][1]).toMatchObject({ method: "GET", body: undefined,
+    headers: { Authorization: "Bearer test-access" } });
+  expect(myProgramsPath("program/a")).toBe("/my-programs/program%2Fa");
 });
 it("does not call the backend without an access token", async () => {
   vi.mocked(fetchAuthSession).mockResolvedValue({} as never); const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);

@@ -13,6 +13,11 @@ export type Invitation = {
   status: InvitationStatus; expiresAt: string;
 };
 export type AcceptedInvitation = { invitationId: string; status: "ACCEPTED"; enrollmentId: string; enrollmentStatus: "ACTIVE" };
+export type MyProgram = {
+  id: string; organizationId: string; organizationName: string; name: string; description: string | null;
+  status: "DRAFT" | "SCHEDULED" | "ACTIVE" | "COMPLETED" | "CANCELLED";
+  startDate: string | null; endDate: string | null; version: number;
+};
 
 export class ParticipationRequestError extends Error {
   constructor(public readonly status: number, public readonly fields: string[] = [], public readonly requestId?: string) {
@@ -22,6 +27,10 @@ export class ParticipationRequestError extends Error {
 
 export function enrollmentsPath(organizationId: string, programId: string) {
   return `/organizations/${encodeURIComponent(organizationId)}/programs/${encodeURIComponent(programId)}/enrollments`;
+}
+
+export function myProgramsPath(programId?: string) {
+  return programId ? `/my-programs/${encodeURIComponent(programId)}` : "/my-programs";
 }
 
 async function request<T>(path: string, method: "GET" | "POST", expectedStatus: number, signal?: AbortSignal, input?: EnrollmentInput): Promise<T> {
@@ -59,6 +68,10 @@ export const listInvitations = (page = 0, signal?: AbortSignal) =>
   request<PageResult<Invitation>>(`/invitations?page=${page}&size=20`, "GET", 200, signal);
 export const acceptInvitation = (id: string, signal?: AbortSignal) =>
   request<AcceptedInvitation>(`/invitations/${encodeURIComponent(id)}/accept`, "POST", 200, signal);
+export const listMyPrograms = (page = 0, signal?: AbortSignal) =>
+  request<PageResult<MyProgram>>(`/me/programs?page=${page}&size=20`, "GET", 200, signal);
+export const getMyProgram = (programId: string, signal?: AbortSignal) =>
+  request<MyProgram>(`/me/programs/${encodeURIComponent(programId)}`, "GET", 200, signal);
 
 export function participationErrorMessage(error: unknown) {
   const status = error instanceof ParticipationRequestError ? error.status : 0;
@@ -71,6 +84,15 @@ export function participationErrorMessage(error: unknown) {
     : status === 503 ? "El servicio de invitaciones no está disponible. Revisa el listado antes de reintentar."
     : "No se pudo completar la consulta. Inténtalo de nuevo.";
   return message + (error instanceof ParticipationRequestError && error.requestId ? ` Referencia: ${error.requestId}` : "");
+}
+
+export function myProgramErrorMessage(error: unknown) {
+  const status = error instanceof ParticipationRequestError ? error.status : 0;
+  return status === 401 ? "Tu sesión no está disponible. Inicia sesión de nuevo."
+    : status === 403 ? "No tienes acceso activo como colaborador."
+    : status === 404 ? "El programa no está disponible para esta cuenta."
+    : status === 400 ? "La página o el programa solicitado no es válido."
+    : "No se pudieron consultar tus programas. Inténtalo de nuevo.";
 }
 
 export function deliveryMessage(status: NonNullable<Enrollment["invitation"]>["deliveryStatus"]) {

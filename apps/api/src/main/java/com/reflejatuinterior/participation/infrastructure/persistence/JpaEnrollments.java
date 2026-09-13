@@ -1,5 +1,6 @@
 package com.reflejatuinterior.participation.infrastructure.persistence;
 
+import java.util.Set;
 import java.util.Optional;
 import java.util.UUID;
 import com.reflejatuinterior.participation.application.EnrollmentNotFound;
@@ -42,6 +43,19 @@ class JpaEnrollments implements Enrollments {
         var entity = repository.lockByInvitation(organizationId, invitationId).orElseThrow(EnrollmentNotFound::new);
         entity.activate();
         return data(repository.saveAndFlush(entity));
+    }
+
+    @Override public Page listOwned(Set<UUID> membershipIds, int page, int size) {
+        var result = repository.findByParticipantMembershipIdInAndStatusIn(membershipIds,
+                Set.of(EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED),
+                PageRequest.of(page, size, Sort.by("id").descending()));
+        return new Page(result.getContent().stream().map(JpaEnrollments::data).toList(), page, size,
+                result.getTotalElements(), result.getTotalPages());
+    }
+
+    @Override public Optional<Data> findOwned(Set<UUID> membershipIds, UUID programId) {
+        return repository.findFirstByParticipantMembershipIdInAndProgramIdAndStatusIn(membershipIds, programId,
+                Set.of(EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED)).map(JpaEnrollments::data);
     }
 
     private static Data data(EnrollmentJpaEntity e) {

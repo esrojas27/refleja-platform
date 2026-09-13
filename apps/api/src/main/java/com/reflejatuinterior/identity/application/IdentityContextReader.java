@@ -15,7 +15,7 @@ public interface IdentityContextReader {
                     String firstName, String lastName, String status) {
     }
 
-    record MembershipData(UUID organizationId, String status, Set<String> roles) {
+    record MembershipData(UUID id, UUID organizationId, String status, Set<String> roles) {
         public MembershipData {
             roles = Set.copyOf(roles);
         }

@@ -41,6 +41,8 @@ class ActuatorHealthSecurityConfiguration {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(EndpointRequest.to("health")).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/me").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/me/programs",
+                                "/api/v1/me/programs/{programId}").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/organizations").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/organizations/{organizationId}/programs").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/organizations/{organizationId}/programs",

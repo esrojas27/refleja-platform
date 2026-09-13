@@ -1,9 +1,8 @@
 # RTI-VS1-010 — Enroll and Invite Collaborator
 
 Estado: **cerrado para desarrollo local**. La verificación automática y el recorrido
-manual completo contra Cognito y Amazon SES reales fueron correctos. Los cambios
-continúan sin publicar hasta crear el commit exclusivo del ticket. RTI-VS1-011 no
-ha comenzado.
+manual completo contra Cognito y Amazon SES reales fueron correctos. El cierre está
+publicado en el commit `bbf8d98`.
 
 Se revisaron Product Definition, ADR-001 a ADR-005 y el ticket 010 del
 [documento canónico](https://docs.google.com/document/d/1vzpG5ZiD6uTD6jT9USe_R1rdhU7bN54Q38Ty3Udu-Ik/edit?tab=t.s1fvvog8kpix).
@@ -125,6 +124,5 @@ inscripción; una repetición reutiliza el mismo `sub` y no debe borrarlo
 automáticamente. RLS pertenece al 012 y CI/E2E completo al 013; los controles de
 tenant y autorización del 010 ya se aplican en backend y base de datos.
 
-El recorrido y los criterios del 010 están aceptados para desarrollo local. Falta
-únicamente publicar sus cambios en un commit exclusivo antes de iniciar
-RTI-VS1-011.
+El recorrido y los criterios del 010 están aceptados para desarrollo local y su
+incremento se publicó antes de iniciar RTI-VS1-011.

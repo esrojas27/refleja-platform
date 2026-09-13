@@ -3,9 +3,11 @@ package com.reflejatuinterior.participation.api;
 import java.util.List;
 import java.util.UUID;
 import com.reflejatuinterior.identity.CollaboratorInvitations;
+import com.reflejatuinterior.identity.CollaboratorAccess;
 import com.reflejatuinterior.identity.OrganizationAccess;
 import com.reflejatuinterior.participation.application.EnrollmentConflict;
 import com.reflejatuinterior.participation.application.EnrollmentNotFound;
+import com.reflejatuinterior.participation.application.MyProgramNotFound;
 import com.reflejatuinterior.participation.domain.InvalidEnrollmentInput;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -18,13 +20,18 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
-@RestControllerAdvice(assignableTypes = {EnrollmentController.class, InvitationController.class})
+@RestControllerAdvice(assignableTypes = {EnrollmentController.class, InvitationController.class, MyProgramController.class})
 class EnrollmentErrorHandler {
-    @ExceptionHandler({OrganizationAccess.Denied.class, CollaboratorInvitations.Denied.class})
+    @ExceptionHandler({OrganizationAccess.Denied.class, CollaboratorInvitations.Denied.class, CollaboratorAccess.Denied.class})
     ResponseEntity<ErrorResponse> denied(HttpServletRequest request) { return error(request, 403, "FORBIDDEN", List.of()); }
 
     @ExceptionHandler({EnrollmentNotFound.class, CollaboratorInvitations.Unavailable.class})
     ResponseEntity<ErrorResponse> missing(HttpServletRequest request) { return error(request, 404, "ENROLLMENT_NOT_FOUND", List.of()); }
+
+    @ExceptionHandler(MyProgramNotFound.class)
+    ResponseEntity<ErrorResponse> programMissing(HttpServletRequest request) {
+        return error(request, 404, "PROGRAM_NOT_FOUND", "Program resource not found.", List.of());
+    }
 
     @ExceptionHandler(CollaboratorInvitations.Expired.class)
     ResponseEntity<ErrorResponse> expired(HttpServletRequest request) { return error(request, 410, "INVITATION_EXPIRED", List.of()); }
@@ -61,8 +68,13 @@ class EnrollmentErrorHandler {
     private static FieldError field(String name) { return new FieldError(name, "INVALID_VALUE", "Invalid value."); }
 
     private ResponseEntity<ErrorResponse> error(HttpServletRequest request, int status, String code, List<FieldError> fields) {
+        return error(request, status, code, null, fields);
+    }
+
+    private ResponseEntity<ErrorResponse> error(HttpServletRequest request, int status, String code, String explicitMessage,
+                                                List<FieldError> fields) {
         String id = request.getAttribute("rti.requestId") instanceof String value ? value : UUID.randomUUID().toString();
-        String message = switch (status) {
+        String message = explicitMessage != null ? explicitMessage : switch (status) {
             case 400 -> "Request validation failed.";
             case 403 -> "Operation is not permitted.";
             case 404 -> "Enrollment or invitation resource not found.";
