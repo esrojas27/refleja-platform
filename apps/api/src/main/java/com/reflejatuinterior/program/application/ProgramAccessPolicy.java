@@ -30,9 +30,31 @@ public class ProgramAccessPolicy {
         }
     }
 
+    OrganizationAccess.Context authorizeConsultant(String subject, UUID organizationId, String operation, String requestId) {
+        UUID actor = null;
+        try {
+            var context = access.resolve(subject, organizationId);
+            actor = context.userId();
+            if (!context.roles().contains("CONSULTANT")) throw new OrganizationAccess.Denied();
+            return context;
+        } catch (OrganizationAccess.Unavailable exception) {
+            logDenied(actor, organizationId, operation, requestId);
+            throw new ProgramNotFound();
+        } catch (OrganizationAccess.Denied exception) {
+            logDenied(actor, organizationId, operation, requestId);
+            throw exception;
+        }
+    }
+
     private void logDenied(UUID actor, UUID organizationId, boolean write, String requestId) {
         LoggerFactory.getLogger(ProgramAccessPolicy.class).warn(
                 "action=AUTHORIZATION_DENIED operation={} actor={} organization={} resource=Program requestId={} timestamp={} result=DENIED",
                 write ? "CREATE_PROGRAM" : "VIEW_PROGRAM", actor, organizationId, requestId, Instant.now());
+    }
+
+    private void logDenied(UUID actor, UUID organizationId, String operation, String requestId) {
+        LoggerFactory.getLogger(ProgramAccessPolicy.class).warn(
+                "action=AUTHORIZATION_DENIED operation={} actor={} organization={} resource=Program requestId={} timestamp={} result=DENIED",
+                operation, actor, organizationId, requestId, Instant.now());
     }
 }
