@@ -1,0 +1,224 @@
+name: VS1 CI Gate
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: vs1-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-java@v6.0.1
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: apps/api/pom.xml
+      - name: Compile, test architecture and verify PostgreSQL integration
+        working-directory: apps/api
+        run: mvn -B -ntp -DargLine="-Xmx512m -XX:ActiveProcessorCount=2" verify
+
+  frontend:
+    name: Frontend gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install reproducible frontend dependencies
+        working-directory: apps/web
+        run: npm ci
+      - name: Verify repository scripts
+        run: |
+          node --test scripts/dev.test.mjs
+          node --test scripts/bootstrap-operator.test.mjs
+          node --test scripts/check-mvp-e2e-environment.test.mjs
+      - name: Lint frontend
+        working-directory: apps/web
+        run: npm run lint
+      - name: Run frontend unit and component tests
+        working-directory: apps/web
+        run: npm test -- --maxWorkers=1
+      - name: Build frontend
+        working-directory: apps/web
+        run: npm run build
+      - name: Install Chromium runtime
+        working-directory: apps/web
+        run: npx playwright install --with-deps chromium
+      - name: Run unauthenticated browser smoke tests
+        working-directory: apps/web
+        run: npm run test:e2e -- --workers=1 --grep-invert @mvp
+
+  mvp-e2e:
+    name: MVP E2E gate
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: mvp-e2e
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      POSTGRES_DB: refleja_tu_interior
+      POSTGRES_PORT: "55432"
+      POSTGRES_SUPERUSER_PASSWORD: local-e2e-postgres-password
+      RTI_MIGRATOR_PASSWORD: local-e2e-migrator-password
+      RTI_APP_PASSWORD: local-e2e-runtime-password
+      DB_URL: jdbc:postgresql://127.0.0.1:55432/refleja_tu_interior
+      DB_USERNAME: rti_app
+      DB_PASSWORD: local-e2e-runtime-password
+      DB_MIGRATION_URL: jdbc:postgresql://127.0.0.1:55432/refleja_tu_interior
+      DB_MIGRATION_USERNAME: rti_migrator
+      DB_MIGRATION_PASSWORD: local-e2e-migrator-password
+      OPERATOR_ORGANIZATION_ID: 01901300-0000-7000-8000-000000000001
+      CORS_ALLOWED_ORIGINS: http://localhost:3000
+      INVITATIONS_ENABLED: "true"
+      INVITATIONS_WEB_BASE_URL: http://localhost:3000
+      PLAYWRIGHT_BASE_URL: http://localhost:3000
+      NEXT_PUBLIC_COGNITO_REDIRECT_SIGN_IN: http://localhost:3000/account
+      NEXT_PUBLIC_COGNITO_REDIRECT_SIGN_OUT: http://localhost:3000/login
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
+      RTI_E2E_AWS_ACCOUNT_ID: ${{ vars.RTI_E2E_AWS_ACCOUNT_ID }}
+      RTI_E2E_AWS_ROLE_ARN: ${{ vars.RTI_E2E_AWS_ROLE_ARN }}
+      RTI_E2E_AWS_REGION: ${{ vars.RTI_E2E_AWS_REGION }}
+      RTI_E2E_COGNITO_USER_POOL_ID: ${{ vars.RTI_E2E_COGNITO_USER_POOL_ID }}
+      RTI_E2E_COGNITO_APP_CLIENT_ID: ${{ vars.RTI_E2E_COGNITO_APP_CLIENT_ID }}
+      RTI_E2E_COGNITO_DOMAIN: ${{ vars.RTI_E2E_COGNITO_DOMAIN }}
+      RTI_E2E_CONSULTANT_SUBJECT: ${{ secrets.RTI_E2E_CONSULTANT_SUBJECT }}
+      RTI_E2E_CONSULTANT_EMAIL: ${{ secrets.RTI_E2E_CONSULTANT_EMAIL }}
+      RTI_E2E_CONSULTANT_PASSWORD: ${{ secrets.RTI_E2E_CONSULTANT_PASSWORD }}
+      RTI_E2E_COLLABORATOR_EMAIL: ${{ secrets.RTI_E2E_COLLABORATOR_EMAIL }}
+      RTI_E2E_COLLABORATOR_PASSWORD: ${{ secrets.RTI_E2E_COLLABORATOR_PASSWORD }}
+      RTI_E2E_SES_FROM: ${{ secrets.RTI_E2E_SES_FROM }}
+      INVITATIONS_AWS_REGION: ${{ vars.RTI_E2E_AWS_REGION }}
+      INVITATIONS_COGNITO_USER_POOL_ID: ${{ vars.RTI_E2E_COGNITO_USER_POOL_ID }}
+      INVITATIONS_SES_FROM: ${{ secrets.RTI_E2E_SES_FROM }}
+      COGNITO_ISSUER_URI: https://cognito-idp.${{ vars.RTI_E2E_AWS_REGION }}.amazonaws.com/${{ vars.RTI_E2E_COGNITO_USER_POOL_ID }}
+      COGNITO_JWK_SET_URI: https://cognito-idp.${{ vars.RTI_E2E_AWS_REGION }}.amazonaws.com/${{ vars.RTI_E2E_COGNITO_USER_POOL_ID }}/.well-known/jwks.json
+      COGNITO_APP_CLIENT_ID: ${{ vars.RTI_E2E_COGNITO_APP_CLIENT_ID }}
+      NEXT_PUBLIC_AWS_REGION: ${{ vars.RTI_E2E_AWS_REGION }}
+      NEXT_PUBLIC_COGNITO_USER_POOL_ID: ${{ vars.RTI_E2E_COGNITO_USER_POOL_ID }}
+      NEXT_PUBLIC_COGNITO_APP_CLIENT_ID: ${{ vars.RTI_E2E_COGNITO_APP_CLIENT_ID }}
+      NEXT_PUBLIC_COGNITO_DOMAIN: ${{ vars.RTI_E2E_COGNITO_DOMAIN }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-java@v6.0.1
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: apps/api/pom.xml
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Validate protected E2E configuration
+        run: node scripts/check-mvp-e2e-environment.mjs
+      - name: Obtain short-lived AWS credentials through GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@v6.2.4
+        with:
+          role-to-assume: ${{ env.RTI_E2E_AWS_ROLE_ARN }}
+          role-session-name: rti-vs1-013-${{ github.run_id }}
+          aws-region: ${{ env.RTI_E2E_AWS_REGION }}
+          allowed-account-ids: ${{ env.RTI_E2E_AWS_ACCOUNT_ID }}
+          mask-aws-account-id: true
+      - name: Verify the two pre-existing Cognito test accounts
+        shell: bash
+        run: |
+          set -euo pipefail
+          consultant_status="$(aws cognito-idp admin-get-user --user-pool-id "$RTI_E2E_COGNITO_USER_POOL_ID" --username "$RTI_E2E_CONSULTANT_EMAIL" --query UserStatus --output text)"
+          collaborator_status="$(aws cognito-idp admin-get-user --user-pool-id "$RTI_E2E_COGNITO_USER_POOL_ID" --username "$RTI_E2E_COLLABORATOR_EMAIL" --query UserStatus --output text)"
+          actual_subject="$(aws cognito-idp admin-get-user --user-pool-id "$RTI_E2E_COGNITO_USER_POOL_ID" --username "$RTI_E2E_CONSULTANT_EMAIL" --query "UserAttributes[?Name=='sub'].Value | [0]" --output text)"
+          test "$consultant_status" = CONFIRMED
+          test "$collaborator_status" = CONFIRMED
+          test "$actual_subject" = "$RTI_E2E_CONSULTANT_SUBJECT"
+      - name: Install frontend dependencies and Chromium
+        working-directory: apps/web
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Start disposable PostgreSQL
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -p rti-vs1-013 up -d postgres
+          container="$(docker compose -p rti-vs1-013 ps -q postgres)"
+          for attempt in {1..60}; do
+            test "$(docker inspect --format '{{.State.Health.Status}}' "$container")" = healthy && exit 0
+            sleep 2
+          done
+          docker compose -p rti-vs1-013 logs postgres
+          exit 1
+      - name: Start API and apply Flyway migrations
+        shell: bash
+        run: |
+          set -euo pipefail
+          pushd apps/api
+          nohup mvn -B -ntp spring-boot:run > ../../api-e2e.log 2>&1 &
+          echo $! > ../../api-e2e.pid
+          popd
+          for attempt in {1..90}; do
+            curl --fail --silent http://127.0.0.1:8080/actuator/health | grep -q '"status":"UP"' && exit 0
+            sleep 2
+          done
+          tail -n 200 api-e2e.log
+          exit 1
+      - name: Seed the consultant operator in the disposable database
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -p rti-vs1-013 exec -T \
+            -e RTI_E2E_CONFIRM=true \
+            -e RTI_E2E_CONSULTANT_SUBJECT \
+            -e RTI_E2E_CONSULTANT_EMAIL \
+            -e OPERATOR_ORGANIZATION_ID \
+            postgres psql -X -U postgres -d refleja_tu_interior \
+            < scripts/sql/seed-e2e-operator.sql
+      - name: Start web application
+        shell: bash
+        run: |
+          set -euo pipefail
+          pushd apps/web
+          nohup npm run dev -- --hostname 127.0.0.1 --port 3000 > ../../web-e2e.log 2>&1 &
+          echo $! > ../../web-e2e.pid
+          popd
+          for attempt in {1..90}; do
+            curl --fail --silent http://localhost:3000/login > /dev/null && exit 0
+            sleep 2
+          done
+          tail -n 200 web-e2e.log
+          exit 1
+      - name: Run the real Cognito MVP journey
+        working-directory: apps/web
+        run: npm run test:e2e -- e2e/mvp-journey.spec.ts --workers=1
+      - name: Print bounded service diagnostics on failure
+        if: failure()
+        shell: bash
+        run: |
+          test ! -f api-e2e.log || tail -n 200 api-e2e.log
+          test ! -f web-e2e.log || tail -n 200 web-e2e.log
+          docker compose -p rti-vs1-013 logs --tail 200 postgres || true
+      - name: Remove the disposable environment
+        if: always()
+        shell: bash
+        run: |
+          test ! -f api-e2e.pid || kill "$(cat api-e2e.pid)" 2>/dev/null || true
+          test ! -f web-e2e.pid || kill "$(cat web-e2e.pid)" 2>/dev/null || true
+          docker compose -p rti-vs1-013 down --volumes --remove-orphans || true

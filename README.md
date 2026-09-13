@@ -6,8 +6,9 @@ El repositorio contiene la base técnica inicial (001–005), autenticación con
 (006), contexto interno y roles (007), creación de organizaciones (008) y programas
 (009). La inscripción e invitación de colaboradores (010) está cerrada para
 desarrollo local después de validar el recorrido completo con Cognito y SES reales.
-La vista de programas propios del colaborador (011) está cerrada para desarrollo
-local después de verificarla automáticamente y con la cuenta colaboradora real.
+La vista de programas propios del colaborador (011) y el aislamiento RLS (012)
+están cerrados para desarrollo local. El gate CI y el journey E2E real del 013
+están implementados y pendientes de su primera ejecución remota protegida.
 
 ## Estructura del repositorio
 
@@ -22,6 +23,7 @@ refleja-platform/
 ├── docs/
 │   ├── adr/                 # Índice de decisiones arquitectónicas
 │   └── architecture/        # Plan incremental y actas de aceptación
+├── .github/workflows/       # Gate automático del Vertical Slice 1
 ├── docker-compose.yml       # PostgreSQL local para desarrollo
 ├── .env.example             # Variables locales de ejemplo, sin secretos reales
 ├── .gitignore
@@ -133,6 +135,20 @@ ni un tenant elegido por el cliente. Programas de otra persona u organización s
 ocultan con 404. No se agregaron migraciones ni dependencias. Contrato, seguridad,
 pruebas y validación manual: [acta del 011](docs/architecture/rti-vs1-011-acceptance.md).
 
+### Gate CI y journey del MVP — RTI-VS1-013
+
+`VS1 CI Gate` verifica backend, arquitectura, integración PostgreSQL, aislamiento
+tenant, scripts, frontend, builds y Playwright. El último job recorre el MVP con
+Cognito y SES reales sobre una base PostgreSQL desechable; no usa sesiones ni
+proveedores simulados.
+
+Ese job requiere el entorno protegido de GitHub `mvp-e2e`, dos cuentas Cognito de
+prueba `CONFIRMED`, una identidad SES válida y un rol AWS de mínimo privilegio
+obtenido por OIDC. No se guardan access keys, contraseñas ni subjects en Git. La
+[guía del 013](docs/architecture/rti-vs1-013-acceptance.md) enumera exactamente las
+variables, secretos, permisos, pasos de activación y checks que deben proteger
+`master`.
+
 ### Desarrollo y comprobaciones
 
 La aplicación web vive en `apps/web` y utiliza Next.js, React, TypeScript, App Router, Tailwind CSS y shadcn/ui. Amplify Auth actúa únicamente como cliente de Cognito.
@@ -144,7 +160,7 @@ npm run dev
 npm run lint
 npm test
 npm run build
-npm run test:e2e
+npm run test:e2e -- --grep-invert @mvp
 ```
 
 Las rutas `/`, `/login`, `/account`, `/invitations` y `/my-programs` son
@@ -347,10 +363,9 @@ Todavía no existen:
 
 - sesiones, actividades, progreso o planes de acción dentro de los programas;
 - edición o administración general de organizaciones y programas;
-- aislamiento RLS del ticket 012 (no sustituye los controles backend exigidos antes);
 - registro público o administración de usuarios;
 - infraestructura de hosting para web, API o PostgreSQL;
-- pipelines de CI/CD.
+- despliegue continuo; el workflow del 013 es exclusivamente un gate de CI.
 
 La integración Cognito/SES del 010 se aplicó y probó en desarrollo con correo real.
 Continúan pendientes para un uso externo el remitente corporativo, la autenticación

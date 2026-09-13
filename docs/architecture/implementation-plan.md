@@ -33,7 +33,12 @@ Este archivo registra el punto de continuación; no reemplaza los tickets ni los
   y abrir sólo programas respaldados por inscripciones propias `ACTIVE` o
   `COMPLETED`; el usuario confirmó el recorrido con Cognito real.
   [Acta y procedimiento](rti-vs1-011-acceptance.md).
-- **012–013:** pendientes; no iniciados.
+- **012:** cerrado y publicado en `6a2ba68`. RLS protege programas e inscripciones,
+  el runtime no puede evadirlo y el recorrido manual fue confirmado.
+  [Acta del 012](rti-vs1-012-acceptance.md).
+- **013:** journey E2E y workflow CI implementados. Pendiente configurar el
+  entorno protegido `mvp-e2e`, ejecutar el primer gate remoto y hacer requeridos
+  sus tres checks antes de declarar `V0.1.0`.
 - **Primer operador:** mecanismo administrativo implementado y aplicado localmente
   con aprobación expresa: organización operadora real, membresía activa y rol
   `CONSULTANT` acotado. [Procedimiento y evidencia](first-operator-bootstrap.md).
@@ -60,8 +65,7 @@ advertencia de lentitud del sistema de archivos, sin una causa física confirmad
 
 | Orden | Ticket | Resultado esperado |
 | --- | --- | --- |
-| 1 | **012 — Tenant Isolation + RLS Hardening** | RLS en tablas aplicables y pruebas PostgreSQL de aislamiento entre organizaciones. |
-| 2 | **013 — End-to-End Test + CI Gate** | Automatizar el journey completo y su puerta de validación en CI. |
+| 1 | **013 — End-to-End Test + CI Gate** | Activar el entorno protegido, obtener un run verde y exigir los tres checks en `master`. |
 
 ## Distancia al MVP validable
 
