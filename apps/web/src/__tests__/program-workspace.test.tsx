@@ -25,8 +25,8 @@ it("offers only implemented program destinations and marks the overview as activ
   expect(screen.getByRole("link", { name: "Resumen" }).getAttribute("aria-current")).toBe("page");
   expect(screen.getByRole("link", { name: "Colaboradores" }).getAttribute("href")).toBe("/organizations/org-a/programs/program-a/enrollments");
   expect(screen.getByRole("link", { name: "Contenido" }).getAttribute("href")).toBe("/organizations/org-a/programs/program-a/content");
+  expect(screen.getByRole("link", { name: "Actividades" }).getAttribute("href")).toBe("/organizations/org-a/programs/program-a/activities");
   expect(screen.getByText("Contenido real")).toBeTruthy();
-  expect(screen.queryByRole("link", { name: /actividades/i })).toBeNull();
   expect(screen.queryByRole("link", { name: /progreso/i })).toBeNull();
   expect(screen.queryByRole("link", { name: /evaluaciones/i })).toBeNull();
 });

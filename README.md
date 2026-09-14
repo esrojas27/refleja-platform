@@ -8,7 +8,7 @@ El repositorio contiene la base técnica inicial (001–005), autenticación con
 desarrollo local después de validar el recorrido completo con Cognito y SES reales.
 La vista de programas propios del colaborador (011) y el aislamiento RLS (012)
 están cerrados para desarrollo local. El gate CI y el journey E2E real del 013
-están implementados y pendientes de su primera ejecución remota protegida.
+ya fueron validados en GitHub con sus tres gates en verde.
 
 ## Estructura del repositorio
 
@@ -134,6 +134,19 @@ resuelve la persona desde el `sub` del Access Token y no acepta un `participantI
 ni un tenant elegido por el cliente. Programas de otra persona u organización se
 ocultan con 404. No se agregaron migraciones ni dependencias. Contrato, seguridad,
 pruebas y validación manual: [acta del 011](docs/architecture/rti-vs1-011-acceptance.md).
+
+### Actividades asignadas
+
+Un `CONSULTANT` puede abrir **Actividades** dentro del espacio de trabajo de un
+programa, escoger una sesión, definir título, instrucciones y fecha límite, y
+asignar la actividad a una o más inscripciones `ACTIVE`. La creación y las
+asignaciones se confirman en una sola transacción.
+
+El colaborador ve únicamente sus actividades en el detalle de **Mis programas**.
+La API deriva su inscripción del Access Token; no acepta identificadores de
+usuario, membresía u organización elegidos por el navegador. Este corte no incluye
+entregas, archivos, comentarios, revisión ni progreso. Contrato, persistencia y
+recorrido manual: [actividades del programa](docs/architecture/program-activities-foundation.md).
 
 ### Gate CI y journey del MVP — RTI-VS1-013
 
@@ -299,6 +312,10 @@ RTI-VS1-010 agrega `user_invitations` y la referencia opcional desde `enrollment
 La invitación conserva estado, vencimiento y resultado operativo de entrega; no
 almacena contraseñas, códigos OAuth ni tokens de aceptación.
 
+Los incrementos posteriores agregan `program_modules`, `program_sessions`,
+`program_activities` y `activity_assignments`. Las definiciones de actividad son
+propiedad de `program`; las asignaciones pertenecen a `participation`.
+
 Los identificadores son UUID; Hibernate genera UUIDv7 antes del `INSERT`. Los estados se almacenan por nombre simbólico y se restringen en PostgreSQL. Las referencias entre módulos se representan en JPA como UUID escalares, mientras que las claves foráneas compuestas aseguran que programas, membresías y enrollments pertenezcan a la misma organización. Las entidades y repositorios son detalles internos de persistencia de los módulos `identity`, `organization`, `program` y `participation`.
 
 RTI-VS1-006 y 007 no modifican este esquema ni agregan migraciones. El aprovisionamiento
@@ -347,7 +364,9 @@ La API vive en `apps/api`, utiliza Java 21 y Maven. Además de health, identidad
 organizaciones y programas, expone las operaciones del 010 bajo
 `/api/v1/organizations/{organizationId}/programs/{programId}/enrollments` y
 `/api/v1/invitations`, junto con la consulta propia del 011 bajo
-`/api/v1/me/programs`. La resolución de contexto usa el modelo de lectura JDBC
+`/api/v1/me/programs`, y las actividades asignadas bajo las rutas documentadas en
+[actividades del programa](docs/architecture/program-activities-foundation.md).
+La resolución de contexto usa el modelo de lectura JDBC
 permitido por ADR-004; las escrituras usan JPA dentro del módulo propietario.
 `identity` orquesta el aprovisionamiento externo y la concesión de acceso mediante
 APIs públicas de módulo, sin exponer repositorios entre módulos.
@@ -364,7 +383,7 @@ Todas las implementaciones futuras deberán respetar las decisiones aceptadas. C
 
 Todavía no existen:
 
-- sesiones, actividades, progreso o planes de acción dentro de los programas;
+- entregas de actividades, progreso o planes de acción dentro de los programas;
 - edición o administración general de organizaciones y programas;
 - registro público o administración de usuarios;
 - infraestructura de hosting para web, API o PostgreSQL;

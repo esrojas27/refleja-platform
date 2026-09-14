@@ -42,18 +42,21 @@ class ActuatorHealthSecurityConfiguration {
                         .requestMatchers(EndpointRequest.to("health")).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/me").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/me/programs",
-                                "/api/v1/me/programs/{programId}").authenticated()
+                                "/api/v1/me/programs/{programId}",
+                                "/api/v1/me/programs/{programId}/activities").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/organizations").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/organizations/{organizationId}/programs").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/organizations/{organizationId}/programs",
                                 "/api/v1/organizations/{organizationId}/programs/{programId}",
-                                "/api/v1/organizations/{organizationId}/programs/{programId}/modules").authenticated()
+                                "/api/v1/organizations/{organizationId}/programs/{programId}/modules",
+                                "/api/v1/organizations/{organizationId}/programs/{programId}/activities").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/organizations/{organizationId}/programs/{programId}/enrollments",
                                 "/api/v1/invitations").authenticated()
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/enrollments",
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/modules",
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/modules/{moduleId}/sessions",
+                                "/api/v1/organizations/{organizationId}/programs/{programId}/activities",
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/enrollments/{enrollmentId}/invitation-delivery",
                                 "/api/v1/invitations/{invitationId}/accept").authenticated()
                         .anyRequest().denyAll())

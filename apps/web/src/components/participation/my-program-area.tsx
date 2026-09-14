@@ -12,6 +12,7 @@ import {
   type MyProgram,
   type PageResult,
 } from "@/lib/participation/participation-api";
+import { activityErrorMessage, listMyProgramActivities, type AssignedActivity } from "@/lib/participation/activity-api";
 
 const button = "rti-button-secondary";
 
@@ -97,13 +98,46 @@ function MyProgramDetail({ programId }: { programId: string }) {
   return <div className="mt-7">
     {message && <p role="status" className="rounded-2xl bg-muted/60 px-4 py-3 text-sm">{message}</p>}
     {needsLogin && <Link href="/login" className="rti-link mt-3 inline-block text-sm">Iniciar sesión</Link>}
-    {program && <dl className="grid gap-x-8 gap-y-2 break-words rounded-2xl border border-border/70 bg-background/70 p-5 sm:grid-cols-[auto_1fr]">
-      <dt className="font-medium">Nombre</dt><dd>{program.name}</dd>
-      <dt className="font-medium">Organización</dt><dd>{program.organizationName}</dd>
-      <dt className="font-medium">Descripción</dt><dd className="whitespace-pre-wrap">{program.description || "Sin descripción"}</dd>
-      <dt className="font-medium">Estado</dt><dd>{program.status}</dd>
-      <dt className="font-medium">Inicio</dt><dd>{program.startDate ?? "Sin fecha"}</dd>
-      <dt className="font-medium">Fin</dt><dd>{program.endDate ?? "Sin fecha"}</dd>
-    </dl>}
+    {program && <div className="space-y-7">
+      <dl className="grid gap-x-8 gap-y-2 break-words rounded-2xl border border-border/70 bg-background/70 p-5 sm:grid-cols-[auto_1fr]">
+        <dt className="font-medium">Nombre</dt><dd>{program.name}</dd>
+        <dt className="font-medium">Organización</dt><dd>{program.organizationName}</dd>
+        <dt className="font-medium">Descripción</dt><dd className="whitespace-pre-wrap">{program.description || "Sin descripción"}</dd>
+        <dt className="font-medium">Estado</dt><dd>{program.status}</dd>
+        <dt className="font-medium">Inicio</dt><dd>{program.startDate ?? "Sin fecha"}</dd>
+        <dt className="font-medium">Fin</dt><dd>{program.endDate ?? "Sin fecha"}</dd>
+      </dl>
+      <AssignedActivityList programId={programId} />
+    </div>}
   </div>;
+}
+
+function AssignedActivityList({ programId }: { programId: string }) {
+  const [activities, setActivities] = useState<AssignedActivity[]>();
+  const [message, setMessage] = useState("Cargando actividades asignadas…");
+
+  useEffect(() => {
+    const controller = new AbortController();
+    listMyProgramActivities(programId, controller.signal).then(result => {
+      if (controller.signal.aborted) return;
+      setActivities(result.items);
+      setMessage(result.items.length ? "" : "Todavía no tienes actividades asignadas en este programa.");
+    }).catch(error => {
+      if (!controller.signal.aborted) setMessage(activityErrorMessage(error));
+    });
+    return () => controller.abort();
+  }, [programId]);
+
+  return <section aria-labelledby="assigned-activities-title">
+    <h2 id="assigned-activities-title" className="text-xl font-semibold">Actividades asignadas</h2>
+    {message && <p role="status" className="mt-3 rounded-2xl bg-muted/60 px-4 py-3 text-sm">{message}</p>}
+    {activities && activities.length > 0 && <ol className="mt-4 grid gap-4 sm:grid-cols-2">
+      {activities.map(activity => <li key={activity.id} className="rounded-2xl border border-border/70 bg-background/70 p-5">
+        <p className="rti-kicker">Actividad {activity.position}</p>
+        <h3 className="mt-2 text-lg font-semibold">{activity.title}</h3>
+        <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{activity.instructions}</p>
+        <p className="mt-3 text-sm font-medium">Fecha límite: {activity.dueDate}</p>
+      </li>)}
+    </ol>}
+  </section>;
 }

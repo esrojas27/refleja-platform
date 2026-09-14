@@ -30,6 +30,10 @@ class TenantIsolationIntegrationTests extends PostgreSqlIntegrationTestSupport {
     private final UUID moduleB = uuid7(0xc0c);
     private final UUID sessionA = uuid7(0xc0d);
     private final UUID sessionB = uuid7(0xc0e);
+    private final UUID activityA = uuid7(0xc0f);
+    private final UUID activityB = uuid7(0xc10);
+    private final UUID assignmentA = uuid7(0xc11);
+    private final UUID assignmentB = uuid7(0xc12);
 
     @Autowired
     OrganizationTenantContext tenantContext;
@@ -43,6 +47,8 @@ class TenantIsolationIntegrationTests extends PostgreSqlIntegrationTestSupport {
     void fixture() {
         transactions = new TransactionTemplate(transactionManager);
         var admin = migratorJdbcTemplate();
+        admin.update("delete from rti.activity_assignments where organization_id in (?, ?)", organizationA, organizationB);
+        admin.update("delete from rti.program_activities where organization_id in (?, ?)", organizationA, organizationB);
         admin.update("delete from rti.program_sessions where organization_id in (?, ?)", organizationA, organizationB);
         admin.update("delete from rti.program_modules where organization_id in (?, ?)", organizationA, organizationB);
         admin.update("delete from rti.enrollments where organization_id in (?, ?)", organizationA, organizationB);
@@ -83,6 +89,22 @@ class TenantIsolationIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 """,
                 enrollmentA, organizationA, programA, membershipA,
                 enrollmentB, organizationB, programB, membershipB);
+        admin.update("""
+                insert into rti.program_activities
+                    (id, organization_id, program_id, module_id, session_id, title, instructions, due_date,
+                     position, created_at, updated_at, version)
+                values (?, ?, ?, ?, ?, 'Activity A', 'Instructions A', '2026-10-08', 1, now(), now(), 0),
+                       (?, ?, ?, ?, ?, 'Activity B', 'Instructions B', '2026-10-08', 1, now(), now(), 0)
+                """, activityA, organizationA, programA, moduleA, sessionA,
+                activityB, organizationB, programB, moduleB, sessionB);
+        admin.update("""
+                insert into rti.activity_assignments
+                    (id, organization_id, program_id, activity_id, enrollment_id, assigned_at,
+                     created_at, updated_at, version)
+                values (?, ?, ?, ?, ?, now(), now(), now(), 0),
+                       (?, ?, ?, ?, ?, now(), now(), now(), 0)
+                """, assignmentA, organizationA, programA, activityA, enrollmentA,
+                assignmentB, organizationB, programB, activityB, enrollmentB);
     }
 
     @Test
@@ -97,18 +119,23 @@ class TenantIsolationIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 from pg_class c
                 join pg_namespace n on n.oid = c.relnamespace
                 where n.nspname = 'rti'
-                  and c.relname in ('programs', 'enrollments', 'program_modules', 'program_sessions')
+                  and c.relname in ('programs', 'enrollments', 'program_modules', 'program_sessions',
+                                    'program_activities', 'activity_assignments')
                   and c.relrowsecurity
                 order by c.relname
-                """, String.class)).containsExactly("enrollments", "program_modules", "program_sessions", "programs");
+                """, String.class)).containsExactly("activity_assignments", "enrollments", "program_activities",
+                        "program_modules", "program_sessions", "programs");
         assertThat(admin.queryForList("""
                 select policyname
                 from pg_policies
                 where schemaname = 'rti'
-                  and tablename in ('programs', 'enrollments', 'program_modules', 'program_sessions')
+                  and tablename in ('programs', 'enrollments', 'program_modules', 'program_sessions',
+                                    'program_activities', 'activity_assignments')
                 order by policyname
-                """, String.class)).containsExactly("enrollments_tenant_isolation", "program_modules_tenant_isolation",
-                        "program_sessions_tenant_isolation", "programs_tenant_isolation");
+                """, String.class)).containsExactly("activity_assignments_tenant_isolation",
+                        "enrollments_tenant_isolation", "program_activities_tenant_isolation",
+                        "program_modules_tenant_isolation", "program_sessions_tenant_isolation",
+                        "programs_tenant_isolation");
     }
 
     @Test
@@ -117,6 +144,8 @@ class TenantIsolationIntegrationTests extends PostgreSqlIntegrationTestSupport {
         assertThat(count("enrollments")).isZero();
         assertThat(count("program_modules")).isZero();
         assertThat(count("program_sessions")).isZero();
+        assertThat(count("program_activities")).isZero();
+        assertThat(count("activity_assignments")).isZero();
     }
 
     @Test
@@ -132,12 +161,18 @@ class TenantIsolationIntegrationTests extends PostgreSqlIntegrationTestSupport {
             assertThat(countById("program_modules", moduleB)).isZero();
             assertThat(countById("program_sessions", sessionA)).isEqualTo(1);
             assertThat(countById("program_sessions", sessionB)).isZero();
+            assertThat(countById("program_activities", activityA)).isEqualTo(1);
+            assertThat(countById("program_activities", activityB)).isZero();
+            assertThat(countById("activity_assignments", assignmentA)).isEqualTo(1);
+            assertThat(countById("activity_assignments", assignmentB)).isZero();
         });
 
         assertThat(count("programs")).isZero();
         assertThat(count("enrollments")).isZero();
         assertThat(count("program_modules")).isZero();
         assertThat(count("program_sessions")).isZero();
+        assertThat(count("program_activities")).isZero();
+        assertThat(count("activity_assignments")).isZero();
     }
 
     @Test
@@ -152,6 +187,10 @@ class TenantIsolationIntegrationTests extends PostgreSqlIntegrationTestSupport {
                     "update rti.program_modules set name = 'tampered' where id = ?", moduleB)).isZero();
             assertThat(jdbcTemplate.update(
                     "delete from rti.program_sessions where id = ?", sessionB)).isZero();
+            assertThat(jdbcTemplate.update(
+                    "update rti.program_activities set title = 'tampered' where id = ?", activityB)).isZero();
+            assertThat(jdbcTemplate.update(
+                    "delete from rti.activity_assignments where id = ?", assignmentB)).isZero();
         });
 
         var admin = migratorJdbcTemplate();
@@ -162,6 +201,10 @@ class TenantIsolationIntegrationTests extends PostgreSqlIntegrationTestSupport {
         assertThat(admin.queryForObject("select name from rti.program_modules where id = ?", String.class, moduleB))
                 .isEqualTo("Module B");
         assertThat(admin.queryForObject("select count(*) from rti.program_sessions where id = ?", Long.class, sessionB))
+                .isEqualTo(1);
+        assertThat(admin.queryForObject("select title from rti.program_activities where id = ?", String.class, activityB))
+                .isEqualTo("Activity B");
+        assertThat(admin.queryForObject("select count(*) from rti.activity_assignments where id = ?", Long.class, assignmentB))
                 .isEqualTo(1);
     }
 

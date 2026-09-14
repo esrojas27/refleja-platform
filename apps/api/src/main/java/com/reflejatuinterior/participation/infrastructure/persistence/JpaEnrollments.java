@@ -2,6 +2,7 @@ package com.reflejatuinterior.participation.infrastructure.persistence;
 
 import java.util.List;
 import java.util.Set;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
 import com.reflejatuinterior.participation.application.EnrollmentNotFound;
@@ -94,6 +95,23 @@ class JpaEnrollments implements Enrollments {
                 .setParameter("statuses", Set.of(EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED))
                 .setMaxResults(1)
                 .getResultStream().findFirst().map(JpaEnrollments::data);
+    }
+
+    @Override public List<Data> findActive(UUID organizationId, UUID programId, Collection<UUID> enrollmentIds) {
+        if (enrollmentIds.isEmpty()) return List.of();
+        return entityManager.createQuery("""
+                select e from EnrollmentJpaEntity e
+                where e.organizationId = :organizationId
+                  and e.programId = :programId
+                  and e.id in :enrollmentIds
+                  and e.status = :status
+                order by e.id
+                """, EnrollmentJpaEntity.class)
+                .setParameter("organizationId", organizationId)
+                .setParameter("programId", programId)
+                .setParameter("enrollmentIds", enrollmentIds)
+                .setParameter("status", EnrollmentStatus.ACTIVE)
+                .getResultList().stream().map(JpaEnrollments::data).toList();
     }
 
     private static Data data(EnrollmentJpaEntity e) {

@@ -9,6 +9,8 @@ import com.reflejatuinterior.participation.application.EnrollmentConflict;
 import com.reflejatuinterior.participation.application.EnrollmentNotFound;
 import com.reflejatuinterior.participation.application.MyProgramNotFound;
 import com.reflejatuinterior.participation.domain.InvalidEnrollmentInput;
+import com.reflejatuinterior.participation.domain.InvalidActivityAssignment;
+import com.reflejatuinterior.program.ProgramActivities;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -20,7 +22,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
-@RestControllerAdvice(assignableTypes = {EnrollmentController.class, InvitationController.class, MyProgramController.class})
+@RestControllerAdvice(assignableTypes = {EnrollmentController.class, InvitationController.class, MyProgramController.class,
+        ActivityController.class})
 class EnrollmentErrorHandler {
     @ExceptionHandler({OrganizationAccess.Denied.class, CollaboratorInvitations.Denied.class, CollaboratorAccess.Denied.class})
     ResponseEntity<ErrorResponse> denied(HttpServletRequest request) { return error(request, 403, "FORBIDDEN", List.of()); }
@@ -30,6 +33,11 @@ class EnrollmentErrorHandler {
 
     @ExceptionHandler(MyProgramNotFound.class)
     ResponseEntity<ErrorResponse> programMissing(HttpServletRequest request) {
+        return error(request, 404, "PROGRAM_NOT_FOUND", "Program resource not found.", List.of());
+    }
+
+    @ExceptionHandler(ProgramActivities.Missing.class)
+    ResponseEntity<ErrorResponse> activityMissing(HttpServletRequest request) {
         return error(request, 404, "PROGRAM_NOT_FOUND", "Program resource not found.", List.of());
     }
 
@@ -45,6 +53,16 @@ class EnrollmentErrorHandler {
 
     @ExceptionHandler(InvalidEnrollmentInput.class)
     ResponseEntity<ErrorResponse> invalid(InvalidEnrollmentInput exception, HttpServletRequest request) {
+        return error(request, 400, "VALIDATION_ERROR", List.of(field(exception.field())));
+    }
+
+    @ExceptionHandler(InvalidActivityAssignment.class)
+    ResponseEntity<ErrorResponse> invalidAssignment(InvalidActivityAssignment exception, HttpServletRequest request) {
+        return error(request, 400, "VALIDATION_ERROR", List.of(field(exception.field())));
+    }
+
+    @ExceptionHandler(ProgramActivities.InvalidInput.class)
+    ResponseEntity<ErrorResponse> invalidActivity(ProgramActivities.InvalidInput exception, HttpServletRequest request) {
         return error(request, 400, "VALIDATION_ERROR", List.of(field(exception.field())));
     }
 

@@ -57,8 +57,8 @@ async function request<T>(path: string, method: "GET" | "POST", expectedStatus: 
   return response.json() as Promise<T>;
 }
 
-export const listEnrollments = (org: string, program: string, page = 0, signal?: AbortSignal) =>
-  request<PageResult<Enrollment>>(`${enrollmentsPath(org, program)}?page=${page}&size=20`, "GET", 200, signal);
+export const listEnrollments = (org: string, program: string, page = 0, signal?: AbortSignal, size = 20) =>
+  request<PageResult<Enrollment>>(`${enrollmentsPath(org, program)}?page=${page}&size=${size}`, "GET", 200, signal);
 export const createEnrollment = (org: string, program: string, input: EnrollmentInput, signal?: AbortSignal) =>
   request<Enrollment>(enrollmentsPath(org, program), "POST", 201, signal, input);
 export const retryInvitationDelivery = (org: string, program: string, enrollment: string, signal?: AbortSignal) =>

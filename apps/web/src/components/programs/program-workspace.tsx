@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BookOpenText, ChevronLeft, ListTree, UsersRound } from "lucide-react";
+import { BookOpenText, CheckSquare2, ChevronLeft, ListTree, UsersRound } from "lucide-react";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { programsPath } from "@/lib/programs/program-api";
@@ -42,6 +42,12 @@ export function ProgramWorkspace({
       label: "Colaboradores",
       icon: UsersRound,
       active: current => current === `${programPath}/enrollments`,
+    },
+    {
+      href: `${programPath}/activities`,
+      label: "Actividades",
+      icon: CheckSquare2,
+      active: current => current === `${programPath}/activities`,
     },
   ];
 
