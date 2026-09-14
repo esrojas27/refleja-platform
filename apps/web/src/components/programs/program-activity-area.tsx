@@ -5,7 +5,8 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { fetchCurrentIdentity, IdentityRequestError } from "@/lib/auth/authenticated-api";
 import { listEnrollments, ParticipationRequestError, type Enrollment } from "@/lib/participation/participation-api";
 import { ActivityRequestError, activityErrorMessage, createProgramActivity, listProgramActivities,
-  type ActivityInput, type ProgramActivity } from "@/lib/participation/activity-api";
+  reviewActivityAssignment, type ActivityAssignee, type ActivityInput, type ProgramActivity }
+  from "@/lib/participation/activity-api";
 import { listProgramModules, ProgramContentRequestError, type ProgramModule } from "@/lib/programs/program-content-api";
 
 type SessionOption = { id: string; label: string };
@@ -86,8 +87,11 @@ function ActivityContent({ organizationId, programId }: { organizationId: string
             <h3 className="mt-2 text-lg font-semibold">{activity.title}</h3>
             <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{activity.instructions}</p>
             <p className="mt-3 text-sm font-medium">Fecha límite: {activity.dueDate}</p>
-            <p className="mt-2 text-sm text-muted-foreground">Asignada a: {activity.assignees.map(assignee =>
-              [assignee.firstName, assignee.lastName].filter(Boolean).join(" ") || assignee.email).join(", ")}</p>
+            <div className="mt-4 space-y-3"><p className="text-sm font-medium">Seguimiento por colaborador</p>
+              {activity.assignees.map(assignee => <ReviewPanel key={assignee.assignmentId}
+                organizationId={organizationId} programId={programId} activityId={activity.id}
+                assignee={assignee} onReviewed={() => refresh()} />)}
+            </div>
           </li>)}</ol>}
       </section>
     </div>}
@@ -105,6 +109,7 @@ export function ActivityForm({ organizationId, programId, sessions, enrollments,
 }) {
   const [input, setInput] = useState({ sessionId: sessions[0]?.id ?? "", title: "", instructions: "", dueDate: "" });
   const [selected, setSelected] = useState<string[]>([]);
+  const [assignToAll, setAssignToAll] = useState(true);
   const [pending, setPending] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [message, setMessage] = useState("");
@@ -123,10 +128,12 @@ export function ActivityForm({ organizationId, programId, sessions, enrollments,
     const position = Math.max(0, ...activities.filter(activity => activity.sessionId === input.sessionId)
       .map(activity => activity.position)) + 1;
     const clean: ActivityInput = { sessionId: input.sessionId, title: input.title.trim(),
-      instructions: input.instructions.trim(), dueDate: input.dueDate, position, enrollmentIds: selected };
+      instructions: input.instructions.trim(), dueDate: input.dueDate, position, assignToAll,
+      enrollmentIds: assignToAll ? [] : selected };
     if (!clean.sessionId || !clean.title || clean.title.length > 255 || !clean.instructions
-        || clean.instructions.length > 10000 || !/^\d{4}-\d{2}-\d{2}$/.test(clean.dueDate) || !selected.length) {
-      setMessage("Completa la sesión, el título, las instrucciones, la fecha límite y al menos un colaborador."); return;
+        || clean.instructions.length > 10000 || !/^\d{4}-\d{2}-\d{2}$/.test(clean.dueDate)
+        || (!assignToAll && !selected.length)) {
+      setMessage("Completa la sesión, el título, las instrucciones, la fecha límite y los destinatarios."); return;
     }
     submitting.current = true; setPending(true); setMessage("Creando y asignando actividad…");
     const controller = new AbortController(); request.current = controller;
@@ -164,8 +171,14 @@ export function ActivityForm({ organizationId, programId, sessions, enrollments,
       <input id="activity-due-date" type="date" className="rti-field" required value={input.dueDate}
         onChange={event => setInput({ ...input, dueDate: event.target.value })} disabled={pending || blocked || unavailable} /></div>
     <fieldset disabled={pending || blocked || unavailable} className="space-y-3">
-      <legend className="text-sm font-medium">Asignar a</legend>
-      {enrollments.map(enrollment => <label key={enrollment.id}
+      <legend className="text-sm font-medium">Destinatarios</legend>
+      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-primary/25 bg-accent/35 px-3 py-3 text-sm">
+        <input type="checkbox" className="mt-1 size-4 accent-primary" checked={assignToAll}
+          onChange={event => setAssignToAll(event.target.checked)} />
+        <span><span className="block font-medium">Asignar a todos los colaboradores activos</span>
+          <span className="text-muted-foreground">Incluye a todas las inscripciones activas del programa.</span></span>
+      </label>
+      {!assignToAll && enrollments.map(enrollment => <label key={enrollment.id}
         className="flex cursor-pointer items-start gap-3 rounded-xl border border-border/70 px-3 py-3 text-sm">
         <input type="checkbox" className="mt-1 size-4 accent-primary" checked={selected.includes(enrollment.id)}
           onChange={() => toggle(enrollment.id)} />
@@ -177,4 +190,57 @@ export function ActivityForm({ organizationId, programId, sessions, enrollments,
       {pending ? "Creando…" : "Crear y asignar actividad"}
     </button>
   </form>;
+}
+
+function ReviewPanel({ organizationId, programId, activityId, assignee, onReviewed }: {
+  organizationId: string; programId: string; activityId: string; assignee: ActivityAssignee;
+  onReviewed: () => void;
+}) {
+  const [comment, setComment] = useState("");
+  const [pending, setPending] = useState(false);
+  const [message, setMessage] = useState("");
+  const name = [assignee.firstName, assignee.lastName].filter(Boolean).join(" ") || assignee.email;
+
+  async function review(decision: "APPROVE" | "REQUEST_CHANGES") {
+    const cleanComment = comment.trim();
+    if (decision === "REQUEST_CHANGES" && !cleanComment) {
+      setMessage("Escribe qué debe ajustar el colaborador."); return;
+    }
+    setPending(true); setMessage("Guardando revisión…");
+    try {
+      await reviewActivityAssignment(organizationId, programId, activityId, assignee.assignmentId,
+        { decision, comment: cleanComment || null });
+      setMessage(decision === "APPROVE" ? "Actividad aprobada." : "Cambios solicitados.");
+      onReviewed();
+    } catch (error) {
+      setMessage(activityErrorMessage(error));
+    } finally { setPending(false); }
+  }
+
+  return <article className="rounded-xl border border-border/70 bg-card/80 p-4 text-sm">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <div><p className="font-medium">{name}</p><p className="text-muted-foreground">{assignee.email}</p></div>
+      <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium">{assignmentStatusLabel(assignee.status)}</span>
+    </div>
+    {assignee.responseText && <div className="mt-3"><p className="font-medium">Respuesta</p>
+      <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{assignee.responseText}</p></div>}
+    {assignee.reviewComment && <p className="mt-3 text-muted-foreground">Comentario de revisión: {assignee.reviewComment}</p>}
+    {assignee.status === "SUBMITTED" && <div className="mt-4 space-y-3">
+      <label className="block font-medium" htmlFor={`review-${assignee.assignmentId}`}>Comentario de revisión</label>
+      <textarea id={`review-${assignee.assignmentId}`} className="rti-field min-h-24 resize-y" maxLength={5000}
+        value={comment} onChange={event => setComment(event.target.value)} disabled={pending} />
+      {message && <p role="status" className="rounded-xl bg-muted/60 px-3 py-2">{message}</p>}
+      <div className="flex flex-wrap gap-3">
+        <button type="button" className="rti-button-primary" disabled={pending}
+          onClick={() => void review("APPROVE")}>Aprobar actividad</button>
+        <button type="button" className="rti-button-secondary" disabled={pending}
+          onClick={() => void review("REQUEST_CHANGES")}>Solicitar cambios</button>
+      </div>
+    </div>}
+  </article>;
+}
+
+function assignmentStatusLabel(status: ActivityAssignee["status"]) {
+  return { ASSIGNED: "Pendiente", SUBMITTED: "Por revisar", CHANGES_REQUESTED: "Requiere cambios",
+    COMPLETED: "Completada" }[status];
 }

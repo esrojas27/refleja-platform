@@ -2,18 +2,26 @@ import { fetchAuthSession } from "aws-amplify/auth";
 import { programsPath } from "@/lib/programs/program-api";
 
 export type ActivityAssignee = {
-  enrollmentId: string; email: string; firstName: string | null; lastName: string | null;
+  assignmentId: string; enrollmentId: string; email: string; firstName: string | null; lastName: string | null;
+  status: ActivityAssignmentStatus; responseText: string | null; submittedAt: string | null;
+  reviewComment: string | null; reviewedAt: string | null; version: number;
 };
+export type ActivityAssignmentStatus = "ASSIGNED" | "SUBMITTED" | "CHANGES_REQUESTED" | "COMPLETED";
 export type ProgramActivity = {
   id: string; organizationId: string; programId: string; moduleId: string; sessionId: string;
   title: string; instructions: string; dueDate: string; position: number; version: number;
   assignees: ActivityAssignee[];
 };
-export type AssignedActivity = Omit<ProgramActivity, "assignees">;
+export type AssignedActivity = Omit<ProgramActivity, "assignees"> & {
+  assignmentId: string; assignmentStatus: ActivityAssignmentStatus; responseText: string | null;
+  submittedAt: string | null; reviewComment: string | null; reviewedAt: string | null;
+  assignmentVersion: number;
+};
 export type ActivityInput = {
   sessionId: string; title: string; instructions: string; dueDate: string;
-  position: number; enrollmentIds: string[];
+  position: number; assignToAll: boolean; enrollmentIds: string[];
 };
+export type ActivityReviewInput = { decision: "APPROVE" | "REQUEST_CHANGES"; comment: string | null };
 
 export class ActivityRequestError extends Error {
   constructor(public readonly status: number, public readonly fields: string[] = [], public readonly requestId?: string) {
@@ -27,7 +35,7 @@ export function programActivitiesPath(organizationId: string, programId: string)
 }
 
 async function request<T>(path: string, method: "GET" | "POST", expected: number,
-  input?: ActivityInput, signal?: AbortSignal): Promise<T> {
+  input?: unknown, signal?: AbortSignal): Promise<T> {
   signal?.throwIfAborted();
   const session = await fetchAuthSession();
   signal?.throwIfAborted();
@@ -41,7 +49,8 @@ async function request<T>(path: string, method: "GET" | "POST", expected: number
   });
   if (response.status !== expected) {
     const body = await response.json().catch(() => null);
-    const allowed = ["sessionId", "title", "instructions", "dueDate", "position", "enrollmentIds"];
+    const allowed = ["sessionId", "title", "instructions", "dueDate", "position", "enrollmentIds",
+      "responseText", "decision", "comment"];
     const fields = body?.code === "VALIDATION_ERROR" && Array.isArray(body.errors)
       ? body.errors.map((error: { field?: unknown }) => error?.field)
         .filter((field: unknown): field is string => typeof field === "string" && allowed.includes(field))
@@ -63,6 +72,16 @@ export const createProgramActivity = (organizationId: string, programId: string,
 export const listMyProgramActivities = (programId: string, signal?: AbortSignal) =>
   request<{ items: AssignedActivity[] }>(`/me/programs/${encodeURIComponent(programId)}/activities`,
     "GET", 200, undefined, signal);
+
+export const submitMyActivity = (programId: string, activityId: string, responseText: string,
+  signal?: AbortSignal) => request<AssignedActivity>(
+    `/me/programs/${encodeURIComponent(programId)}/activities/${encodeURIComponent(activityId)}/submission`,
+    "POST", 200, { responseText }, signal);
+
+export const reviewActivityAssignment = (organizationId: string, programId: string, activityId: string,
+  assignmentId: string, input: ActivityReviewInput, signal?: AbortSignal) => request<ActivityAssignee>(
+    `${programActivitiesPath(organizationId, programId)}/${encodeURIComponent(activityId)}`
+      + `/assignments/${encodeURIComponent(assignmentId)}/review`, "POST", 200, input, signal);
 
 export function activityErrorMessage(error: unknown) {
   const status = error instanceof ActivityRequestError ? error.status : 0;

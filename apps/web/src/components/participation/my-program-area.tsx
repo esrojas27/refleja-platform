@@ -12,7 +12,8 @@ import {
   type MyProgram,
   type PageResult,
 } from "@/lib/participation/participation-api";
-import { activityErrorMessage, listMyProgramActivities, type AssignedActivity } from "@/lib/participation/activity-api";
+import { activityErrorMessage, listMyProgramActivities, submitMyActivity,
+  type AssignedActivity } from "@/lib/participation/activity-api";
 
 const button = "rti-button-secondary";
 
@@ -132,12 +133,57 @@ function AssignedActivityList({ programId }: { programId: string }) {
     <h2 id="assigned-activities-title" className="text-xl font-semibold">Actividades asignadas</h2>
     {message && <p role="status" className="mt-3 rounded-2xl bg-muted/60 px-4 py-3 text-sm">{message}</p>}
     {activities && activities.length > 0 && <ol className="mt-4 grid gap-4 sm:grid-cols-2">
-      {activities.map(activity => <li key={activity.id} className="rounded-2xl border border-border/70 bg-background/70 p-5">
-        <p className="rti-kicker">Actividad {activity.position}</p>
-        <h3 className="mt-2 text-lg font-semibold">{activity.title}</h3>
-        <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{activity.instructions}</p>
-        <p className="mt-3 text-sm font-medium">Fecha límite: {activity.dueDate}</p>
-      </li>)}
+      {activities.map(activity => <AssignedActivityCard key={activity.id} programId={programId} activity={activity}
+        onSubmitted={updated => setActivities(current => current?.map(item => item.id === updated.id ? updated : item))} />)}
     </ol>}
   </section>;
+}
+
+function AssignedActivityCard({ programId, activity, onSubmitted }: {
+  programId: string; activity: AssignedActivity; onSubmitted: (activity: AssignedActivity) => void;
+}) {
+  const [response, setResponse] = useState(activity.responseText ?? "");
+  const [pending, setPending] = useState(false);
+  const [message, setMessage] = useState("");
+  const editable = activity.assignmentStatus === "ASSIGNED" || activity.assignmentStatus === "CHANGES_REQUESTED";
+
+  async function submit() {
+    const clean = response.trim();
+    if (!clean) { setMessage("Escribe tu respuesta antes de completar la actividad."); return; }
+    setPending(true); setMessage("Enviando actividad…");
+    try {
+      const saved = await submitMyActivity(programId, activity.id, clean);
+      setMessage("Actividad enviada para revisión.");
+      onSubmitted(saved);
+    } catch (error) {
+      setMessage(activityErrorMessage(error));
+    } finally { setPending(false); }
+  }
+
+  return <li className="rounded-2xl border border-border/70 bg-background/70 p-5">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <p className="rti-kicker">Actividad {activity.position}</p>
+      <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium">{collaboratorStatusLabel(activity.assignmentStatus)}</span>
+    </div>
+    <h3 className="mt-2 text-lg font-semibold">{activity.title}</h3>
+    <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{activity.instructions}</p>
+    <p className="mt-3 text-sm font-medium">Fecha límite: {activity.dueDate}</p>
+    {activity.reviewComment && <p className="mt-4 rounded-xl border border-primary/20 bg-accent/40 px-3 py-2 text-sm">
+      Comentario del consultor: {activity.reviewComment}</p>}
+    {editable ? <div className="mt-4 space-y-3">
+      <label htmlFor={`response-${activity.id}`} className="block text-sm font-medium">Tu respuesta</label>
+      <textarea id={`response-${activity.id}`} className="rti-field min-h-32 resize-y" maxLength={10000}
+        value={response} onChange={event => setResponse(event.target.value)} disabled={pending} />
+      <button type="button" className="rti-button-primary" disabled={pending} onClick={() => void submit()}>
+        {pending ? "Enviando…" : activity.assignmentStatus === "CHANGES_REQUESTED" ? "Enviar corrección" : "Completar actividad"}
+      </button>
+    </div> : activity.responseText && <div className="mt-4 text-sm"><p className="font-medium">Tu respuesta</p>
+      <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{activity.responseText}</p></div>}
+    {message && <p role="status" className="mt-3 rounded-xl bg-muted/60 px-3 py-2 text-sm">{message}</p>}
+  </li>;
+}
+
+function collaboratorStatusLabel(status: AssignedActivity["assignmentStatus"]) {
+  return { ASSIGNED: "Pendiente", SUBMITTED: "En revisión", CHANGES_REQUESTED: "Requiere cambios",
+    COMPLETED: "Completada" }[status];
 }

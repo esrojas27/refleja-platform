@@ -3,14 +3,15 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { MyProgramArea } from "@/components/participation/my-program-area";
 import { getMyProgram, listMyPrograms, ParticipationRequestError, type MyProgram } from "@/lib/participation/participation-api";
-import { listMyProgramActivities } from "@/lib/participation/activity-api";
+import { listMyProgramActivities, submitMyActivity } from "@/lib/participation/activity-api";
 
 vi.mock("@/lib/participation/participation-api", async original => ({
   ...await original<typeof import("@/lib/participation/participation-api")>(),
   getMyProgram: vi.fn(), listMyPrograms: vi.fn(),
 }));
 vi.mock("@/lib/participation/activity-api", async original => ({
-  ...await original<typeof import("@/lib/participation/activity-api")>(), listMyProgramActivities: vi.fn(),
+  ...await original<typeof import("@/lib/participation/activity-api")>(),
+  listMyProgramActivities: vi.fn(), submitMyActivity: vi.fn(),
 }));
 
 const program: MyProgram = {
@@ -25,7 +26,14 @@ beforeEach(() => {
   vi.mocked(getMyProgram).mockResolvedValue(program);
   vi.mocked(listMyProgramActivities).mockResolvedValue({ items: [{ id: "activity-a", organizationId: "org-a",
     programId: "program-a", moduleId: "module-a", sessionId: "session-a", title: "Reflexión inicial",
-    instructions: "Describe tu punto de partida.", dueDate: "2026-10-08", position: 1, version: 0 }] });
+    instructions: "Describe tu punto de partida.", dueDate: "2026-10-08", position: 1, version: 0,
+    assignmentId: "assignment-a", assignmentStatus: "ASSIGNED", responseText: null, submittedAt: null,
+    reviewComment: null, reviewedAt: null, assignmentVersion: 0 }] });
+  vi.mocked(submitMyActivity).mockResolvedValue({ id: "activity-a", organizationId: "org-a",
+    programId: "program-a", moduleId: "module-a", sessionId: "session-a", title: "Reflexión inicial",
+    instructions: "Describe tu punto de partida.", dueDate: "2026-10-08", position: 1, version: 0,
+    assignmentId: "assignment-a", assignmentStatus: "SUBMITTED", responseText: "Mi reflexión",
+    submittedAt: "2026-10-07T12:00:00Z", reviewComment: null, reviewedAt: null, assignmentVersion: 1 });
 });
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 
@@ -46,6 +54,14 @@ it("opens basic detail without requesting a participant or organization identifi
   expect(getMyProgram).toHaveBeenCalledWith("program-a", expect.any(AbortSignal));
   expect(await screen.findByText("Reflexión inicial")).toBeTruthy();
   expect(listMyProgramActivities).toHaveBeenCalledWith("program-a", expect.any(AbortSignal));
+});
+
+it("lets the collaborator complete an assigned activity with a textual response", async () => {
+  render(<MyProgramArea mode="detail" programId="program-a" />);
+  fireEvent.change(await screen.findByLabelText("Tu respuesta"), { target: { value: " Mi reflexión " } });
+  fireEvent.click(screen.getByRole("button", { name: "Completar actividad" }));
+  await waitFor(() => expect(submitMyActivity).toHaveBeenCalledWith("program-a", "activity-a", "Mi reflexión"));
+  expect(await screen.findByText("En revisión")).toBeTruthy();
 });
 
 it.each([

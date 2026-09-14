@@ -99,10 +99,10 @@ class TenantIsolationIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 activityB, organizationB, programB, moduleB, sessionB);
         admin.update("""
                 insert into rti.activity_assignments
-                    (id, organization_id, program_id, activity_id, enrollment_id, assigned_at,
+                    (id, organization_id, program_id, activity_id, enrollment_id, assigned_at, status,
                      created_at, updated_at, version)
-                values (?, ?, ?, ?, ?, now(), now(), now(), 0),
-                       (?, ?, ?, ?, ?, now(), now(), now(), 0)
+                values (?, ?, ?, ?, ?, now(), 'ASSIGNED', now(), now(), 0),
+                       (?, ?, ?, ?, ?, now(), 'ASSIGNED', now(), now(), 0)
                 """, assignmentA, organizationA, programA, activityA, enrollmentA,
                 assignmentB, organizationB, programB, activityB, enrollmentB);
     }
@@ -190,7 +190,8 @@ class TenantIsolationIntegrationTests extends PostgreSqlIntegrationTestSupport {
             assertThat(jdbcTemplate.update(
                     "update rti.program_activities set title = 'tampered' where id = ?", activityB)).isZero();
             assertThat(jdbcTemplate.update(
-                    "delete from rti.activity_assignments where id = ?", assignmentB)).isZero();
+                    "update rti.activity_assignments set status = 'SUBMITTED', response_text = 'tampered', "
+                            + "submitted_at = now() where id = ?", assignmentB)).isZero();
         });
 
         var admin = migratorJdbcTemplate();
@@ -206,6 +207,8 @@ class TenantIsolationIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 .isEqualTo("Activity B");
         assertThat(admin.queryForObject("select count(*) from rti.activity_assignments where id = ?", Long.class, assignmentB))
                 .isEqualTo(1);
+        assertThat(admin.queryForObject("select status from rti.activity_assignments where id = ?", String.class, assignmentB))
+                .isEqualTo("ASSIGNED");
     }
 
     @Test

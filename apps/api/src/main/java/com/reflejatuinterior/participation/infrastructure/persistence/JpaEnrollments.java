@@ -114,6 +114,20 @@ class JpaEnrollments implements Enrollments {
                 .getResultList().stream().map(JpaEnrollments::data).toList();
     }
 
+    @Override public List<Data> findAllActive(UUID organizationId, UUID programId) {
+        return entityManager.createQuery("""
+                select e from EnrollmentJpaEntity e
+                where e.organizationId = :organizationId
+                  and e.programId = :programId
+                  and e.status = :status
+                order by e.id
+                """, EnrollmentJpaEntity.class)
+                .setParameter("organizationId", organizationId)
+                .setParameter("programId", programId)
+                .setParameter("status", EnrollmentStatus.ACTIVE)
+                .getResultList().stream().map(JpaEnrollments::data).toList();
+    }
+
     private static Data data(EnrollmentJpaEntity e) {
         return new Data(e.id(), e.organizationId(), e.programId(), e.participantMembershipId(), e.invitationId(), e.status().name());
     }

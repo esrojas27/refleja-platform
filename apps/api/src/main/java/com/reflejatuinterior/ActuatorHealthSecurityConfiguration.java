@@ -57,8 +57,10 @@ class ActuatorHealthSecurityConfiguration {
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/modules",
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/modules/{moduleId}/sessions",
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/activities",
+                                "/api/v1/organizations/{organizationId}/programs/{programId}/activities/{activityId}/assignments/{assignmentId}/review",
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/enrollments/{enrollmentId}/invitation-delivery",
-                                "/api/v1/invitations/{invitationId}/accept").authenticated()
+                                "/api/v1/invitations/{invitationId}/accept",
+                                "/api/v1/me/programs/{programId}/activities/{activityId}/submission").authenticated()
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(resourceServer ->
                         resourceServer.jwt(Customizer.withDefaults())

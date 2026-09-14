@@ -139,14 +139,16 @@ pruebas y validación manual: [acta del 011](docs/architecture/rti-vs1-011-accep
 
 Un `CONSULTANT` puede abrir **Actividades** dentro del espacio de trabajo de un
 programa, escoger una sesión, definir título, instrucciones y fecha límite, y
-asignar la actividad a una o más inscripciones `ACTIVE`. La creación y las
-asignaciones se confirman en una sola transacción.
+asignar la actividad a todas las inscripciones `ACTIVE` o seleccionar destinatarios
+individuales. La creación y las asignaciones se confirman en una sola transacción.
 
 El colaborador ve únicamente sus actividades en el detalle de **Mis programas**.
 La API deriva su inscripción del Access Token; no acepta identificadores de
-usuario, membresía u organización elegidos por el navegador. Este corte no incluye
-entregas, archivos, comentarios, revisión ni progreso. Contrato, persistencia y
-recorrido manual: [actividades del programa](docs/architecture/program-activities-foundation.md).
+usuario, membresía u organización elegidos por el navegador. Puede enviar una
+respuesta textual; el consultor la aprueba o solicita cambios y la actividad queda
+completada únicamente tras la aprobación. Archivos, calificaciones y progreso
+agregado siguen fuera de alcance. Contrato, persistencia y recorrido manual:
+[entrega y revisión de actividades](docs/architecture/activity-completion-review.md).
 
 ### Gate CI y journey del MVP — RTI-VS1-013
 

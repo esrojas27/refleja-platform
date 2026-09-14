@@ -110,6 +110,52 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("enrollmentIds"));
     }
 
+    @Test void consultantAssignsEveryoneAndReviewsCollaboratorSubmissions() throws Exception {
+        var created = mvc.perform(post(consultantPath()).header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(allBody()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.assignees.length()").value(2))
+                .andExpect(jsonPath("$.assignees[0].status").value("ASSIGNED"))
+                .andReturn().getResponse();
+        var tree = json.readTree(created.getContentAsString());
+        var activityId = UUID.fromString(tree.path("id").asText());
+        var assignmentId = UUID.fromString(tree.path("assignees").get(0).path("assignmentId").asText());
+        var firstEnrollmentId = UUID.fromString(tree.path("assignees").get(0).path("enrollmentId").asText());
+        var firstCollaborator = firstEnrollmentId.equals(enrollment) ? collaborator : otherCollaborator;
+
+        mvc.perform(post(collaboratorPath() + "/" + activityId + "/submission")
+                .header("Authorization", token(firstCollaborator)).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"responseText\":\"  Mi reflexión final.  \"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.assignmentStatus").value("SUBMITTED"))
+                .andExpect(jsonPath("$.responseText").value("Mi reflexión final."));
+
+        mvc.perform(post(collaboratorPath() + "/" + activityId + "/submission")
+                .header("Authorization", token(firstCollaborator)).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"responseText\":\"Duplicada\"}"))
+                .andExpect(status().isConflict());
+
+        mvc.perform(post(reviewPath(activityId, assignmentId)).header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"decision\":\"REQUEST_CHANGES\",\"comment\":\"  Agrega un ejemplo.  \"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CHANGES_REQUESTED"))
+                .andExpect(jsonPath("$.reviewComment").value("Agrega un ejemplo."));
+
+        mvc.perform(post(collaboratorPath() + "/" + activityId + "/submission")
+                .header("Authorization", token(firstCollaborator)).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"responseText\":\"Reflexión con ejemplo.\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.assignmentStatus").value("SUBMITTED"))
+                .andExpect(jsonPath("$.reviewComment").doesNotExist());
+
+        mvc.perform(post(reviewPath(activityId, assignmentId)).header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"decision\":\"APPROVE\",\"comment\":\"Buen trabajo.\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("COMPLETED"));
+
+        mvc.perform(get(collaboratorPath()).header("Authorization", token(firstCollaborator)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].assignmentStatus").value("COMPLETED"))
+                .andExpect(jsonPath("$.items[0].responseText").value("Reflexión con ejemplo."));
+    }
+
     @Test void requiresAuthenticationAndDoesNotExposeUnknownSessions() throws Exception {
         mvc.perform(get(consultantPath())).andExpect(status().isUnauthorized());
         mvc.perform(get(collaboratorPath())).andExpect(status().isUnauthorized());
@@ -123,12 +169,20 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
         return "/api/v1/organizations/" + organization + "/programs/" + program + "/activities";
     }
     private String collaboratorPath() { return "/api/v1/me/programs/" + program + "/activities"; }
+    private String reviewPath(UUID activityId, UUID assignmentId) {
+        return consultantPath() + "/" + activityId + "/assignments/" + assignmentId + "/review";
+    }
     private String body(UUID... enrollmentIds) {
         var ids = java.util.Arrays.stream(enrollmentIds).map(id -> "\"" + id + "\"")
                 .collect(java.util.stream.Collectors.joining(","));
         return "{\"sessionId\":\"" + session + "\",\"title\":\" Reflexión inicial \","
                 + "\"instructions\":\"Describe tu punto de partida.\",\"dueDate\":\"2026-10-08\","
-                + "\"position\":1,\"enrollmentIds\":[" + ids + "]}";
+                + "\"position\":1,\"assignToAll\":false,\"enrollmentIds\":[" + ids + "]}";
+    }
+    private String allBody() {
+        return "{\"sessionId\":\"" + session + "\",\"title\":\"Reflexión general\","
+                + "\"instructions\":\"Describe tu avance.\",\"dueDate\":\"2026-10-08\","
+                + "\"position\":1,\"assignToAll\":true,\"enrollmentIds\":[]}";
     }
     private String token(UUID userId) {
         var now = Instant.now();

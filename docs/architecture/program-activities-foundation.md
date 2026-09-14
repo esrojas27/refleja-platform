@@ -20,8 +20,10 @@ El incremento continúa fuera de VS1 y no modifica sus criterios de cierre.
 - El colaborador accede mediante su `sub` de Cognito y sólo recibe actividades
   vinculadas a su propia inscripción activa o completada.
 
-No se implementan edición, eliminación, reasignación, entregas, respuestas,
-archivos, comentarios, revisión, evaluaciones ni cálculo de progreso.
+La entrega textual y la revisión se agregan en el incremento documentado en
+[entrega y revisión de actividades](activity-completion-review.md). Continúan fuera
+de alcance la edición, eliminación, reasignación, archivos, evaluaciones y el
+cálculo agregado de progreso.
 
 ## Propiedad modular y persistencia
 
@@ -64,7 +66,5 @@ desde el cliente: deriva la propiedad de la identidad autenticada.
 
 ## Continuación
 
-El siguiente incremento debe definir el contrato de entrega: tipo de respuesta,
-evidencia permitida, estado de finalización y revisión del consultor. El progreso
-debe derivarse de esas reglas, no inferirse únicamente de la existencia de una
-asignación.
+El progreso agregado debe derivarse del estado `COMPLETED` documentado en el
+siguiente incremento, no inferirse únicamente de la existencia de una asignación.

@@ -8,6 +8,8 @@ import com.reflejatuinterior.identity.OrganizationAccess;
 import com.reflejatuinterior.participation.application.EnrollmentConflict;
 import com.reflejatuinterior.participation.application.EnrollmentNotFound;
 import com.reflejatuinterior.participation.application.MyProgramNotFound;
+import com.reflejatuinterior.participation.application.ActivityAssignmentNotFound;
+import com.reflejatuinterior.participation.application.ActivityWorkflowConflict;
 import com.reflejatuinterior.participation.domain.InvalidEnrollmentInput;
 import com.reflejatuinterior.participation.domain.InvalidActivityAssignment;
 import com.reflejatuinterior.program.ProgramActivities;
@@ -28,7 +30,8 @@ class EnrollmentErrorHandler {
     @ExceptionHandler({OrganizationAccess.Denied.class, CollaboratorInvitations.Denied.class, CollaboratorAccess.Denied.class})
     ResponseEntity<ErrorResponse> denied(HttpServletRequest request) { return error(request, 403, "FORBIDDEN", List.of()); }
 
-    @ExceptionHandler({EnrollmentNotFound.class, CollaboratorInvitations.Unavailable.class})
+    @ExceptionHandler({EnrollmentNotFound.class, CollaboratorInvitations.Unavailable.class,
+            ActivityAssignmentNotFound.class})
     ResponseEntity<ErrorResponse> missing(HttpServletRequest request) { return error(request, 404, "ENROLLMENT_NOT_FOUND", List.of()); }
 
     @ExceptionHandler(MyProgramNotFound.class)
@@ -48,7 +51,7 @@ class EnrollmentErrorHandler {
     ResponseEntity<ErrorResponse> unavailable(HttpServletRequest request) { return error(request, 503, "INVITATION_SERVICE_UNAVAILABLE", List.of()); }
 
     @ExceptionHandler({EnrollmentConflict.class, CollaboratorInvitations.Conflict.class, DataIntegrityViolationException.class,
-            OptimisticLockingFailureException.class})
+            OptimisticLockingFailureException.class, ActivityWorkflowConflict.class})
     ResponseEntity<ErrorResponse> conflict(HttpServletRequest request) { return error(request, 409, "ENROLLMENT_CONFLICT", List.of()); }
 
     @ExceptionHandler(InvalidEnrollmentInput.class)
