@@ -9,7 +9,7 @@ export type ActivityAssignee = {
 export type ActivityAssignmentStatus = "ASSIGNED" | "SUBMITTED" | "CHANGES_REQUESTED" | "COMPLETED";
 export type ProgramActivity = {
   id: string; organizationId: string; programId: string; moduleId: string; sessionId: string;
-  title: string; instructions: string; dueDate: string; position: number; version: number;
+  title: string; instructions: string; youtubeUrl: string | null; dueDate: string; position: number; version: number;
   assignees: ActivityAssignee[];
 };
 export type AssignedActivity = Omit<ProgramActivity, "assignees"> & {
@@ -18,7 +18,7 @@ export type AssignedActivity = Omit<ProgramActivity, "assignees"> & {
   assignmentVersion: number;
 };
 export type ActivityInput = {
-  sessionId: string; title: string; instructions: string; dueDate: string;
+  sessionId: string; title: string; instructions: string; youtubeUrl: string | null; dueDate: string;
   position: number; assignToAll: boolean; enrollmentIds: string[];
 };
 export type ActivityReviewInput = { decision: "APPROVE" | "REQUEST_CHANGES"; comment: string | null };
@@ -49,7 +49,7 @@ async function request<T>(path: string, method: "GET" | "POST", expected: number
   });
   if (response.status !== expected) {
     const body = await response.json().catch(() => null);
-    const allowed = ["sessionId", "title", "instructions", "dueDate", "position", "enrollmentIds",
+    const allowed = ["sessionId", "title", "instructions", "youtubeUrl", "dueDate", "position", "enrollmentIds",
       "responseText", "decision", "comment"];
     const fields = body?.code === "VALIDATION_ERROR" && Array.isArray(body.errors)
       ? body.errors.map((error: { field?: unknown }) => error?.field)
@@ -82,6 +82,26 @@ export const reviewActivityAssignment = (organizationId: string, programId: stri
   assignmentId: string, input: ActivityReviewInput, signal?: AbortSignal) => request<ActivityAssignee>(
     `${programActivitiesPath(organizationId, programId)}/${encodeURIComponent(activityId)}`
       + `/assignments/${encodeURIComponent(assignmentId)}/review`, "POST", 200, input, signal);
+
+export function isYoutubeVideoUrl(value: string) {
+  if (!value) return true;
+  if (value.length > 2048) return false;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" || url.username || url.password || url.port) return false;
+    const id = /^[A-Za-z0-9_-]{11}$/;
+    const segments = url.pathname.split("/").filter(Boolean);
+    if (["youtu.be", "www.youtu.be"].includes(url.hostname)) return segments.length === 1 && id.test(segments[0]);
+    if (["youtube.com", "www.youtube.com", "m.youtube.com"].includes(url.hostname)) {
+      if (url.pathname === "/watch") return id.test(url.searchParams.get("v") ?? "");
+      return segments.length === 2 && ["shorts", "embed", "live"].includes(segments[0]) && id.test(segments[1]);
+    }
+    return ["youtube-nocookie.com", "www.youtube-nocookie.com"].includes(url.hostname)
+      && segments.length === 2 && segments[0] === "embed" && id.test(segments[1]);
+  } catch {
+    return false;
+  }
+}
 
 export function activityErrorMessage(error: unknown) {
   const status = error instanceof ActivityRequestError ? error.status : 0;

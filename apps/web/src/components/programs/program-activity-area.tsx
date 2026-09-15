@@ -5,9 +5,9 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { fetchCurrentIdentity, IdentityRequestError } from "@/lib/auth/authenticated-api";
 import { listEnrollments, ParticipationRequestError, type Enrollment } from "@/lib/participation/participation-api";
 import { ActivityRequestError, activityErrorMessage, createProgramActivity, listProgramActivities,
-  reviewActivityAssignment, type ActivityAssignee, type ActivityInput, type ProgramActivity }
+  isYoutubeVideoUrl, reviewActivityAssignment, type ActivityAssignee, type ActivityInput, type ProgramActivity }
   from "@/lib/participation/activity-api";
-import { listProgramModules, ProgramContentRequestError, type ProgramModule } from "@/lib/programs/program-content-api";
+import { listProgramDimensions, ProgramContentRequestError, type ProgramDimension } from "@/lib/programs/program-content-api";
 
 type SessionOption = { id: string; label: string };
 
@@ -16,7 +16,7 @@ export function ProgramActivityArea({ organizationId, programId }: { organizatio
 }
 
 function ActivityContent({ organizationId, programId }: { organizationId: string; programId: string }) {
-  const [modules, setModules] = useState<ProgramModule[]>();
+  const [dimensions, setDimensions] = useState<ProgramDimension[]>();
   const [enrollments, setEnrollments] = useState<Enrollment[]>();
   const [activities, setActivities] = useState<ProgramActivity[]>();
   const [attempt, setAttempt] = useState(0);
@@ -33,12 +33,12 @@ function ActivityContent({ organizationId, programId }: { organizationId: string
           setMessage("Sólo un consultor autorizado puede gestionar actividades."); return;
         }
         const [structure, enrollmentPage, activityList] = await Promise.all([
-          listProgramModules(organizationId, programId, controller.signal),
+          listProgramDimensions(organizationId, programId, controller.signal),
           listEnrollments(organizationId, programId, 0, controller.signal, 100),
           listProgramActivities(organizationId, programId, controller.signal),
         ]);
         if (controller.signal.aborted) return;
-        setModules(structure.items);
+        setDimensions(structure.items);
         setEnrollments(enrollmentPage.items.filter(enrollment => enrollment.status === "ACTIVE"));
         setActivities(activityList.items);
         setMessage("");
@@ -53,13 +53,13 @@ function ActivityContent({ organizationId, programId }: { organizationId: string
     return () => controller.abort();
   }, [organizationId, programId, attempt]);
 
-  const sessions = useMemo(() => (modules ?? []).flatMap(module => module.sessions.map(session => ({
-    id: session.id, label: `${module.name} · ${session.name}`,
-  }))), [modules]);
+  const sessions = useMemo(() => (dimensions ?? []).flatMap(dimension => dimension.sessions.map(session => ({
+    id: session.id, label: `${dimension.name} · ${session.name}`,
+  }))), [dimensions]);
   const sessionNames = useMemo(() => new Map(sessions.map(session => [session.id, session.label])), [sessions]);
 
   function refresh(saved?: ProgramActivity) {
-    setModules(undefined); setEnrollments(undefined); setActivities(undefined);
+    setDimensions(undefined); setEnrollments(undefined); setActivities(undefined);
     setPending(true); setMessage("Actualizando actividades…");
     if (saved) setNotice(`Actividad creada y asignada a ${saved.assignees.length} colaborador${saved.assignees.length === 1 ? "" : "es"}.`);
     setAttempt(value => value + 1);
@@ -73,7 +73,7 @@ function ActivityContent({ organizationId, programId }: { organizationId: string
     </p>
     {notice && <p role="status" className="mt-5 rounded-2xl border border-accent bg-accent/60 px-4 py-3 text-sm">{notice}</p>}
     {message && <p role="status" className="mt-5 rounded-2xl bg-muted/60 px-4 py-3 text-sm">{message}</p>}
-    {modules && enrollments && activities && <div className="mt-7 grid gap-8 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+    {dimensions && enrollments && activities && <div className="mt-7 grid gap-8 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
       <div className="rounded-2xl border border-border/70 bg-background/70 p-5 sm:p-6">
         <ActivityForm organizationId={organizationId} programId={programId} sessions={sessions}
           enrollments={enrollments} activities={activities} onSaved={refresh} />
@@ -86,6 +86,8 @@ function ActivityContent({ organizationId, programId }: { organizationId: string
             <p className="rti-kicker">{sessionNames.get(activity.sessionId) ?? "Sesión"} · Actividad {activity.position}</p>
             <h3 className="mt-2 text-lg font-semibold">{activity.title}</h3>
             <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{activity.instructions}</p>
+            {activity.youtubeUrl && <a href={activity.youtubeUrl} target="_blank" rel="noopener noreferrer"
+              className="rti-link mt-3 inline-block text-sm">Ver video en YouTube</a>}
             <p className="mt-3 text-sm font-medium">Fecha límite: {activity.dueDate}</p>
             <div className="mt-4 space-y-3"><p className="text-sm font-medium">Seguimiento por colaborador</p>
               {activity.assignees.map(assignee => <ReviewPanel key={assignee.assignmentId}
@@ -107,7 +109,7 @@ export function ActivityForm({ organizationId, programId, sessions, enrollments,
   organizationId: string; programId: string; sessions: SessionOption[]; enrollments: Enrollment[];
   activities: ProgramActivity[]; onSaved: (saved: ProgramActivity) => void;
 }) {
-  const [input, setInput] = useState({ sessionId: sessions[0]?.id ?? "", title: "", instructions: "", dueDate: "" });
+  const [input, setInput] = useState({ sessionId: sessions[0]?.id ?? "", title: "", instructions: "", youtubeUrl: "", dueDate: "" });
   const [selected, setSelected] = useState<string[]>([]);
   const [assignToAll, setAssignToAll] = useState(true);
   const [pending, setPending] = useState(false);
@@ -128,12 +130,14 @@ export function ActivityForm({ organizationId, programId, sessions, enrollments,
     const position = Math.max(0, ...activities.filter(activity => activity.sessionId === input.sessionId)
       .map(activity => activity.position)) + 1;
     const clean: ActivityInput = { sessionId: input.sessionId, title: input.title.trim(),
-      instructions: input.instructions.trim(), dueDate: input.dueDate, position, assignToAll,
+      instructions: input.instructions.trim(), youtubeUrl: input.youtubeUrl.trim() || null,
+      dueDate: input.dueDate, position, assignToAll,
       enrollmentIds: assignToAll ? [] : selected };
     if (!clean.sessionId || !clean.title || clean.title.length > 255 || !clean.instructions
-        || clean.instructions.length > 10000 || !/^\d{4}-\d{2}-\d{2}$/.test(clean.dueDate)
+        || clean.instructions.length > 10000 || (clean.youtubeUrl !== null && !isYoutubeVideoUrl(clean.youtubeUrl))
+        || !/^\d{4}-\d{2}-\d{2}$/.test(clean.dueDate)
         || (!assignToAll && !selected.length)) {
-      setMessage("Completa la sesión, el título, las instrucciones, la fecha límite y los destinatarios."); return;
+      setMessage("Completa los campos requeridos y usa un enlace HTTPS válido de YouTube si agregas un video."); return;
     }
     submitting.current = true; setPending(true); setMessage("Creando y asignando actividad…");
     const controller = new AbortController(); request.current = controller;
@@ -167,6 +171,12 @@ export function ActivityForm({ organizationId, programId, sessions, enrollments,
       <textarea id="activity-instructions" className="rti-field min-h-32 resize-y" required maxLength={10000}
         value={input.instructions} onChange={event => setInput({ ...input, instructions: event.target.value })}
         disabled={pending || blocked || unavailable} /></div>
+    <div><label htmlFor="activity-youtube-url" className="block text-sm font-medium">Video de YouTube (opcional)</label>
+      <input id="activity-youtube-url" type="url" className="rti-field" maxLength={2048}
+        placeholder="https://www.youtube.com/watch?v=..." value={input.youtubeUrl}
+        onChange={event => setInput({ ...input, youtubeUrl: event.target.value })}
+        disabled={pending || blocked || unavailable} />
+      <p className="mt-2 text-xs text-muted-foreground">Se mostrará como enlace. El video embebido llegará en una iteración posterior.</p></div>
     <div><label htmlFor="activity-due-date" className="block text-sm font-medium">Fecha límite</label>
       <input id="activity-due-date" type="date" className="rti-field" required value={input.dueDate}
         onChange={event => setInput({ ...input, dueDate: event.target.value })} disabled={pending || blocked || unavailable} /></div>

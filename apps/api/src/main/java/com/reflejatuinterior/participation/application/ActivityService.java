@@ -47,7 +47,7 @@ public class ActivityService {
 
     @Transactional
     public ActivityResponse create(String subject, UUID organizationId, UUID programId, UUID sessionId,
-            String title, String instructions, LocalDate dueDate, int position,
+            String title, String instructions, String youtubeUrl, LocalDate dueDate, int position,
             boolean assignToAll, List<UUID> enrollmentIds, String requestId) {
         var context = authorizeConsultant(subject, organizationId, programId, "CREATE_ACTIVITY", requestId);
         var uniqueEnrollmentIds = new LinkedHashSet<>(enrollmentIds);
@@ -65,7 +65,7 @@ public class ActivityService {
         }
 
         var activity = activities.create(context.organizationId(), programId, sessionId,
-                title, instructions, dueDate, position);
+                title, instructions, youtubeUrl, dueDate, position);
         var createdAssignments = assignments.create(context.organizationId(), programId, activity.id(),
                 activeEnrollments.stream().map(Enrollments.Data::id).toList());
         auditAfterCommit("PROGRAM_ACTIVITY_ASSIGNED", context.userId(), context.organizationId(), activity.id(), requestId);
@@ -189,7 +189,7 @@ public class ActivityService {
         }
         return new ActivityResponse(activity.id(), activity.organizationId(), activity.programId(),
                 activity.moduleId(), activity.sessionId(), activity.title(), activity.instructions(),
-                activity.dueDate(), activity.position(), activity.version(), assignees);
+                activity.youtubeUrl(), activity.dueDate(), activity.position(), activity.version(), assignees);
     }
 
     private AssigneeResponse assignee(UUID organizationId, UUID programId, ActivityAssignments.Data assignment) {
@@ -222,18 +222,20 @@ public class ActivityService {
             String lastName, String status, String responseText, Instant submittedAt,
             String reviewComment, Instant reviewedAt, long version) {}
     public record ActivityResponse(UUID id, UUID organizationId, UUID programId, UUID moduleId, UUID sessionId,
-            String title, String instructions, LocalDate dueDate, int position, long version,
+            String title, String instructions, String youtubeUrl, LocalDate dueDate, int position, long version,
             List<AssigneeResponse> assignees) {
         public ActivityResponse { assignees = List.copyOf(assignees); }
     }
     public record AssignedActivityResponse(UUID id, UUID organizationId, UUID programId, UUID moduleId,
-            UUID sessionId, String title, String instructions, LocalDate dueDate, int position, long version,
+            UUID sessionId, String title, String instructions, String youtubeUrl, LocalDate dueDate,
+            int position, long version,
             UUID assignmentId, String assignmentStatus, String responseText, Instant submittedAt,
             String reviewComment, Instant reviewedAt, long assignmentVersion) {
         static AssignedActivityResponse from(ProgramActivities.Activity activity, ActivityAssignments.Data assignment) {
             return new AssignedActivityResponse(activity.id(), activity.organizationId(), activity.programId(),
                     activity.moduleId(), activity.sessionId(), activity.title(), activity.instructions(),
-                    activity.dueDate(), activity.position(), activity.version(), assignment.id(), assignment.status(),
+                    activity.youtubeUrl(), activity.dueDate(), activity.position(), activity.version(),
+                    assignment.id(), assignment.status(),
                     assignment.responseText(), assignment.submittedAt(), assignment.reviewComment(),
                     assignment.reviewedAt(), assignment.version());
         }

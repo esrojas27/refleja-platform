@@ -29,14 +29,14 @@ import org.springframework.web.bind.annotation.*;
 @SecurityRequirement(name = "cognitoAccessToken")
 @ApiResponse(responseCode = "401", description = "Missing or invalid Cognito access token")
 @ApiResponse(responseCode = "403", description = "Only an active CONSULTANT in the authorized organization may access structure")
-@ApiResponse(responseCode = "404", description = "Program or module missing or outside authorized tenant")
+@ApiResponse(responseCode = "404", description = "Program or dimension missing or outside authorized tenant")
 class ProgramStructureController {
     private final ProgramStructureService structure;
 
     ProgramStructureController(ProgramStructureService structure) { this.structure = structure; }
 
     @GetMapping
-    @Operation(summary = "List the ordered module and session structure of a program")
+    @Operation(summary = "List the ordered dimension and session structure of a program (legacy /modules path)")
     ResponseEntity<ModuleListResponse> list(@AuthenticationPrincipal Jwt jwt,
             @PathVariable UUID organizationId, @PathVariable UUID programId, HttpServletRequest request) {
         var id = requestId(request);
@@ -47,8 +47,8 @@ class ProgramStructureController {
     }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
-    @Operation(summary = "Append an ordered module to a program")
-    @ApiResponse(responseCode = "201", description = "Module created with UUIDv7 and version 0")
+    @Operation(summary = "Append an ordered dimension to a program (legacy /modules path)")
+    @ApiResponse(responseCode = "201", description = "Dimension created with UUIDv7 and version 0")
     ResponseEntity<ModuleResponse> createModule(@AuthenticationPrincipal Jwt jwt,
             @PathVariable UUID organizationId, @PathVariable UUID programId,
             @Valid @RequestBody CreateModuleRequest input, HttpServletRequest request) {
@@ -61,14 +61,14 @@ class ProgramStructureController {
     }
 
     @PostMapping(path = "/{moduleId}/sessions", consumes = MediaType.APPLICATION_JSON_VALUE)
-    @Operation(summary = "Append an ordered dated session to a program module")
+    @Operation(summary = "Append an ordered dated session to a program dimension (legacy moduleId parameter)")
     @ApiResponse(responseCode = "201", description = "Session created with UUIDv7 and version 0")
     ResponseEntity<SessionResponse> createSession(@AuthenticationPrincipal Jwt jwt,
             @PathVariable UUID organizationId, @PathVariable UUID programId, @PathVariable UUID moduleId,
             @Valid @RequestBody CreateSessionRequest input, HttpServletRequest request) {
         var id = requestId(request);
         var result = structure.createSession(jwt.getSubject(), organizationId, programId, moduleId,
-                input.name(), input.description(), input.scheduledDate(), input.position(), id);
+                input.name(), input.description(), input.objective(), input.scheduledDate(), input.position(), id);
         var location = "/api/v1/organizations/" + organizationId + "/programs/" + programId
                 + "/modules/" + moduleId + "/sessions/" + result.id();
         return ResponseEntity.created(URI.create(location)).cacheControl(CacheControl.noStore())
@@ -86,6 +86,7 @@ class ProgramStructureController {
                                @Positive int position) {}
     record CreateSessionRequest(@NotBlank @Size(max = 255) String name,
                                 @Size(max = 10000) String description,
+                                @Size(max = 10000) String objective,
                                 @NotNull LocalDate scheduledDate,
                                 @Positive int position) {}
     record ModuleListResponse(List<ModuleResponse> items) {}
@@ -98,10 +99,10 @@ class ProgramStructureController {
         }
     }
     record SessionResponse(UUID id, UUID organizationId, UUID programId, UUID moduleId, String name,
-                           String description, LocalDate scheduledDate, int position, long version) {
+                           String description, String objective, LocalDate scheduledDate, int position, long version) {
         static SessionResponse from(ProgramSessionData data) {
             return new SessionResponse(data.id(), data.organizationId(), data.programId(), data.moduleId(),
-                    data.name(), data.description(), data.scheduledDate(), data.position(), data.version());
+                    data.name(), data.description(), data.objective(), data.scheduledDate(), data.position(), data.version());
         }
     }
 }

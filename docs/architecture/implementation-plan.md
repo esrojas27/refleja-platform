@@ -36,14 +36,17 @@ Este archivo registra el punto de continuación; no reemplaza los tickets ni los
 - **012:** cerrado y publicado en `6a2ba68`. RLS protege programas e inscripciones,
   el runtime no puede evadirlo y el recorrido manual fue confirmado.
   [Acta del 012](rti-vs1-012-acceptance.md).
-- **013:** journey E2E y workflow CI implementados. En el run remoto
-  `34741166224`, backend y frontend quedaron correctos; el job protegido se
-  detuvo antes de AWS porque el entorno `mvp-e2e` todavía no tiene sus variables
-  y secretos. Pendiente configurarlo y hacer requeridos los tres checks antes de
-  declarar `V0.1.0`.
-- **Fundación visual:** incremento de producto en curso después de VS1. Unifica
-  identidad visual y navegación sobre las capacidades existentes sin anticipar
-  actividades, progreso ni evaluaciones. [Alcance](product-ui-foundation.md).
+- **013:** journey E2E y workflow CI implementados y validados. El
+  [run `34783940404`](https://github.com/esrojas27/refleja-platform/actions/runs/34783940404)
+  completó correctamente backend, frontend y el recorrido MVP con Cognito/SES
+  reales. El rol usa el sujeto OIDC inmutable del repositorio. Pendientes:
+  proteger `master`, comprobar el bloqueo mediante PR y publicar `V0.1.0`.
+- **Fundación de producto posterior a VS1:** la identidad visual y la navegación
+  ya cubren el espacio de trabajo del programa. También están implementados
+  dimensiones configurables, sesiones con objetivo y el ciclo de actividades:
+  asignación masiva o individual, enlace opcional de YouTube, respuesta textual,
+  solicitud de cambios y aprobación. La API v1 conserva `/modules` como contrato
+  legado. Progreso agregado, evaluaciones y archivos continúan pendientes.
 - **Primer operador:** mecanismo administrativo implementado y aplicado localmente
   con aprobación expresa: organización operadora real, membresía activa y rol
   `CONSULTANT` acotado. [Procedimiento y evidencia](first-operator-bootstrap.md).
@@ -70,7 +73,21 @@ advertencia de lentitud del sistema de archivos, sin una causa física confirmad
 
 | Orden | Ticket | Resultado esperado |
 | --- | --- | --- |
-| 1 | **013 — End-to-End Test + CI Gate** | Activar el entorno protegido, obtener un run verde y exigir los tres checks en `master`. |
+| 1 | **Cierre de VS1** | Exigir los tres checks en `master`, validarlos mediante un PR de prueba y publicar `V0.1.0`. |
+
+## Descubrimiento posterior al MVP
+
+La reunión de producto del 2026-09-14 agregó necesidades de perfil inicial,
+roles Líder/RRHH, ficha DISC, plantillas de programa, cambio de módulos a
+dimensiones, objetivo de sesión, video de YouTube, avisos de vencimiento,
+evaluaciones inicial/final, identidad visual, idioma y progreso. Las decisiones,
+dependencias y una secuencia propuesta están registradas en el
+[backlog de descubrimiento posterior al MVP](product-discovery-backlog.md).
+
+La alineación inicial de terminología y contenido ya fue implementada de forma
+compatible; los demás elementos aún no son tickets aprobados. En especial, no se deben inferir los
+campos que entregará Tata, las preguntas que entregará Paula Rojas ni el alcance de
+autorización de Líder y RRHH.
 
 ## Distancia al MVP validable
 
@@ -108,6 +125,12 @@ criterios de aceptación. No posponer al 012 las garantías de seguridad exigida
 por los ADR para cada funcionalidad anterior.
 
 ## Evidencia de cierre actual
+
+Para el 013: el [run `34783940404`](https://github.com/esrojas27/refleja-platform/actions/runs/34783940404)
+quedó verde con `Backend gate`, `Frontend gate` y `MVP E2E gate`. El job protegido
+validó sus valores públicos, obtuvo credenciales AWS temporales por OIDC, comprobó
+las dos cuentas Cognito `CONFIRMED` y ejecutó el recorrido completo sobre una base
+PostgreSQL desechable. [Acta del 013](rti-vs1-013-acceptance.md).
 
 Para el 011: 163 pruebas backend, 85 frontend y 10 smoke tests Playwright
 correctos; lint y build de producción correctos. Las pruebas incluyen programas

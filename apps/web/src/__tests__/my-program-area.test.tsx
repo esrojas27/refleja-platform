@@ -26,12 +26,14 @@ beforeEach(() => {
   vi.mocked(getMyProgram).mockResolvedValue(program);
   vi.mocked(listMyProgramActivities).mockResolvedValue({ items: [{ id: "activity-a", organizationId: "org-a",
     programId: "program-a", moduleId: "module-a", sessionId: "session-a", title: "Reflexión inicial",
-    instructions: "Describe tu punto de partida.", dueDate: "2026-10-08", position: 1, version: 0,
+    instructions: "Describe tu punto de partida.", youtubeUrl: "https://youtu.be/dQw4w9WgXcQ",
+    dueDate: "2026-10-08", position: 1, version: 0,
     assignmentId: "assignment-a", assignmentStatus: "ASSIGNED", responseText: null, submittedAt: null,
     reviewComment: null, reviewedAt: null, assignmentVersion: 0 }] });
   vi.mocked(submitMyActivity).mockResolvedValue({ id: "activity-a", organizationId: "org-a",
     programId: "program-a", moduleId: "module-a", sessionId: "session-a", title: "Reflexión inicial",
-    instructions: "Describe tu punto de partida.", dueDate: "2026-10-08", position: 1, version: 0,
+    instructions: "Describe tu punto de partida.", youtubeUrl: "https://youtu.be/dQw4w9WgXcQ",
+    dueDate: "2026-10-08", position: 1, version: 0,
     assignmentId: "assignment-a", assignmentStatus: "SUBMITTED", responseText: "Mi reflexión",
     submittedAt: "2026-10-07T12:00:00Z", reviewComment: null, reviewedAt: null, assignmentVersion: 1 });
 });
@@ -53,6 +55,7 @@ it("opens basic detail without requesting a participant or organization identifi
   expect(screen.getByText("Empresa A")).toBeTruthy();
   expect(getMyProgram).toHaveBeenCalledWith("program-a", expect.any(AbortSignal));
   expect(await screen.findByText("Reflexión inicial")).toBeTruthy();
+  expect(screen.getByRole("link", { name: "Ver video en YouTube" }).getAttribute("href")).toBe("https://youtu.be/dQw4w9WgXcQ");
   expect(listMyProgramActivities).toHaveBeenCalledWith("program-a", expect.any(AbortSignal));
 });
 

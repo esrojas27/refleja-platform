@@ -12,7 +12,7 @@ class ReflejaTuInteriorApplicationTests extends PostgreSqlIntegrationTestSupport
 
     private static final List<String> MIGRATION_VERSIONS =
             List.of("202608240151", "202608240337", "20260909010000", "20260912010000", "20260913020000",
-                    "20260914010000", "20260914030000");
+                    "20260914010000", "20260914030000", "20260914050000");
 
     private static final List<String> BUSINESS_TABLES = List.of(
             "activity_assignments",

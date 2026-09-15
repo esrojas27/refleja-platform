@@ -31,6 +31,8 @@ class ProgramActivityJpaEntity {
     private String title;
     @Column(name = "instructions", nullable = false, columnDefinition = "text")
     private String instructions;
+    @Column(name = "youtube_url", length = 2048)
+    private String youtubeUrl;
     @Column(name = "due_date", nullable = false)
     private LocalDate dueDate;
     @Column(name = "position", nullable = false)
@@ -45,13 +47,14 @@ class ProgramActivityJpaEntity {
     protected ProgramActivityJpaEntity() {}
 
     ProgramActivityJpaEntity(UUID organizationId, UUID programId, UUID moduleId, UUID sessionId,
-            String title, String instructions, LocalDate dueDate, int position) {
+            String title, String instructions, String youtubeUrl, LocalDate dueDate, int position) {
         this.organizationId = organizationId;
         this.programId = programId;
         this.moduleId = moduleId;
         this.sessionId = sessionId;
         this.title = title;
         this.instructions = instructions;
+        this.youtubeUrl = youtubeUrl;
         this.dueDate = dueDate;
         this.position = position;
     }
@@ -63,6 +66,7 @@ class ProgramActivityJpaEntity {
     UUID sessionId() { return sessionId; }
     String title() { return title; }
     String instructions() { return instructions; }
+    String youtubeUrl() { return youtubeUrl; }
     LocalDate dueDate() { return dueDate; }
     int position() { return position; }
     long version() { return version; }

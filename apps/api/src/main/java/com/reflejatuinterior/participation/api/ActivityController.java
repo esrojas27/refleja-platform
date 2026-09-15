@@ -51,7 +51,8 @@ class ActivityController {
             @Valid @RequestBody CreateActivityRequest input, HttpServletRequest request) {
         var id = EnrollmentController.requestId(request);
         var result = service.create(jwt.getSubject(), organizationId, programId, input.sessionId(), input.title(),
-                input.instructions(), input.dueDate(), input.position(), input.assignToAll(), input.enrollmentIds(), id);
+                input.instructions(), input.youtubeUrl(), input.dueDate(), input.position(), input.assignToAll(),
+                input.enrollmentIds(), id);
         var location = "/api/v1/organizations/" + organizationId + "/programs/" + programId
                 + "/activities/" + result.id();
         return ResponseEntity.created(URI.create(location)).cacheControl(CacheControl.noStore())
@@ -97,6 +98,7 @@ class ActivityController {
     record CreateActivityRequest(@NotNull UUID sessionId,
                                  @NotBlank @Size(max = 255) String title,
                                  @NotBlank @Size(max = 10000) String instructions,
+                                 @Size(max = 2048) String youtubeUrl,
                                  @NotNull LocalDate dueDate,
                                  @Positive int position,
                                  boolean assignToAll,

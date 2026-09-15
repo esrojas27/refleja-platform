@@ -7,8 +7,10 @@ el consultor puede asignarla a todos los colaboradores activos del programa o
 desmarcar esa opción y elegir destinatarios individuales. El colaborador responde
 con texto y el consultor aprueba la entrega o solicita cambios.
 
-No se incluyen archivos, adjuntos, calificaciones, rúbricas, edición de la
-actividad, notificaciones ni cálculo agregado de progreso.
+La actividad puede conservar un enlace HTTPS validado a un video de YouTube y lo
+muestra al consultor y al colaborador como enlace externo seguro. No se incluyen
+iframe, archivos, adjuntos, calificaciones, rúbricas, edición de la actividad,
+notificaciones ni cálculo agregado de progreso.
 
 ## Estados
 

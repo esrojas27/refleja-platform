@@ -45,7 +45,7 @@ class JpaProgramStructure implements ProgramStructure {
     @Override public ProgramSessionData createSession(UUID organizationId, UUID programId, UUID moduleId,
             NewProgramSession input) {
         return sessionData(sessions.saveAndFlush(new ProgramSessionJpaEntity(organizationId, programId, moduleId,
-                input.name(), input.description(), input.scheduledDate(), input.position())));
+                input.name(), input.description(), input.objective(), input.scheduledDate(), input.position())));
     }
 
     private static ProgramModuleData moduleData(ProgramModuleJpaEntity entity, List<ProgramSessionData> sessions) {
@@ -55,6 +55,6 @@ class JpaProgramStructure implements ProgramStructure {
 
     private static ProgramSessionData sessionData(ProgramSessionJpaEntity entity) {
         return new ProgramSessionData(entity.id(), entity.organizationId(), entity.programId(), entity.moduleId(),
-                entity.name(), entity.description(), entity.scheduledDate(), entity.position(), entity.version());
+                entity.name(), entity.description(), entity.objective(), entity.scheduledDate(), entity.position(), entity.version());
     }
 }

@@ -70,6 +70,7 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 .andExpect(status().isCreated()).andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.title").value("Reflexión inicial"))
                 .andExpect(jsonPath("$.instructions").value("Describe tu punto de partida."))
+                .andExpect(jsonPath("$.youtubeUrl").value("https://youtu.be/dQw4w9WgXcQ"))
                 .andExpect(jsonPath("$.sessionId").value(session.toString()))
                 .andExpect(jsonPath("$.assignees[0].enrollmentId").value(enrollment.toString()))
                 .andReturn().getResponse();
@@ -82,6 +83,7 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
         mvc.perform(get(collaboratorPath()).header("Authorization", token(collaborator)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(1))
                 .andExpect(jsonPath("$.items[0].id").value(activityId.toString()))
+                .andExpect(jsonPath("$.items[0].youtubeUrl").value("https://youtu.be/dQw4w9WgXcQ"))
                 .andExpect(jsonPath("$.items[0].assignees").doesNotExist());
         mvc.perform(get(collaboratorPath()).header("Authorization", token(otherCollaborator)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.items").isEmpty());
@@ -108,6 +110,10 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
         mvc.perform(post(consultantPath()).header("Authorization", token(consultant))
                 .contentType(MediaType.APPLICATION_JSON).content(body(otherEnrollment, otherEnrollment)))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("enrollmentIds"));
+        mvc.perform(post(consultantPath()).header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body(otherEnrollment).replace("https://youtu.be/dQw4w9WgXcQ", "https://example.com/video")))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("youtubeUrl"));
     }
 
     @Test void consultantAssignsEveryoneAndReviewsCollaboratorSubmissions() throws Exception {
@@ -176,12 +182,13 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
         var ids = java.util.Arrays.stream(enrollmentIds).map(id -> "\"" + id + "\"")
                 .collect(java.util.stream.Collectors.joining(","));
         return "{\"sessionId\":\"" + session + "\",\"title\":\" Reflexión inicial \","
-                + "\"instructions\":\"Describe tu punto de partida.\",\"dueDate\":\"2026-10-08\","
+                + "\"instructions\":\"Describe tu punto de partida.\","
+                + "\"youtubeUrl\":\"https://youtu.be/dQw4w9WgXcQ\",\"dueDate\":\"2026-10-08\","
                 + "\"position\":1,\"assignToAll\":false,\"enrollmentIds\":[" + ids + "]}";
     }
     private String allBody() {
         return "{\"sessionId\":\"" + session + "\",\"title\":\"Reflexión general\","
-                + "\"instructions\":\"Describe tu avance.\",\"dueDate\":\"2026-10-08\","
+                + "\"instructions\":\"Describe tu avance.\",\"youtubeUrl\":null,\"dueDate\":\"2026-10-08\","
                 + "\"position\":1,\"assignToAll\":true,\"enrollmentIds\":[]}";
     }
     private String token(UUID userId) {

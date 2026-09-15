@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchAuthSession } from "aws-amplify/auth";
 import { createProgramActivity, listMyProgramActivities, listProgramActivities,
-  reviewActivityAssignment, submitMyActivity } from "@/lib/participation/activity-api";
+  isYoutubeVideoUrl, reviewActivityAssignment, submitMyActivity } from "@/lib/participation/activity-api";
 
 vi.mock("aws-amplify/auth", () => ({ fetchAuthSession: vi.fn() }));
 const session = { tokens: { accessToken: { toString: () => "activity-access" } } };
@@ -18,7 +18,8 @@ describe("activity API", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ items: [] }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: "activity-a" }), { status: 201 }));
     vi.stubGlobal("fetch", fetcher);
-    const input = { sessionId: "session-a", title: "Reflexión", instructions: "Escribe", dueDate: "2026-10-08",
+    const input = { sessionId: "session-a", title: "Reflexión", instructions: "Escribe",
+      youtubeUrl: "https://youtu.be/dQw4w9WgXcQ", dueDate: "2026-10-08",
       position: 1, assignToAll: false, enrollmentIds: ["enrollment-a"] };
     await listProgramActivities("org a", "program/a");
     await createProgramActivity("org a", "program/a", input);
@@ -26,6 +27,13 @@ describe("activity API", () => {
     expect(fetcher.mock.calls[0][0]).toBe(path);
     expect(fetcher.mock.calls[1]).toEqual([path, expect.objectContaining({ method: "POST", body: JSON.stringify(input),
       headers: { Authorization: "Bearer activity-access", "Content-Type": "application/json" } })]);
+  });
+
+  it("accepts only supported HTTPS YouTube video URLs", () => {
+    expect(isYoutubeVideoUrl("https://youtu.be/dQw4w9WgXcQ")).toBe(true);
+    expect(isYoutubeVideoUrl("https://www.youtube.com/watch?v=dQw4w9WgXcQ")).toBe(true);
+    expect(isYoutubeVideoUrl("http://youtube.com/watch?v=dQw4w9WgXcQ")).toBe(false);
+    expect(isYoutubeVideoUrl("https://example.com/watch?v=dQw4w9WgXcQ")).toBe(false);
   });
 
   it("uses self-service submission and tenant-scoped review commands", async () => {

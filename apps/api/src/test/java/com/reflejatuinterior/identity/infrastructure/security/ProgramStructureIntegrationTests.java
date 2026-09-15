@@ -53,6 +53,8 @@ class ProgramStructureIntegrationTests extends PostgreSqlIntegrationTestSupport 
         var sessionResponse = mvc.perform(post(path(organization, program) + "/" + moduleId + "/sessions")
                 .header("Authorization", bearer).contentType(MediaType.APPLICATION_JSON).content(sessionBody(1)))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.moduleId").value(moduleId.toString()))
+                .andExpect(jsonPath("$.objective").value("Definir el punto de partida"))
+                .andExpect(jsonPath("$.description").doesNotExist())
                 .andExpect(jsonPath("$.scheduledDate").value("2026-10-01")).andExpect(jsonPath("$.position").value(1))
                 .andReturn().getResponse();
         var sessionId = UUID.fromString(json.readTree(sessionResponse.getContentAsString()).path("id").asText());
@@ -62,7 +64,8 @@ class ProgramStructureIntegrationTests extends PostgreSqlIntegrationTestSupport 
                 .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(1))
                 .andExpect(jsonPath("$.items[0].id").value(moduleId.toString()))
                 .andExpect(jsonPath("$.items[0].sessions.length()").value(1))
-                .andExpect(jsonPath("$.items[0].sessions[0].id").value(sessionId.toString()));
+                .andExpect(jsonPath("$.items[0].sessions[0].id").value(sessionId.toString()))
+                .andExpect(jsonPath("$.items[0].sessions[0].objective").value("Definir el punto de partida"));
         tenantContext.activate(organization);
         assertThat(jdbcTemplate.queryForObject("select count(*) from rti.program_modules where organization_id=?", Long.class, organization)).isEqualTo(1);
         assertThat(jdbcTemplate.queryForObject("select count(*) from rti.program_sessions where organization_id=?", Long.class, organization)).isEqualTo(1);
@@ -117,7 +120,8 @@ class ProgramStructureIntegrationTests extends PostgreSqlIntegrationTestSupport 
         return "{\"name\":\" Fundamentos \",\"description\":\"Contexto\",\"position\":" + position + "}";
     }
     private String sessionBody(int position) {
-        return "{\"name\":\" Sesión inicial \",\"description\":\"Encuentro\",\"scheduledDate\":\"2026-10-01\",\"position\":" + position + "}";
+        return "{\"name\":\" Sesión inicial \",\"objective\":\" Definir el punto de partida \","
+                + "\"scheduledDate\":\"2026-10-01\",\"position\":" + position + "}";
     }
     private String token(String subject) {
         var now = Instant.now();

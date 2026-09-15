@@ -1,8 +1,8 @@
 # RTI-VS1-013 — End-to-End Test + CI Gate
 
-Estado: **implementado; pendiente de activar y ejecutar el gate remoto**. El MVP no
-se declarará cerrado hasta obtener un run verde de `VS1 CI Gate` y proteger
-`master` con sus tres checks requeridos.
+Estado: **implementado y validado remotamente**. El gate completo está verde;
+quedan pendientes la protección de `master`, el PR de comprobación y la etiqueta
+`V0.1.0` para completar el cierre administrativo del MVP.
 
 Se revisaron Product Definition, ADR-001 a ADR-005 y el ticket 013 del
 [documento canónico](https://docs.google.com/document/d/1vzpG5ZiD6uTD6jT9USe_R1rdhU7bN54Q38Ty3Udu-Ik/edit?tab=t.s1fvvog8kpix).
@@ -53,6 +53,17 @@ Variables del entorno `mvp-e2e`:
 - `RTI_E2E_COGNITO_APP_CLIENT_ID`
 - `RTI_E2E_COGNITO_DOMAIN`
 
+Valores públicos verificados el 2026-09-13:
+
+| Variable | Valor |
+| --- | --- |
+| `RTI_E2E_AWS_ACCOUNT_ID` | `836528258662` |
+| `RTI_E2E_AWS_ROLE_ARN` | `arn:aws:iam::836528258662:role/refleja-tu-interior-github-actions` |
+| `RTI_E2E_AWS_REGION` | `us-east-1` |
+| `RTI_E2E_COGNITO_USER_POOL_ID` | `us-east-1_AKiEfWZMK` |
+| `RTI_E2E_COGNITO_APP_CLIENT_ID` | `35ihde5ft8qvfuaq7d4ctg92pp` |
+| `RTI_E2E_COGNITO_DOMAIN` | `rti-dev-esroj.auth.us-east-1.amazoncognito.com` |
+
 Secretos del entorno:
 
 - `RTI_E2E_CONSULTANT_SUBJECT`
@@ -89,6 +100,18 @@ imprime contraseñas ni valores de identidad.
 
 ## Ejecución y cierre
 
+Evidencia remota de aceptación:
+
+- [`VS1 CI Gate` — run 34783940404](https://github.com/esrojas27/refleja-platform/actions/runs/34783940404),
+  commit `e5caaf0`, ejecutado el 2026-09-13.
+- `Backend gate`, `Frontend gate` y `MVP E2E gate`: correctos.
+- El paso `Verify the two pre-existing Cognito test accounts` confirmó estado
+  `CONFIRMED` para consultor y colaborador y la coincidencia del `sub` del
+  consultor. Los dos logins reales del journey comprobaron que ambas cuentas
+  estaban habilitadas para autenticarse.
+- El journey real completó creación de organización y programa, invitación,
+  cambio de sesión, aceptación y consulta del programa por el colaborador.
+
 Las comprobaciones sin secretos pueden reproducirse localmente:
 
 ```powershell
@@ -114,14 +137,13 @@ del gate frontend. El journey E2E ya verifica la inicialización contra su propi
 PostgreSQL desechable.
 
 El journey autenticado se ejecuta desde Actions para garantizar una base nueva,
-credenciales protegidas y AWS temporal. Para cerrar el 013:
+credenciales protegidas y AWS temporal. El entorno, el rol OIDC y el run verde ya
+están verificados. Para completar el cierre:
 
-1. crear el entorno `mvp-e2e` con las variables y secretos anteriores;
-2. crear o conectar el rol OIDC de mínimo privilegio;
-3. ejecutar `VS1 CI Gate` y conservar un run con los tres jobs verdes;
-4. configurar en las reglas de `master` como checks requeridos `Backend gate`,
+1. configurar en las reglas de `master` como checks requeridos `Backend gate`,
    `Frontend gate` y `MVP E2E gate`;
-5. abrir un PR de comprobación y confirmar que un test fallido impide el merge.
+2. abrir un PR de comprobación y confirmar que el merge permanece bloqueado hasta
+   que finalicen correctamente los tres checks;
+3. publicar la etiqueta `V0.1.0` sobre el commit de cierre aprobado.
 
-Hasta completar esos pasos no existe evidencia remota suficiente para etiquetar
-`V0.1.0`. No se implementó funcionalidad posterior al Vertical Slice 1.
+No se implementó funcionalidad posterior al Vertical Slice 1.

@@ -25,17 +25,18 @@ class JpaProgramActivities implements ProgramActivities {
 
     @Override
     public Activity create(UUID organizationId, UUID programId, UUID sessionId, String title,
-            String instructions, LocalDate dueDate, int position) {
+            String instructions, String youtubeUrl, LocalDate dueDate, int position) {
         var session = sessions.findByOrganizationIdAndProgramIdAndId(organizationId, programId, sessionId)
                 .orElseThrow(Missing::new);
         NewProgramActivity input;
         try {
-            input = new NewProgramActivity(title, instructions, dueDate, position);
+            input = new NewProgramActivity(title, instructions, youtubeUrl, dueDate, position);
         } catch (InvalidProgramInput exception) {
             throw new InvalidInput(exception.field());
         }
         return data(activities.saveAndFlush(new ProgramActivityJpaEntity(organizationId, programId,
-                session.moduleId(), session.id(), input.title(), input.instructions(), input.dueDate(), input.position())));
+                session.moduleId(), session.id(), input.title(), input.instructions(), input.youtubeUrl(),
+                input.dueDate(), input.position())));
     }
 
     @Override
@@ -55,7 +56,7 @@ class JpaProgramActivities implements ProgramActivities {
 
     private static Activity data(ProgramActivityJpaEntity entity) {
         return new Activity(entity.id(), entity.organizationId(), entity.programId(), entity.moduleId(),
-                entity.sessionId(), entity.title(), entity.instructions(), entity.dueDate(),
+                entity.sessionId(), entity.title(), entity.instructions(), entity.youtubeUrl(), entity.dueDate(),
                 entity.position(), entity.version());
     }
 }

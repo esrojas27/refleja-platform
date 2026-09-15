@@ -27,6 +27,8 @@ class ProgramSessionJpaEntity {
     private String name;
     @Column(name = "description", columnDefinition = "text")
     private String description;
+    @Column(name = "objective", columnDefinition = "text")
+    private String objective;
     @Column(name = "scheduled_date", nullable = false)
     private LocalDate scheduledDate;
     @Column(name = "position", nullable = false)
@@ -41,12 +43,13 @@ class ProgramSessionJpaEntity {
     protected ProgramSessionJpaEntity() {}
 
     ProgramSessionJpaEntity(UUID organizationId, UUID programId, UUID moduleId, String name,
-            String description, LocalDate scheduledDate, int position) {
+            String description, String objective, LocalDate scheduledDate, int position) {
         this.organizationId = organizationId;
         this.programId = programId;
         this.moduleId = moduleId;
         this.name = name;
         this.description = description;
+        this.objective = objective;
         this.scheduledDate = scheduledDate;
         this.position = position;
     }
@@ -57,6 +60,7 @@ class ProgramSessionJpaEntity {
     UUID moduleId() { return moduleId; }
     String name() { return name; }
     String description() { return description; }
+    String objective() { return objective; }
     LocalDate scheduledDate() { return scheduledDate; }
     int position() { return position; }
     long version() { return version; }

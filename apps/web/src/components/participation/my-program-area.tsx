@@ -167,6 +167,8 @@ function AssignedActivityCard({ programId, activity, onSubmitted }: {
     </div>
     <h3 className="mt-2 text-lg font-semibold">{activity.title}</h3>
     <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{activity.instructions}</p>
+    {activity.youtubeUrl && <a href={activity.youtubeUrl} target="_blank" rel="noopener noreferrer"
+      className="rti-link mt-3 inline-block text-sm">Ver video en YouTube</a>}
     <p className="mt-3 text-sm font-medium">Fecha límite: {activity.dueDate}</p>
     {activity.reviewComment && <p className="mt-4 rounded-xl border border-primary/20 bg-accent/40 px-3 py-2 text-sm">
       Comentario del consultor: {activity.reviewComment}</p>}

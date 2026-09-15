@@ -138,7 +138,8 @@ pruebas y validación manual: [acta del 011](docs/architecture/rti-vs1-011-accep
 ### Actividades asignadas
 
 Un `CONSULTANT` puede abrir **Actividades** dentro del espacio de trabajo de un
-programa, escoger una sesión, definir título, instrucciones y fecha límite, y
+programa, escoger una sesión, definir título, instrucciones, un enlace opcional
+de YouTube y fecha límite, y
 asignar la actividad a todas las inscripciones `ACTIVE` o seleccionar destinatarios
 individuales. La creación y las asignaciones se confirman en una sola transacción.
 
@@ -147,7 +148,8 @@ La API deriva su inscripción del Access Token; no acepta identificadores de
 usuario, membresía u organización elegidos por el navegador. Puede enviar una
 respuesta textual; el consultor la aprueba o solicita cambios y la actividad queda
 completada únicamente tras la aprobación. Archivos, calificaciones y progreso
-agregado siguen fuera de alcance. Contrato, persistencia y recorrido manual:
+agregado y reproducción embebida siguen fuera de alcance. Contrato, persistencia
+y recorrido manual:
 [entrega y revisión de actividades](docs/architecture/activity-completion-review.md).
 
 ### Gate CI y journey del MVP — RTI-VS1-013
@@ -317,6 +319,13 @@ almacena contraseñas, códigos OAuth ni tokens de aceptación.
 Los incrementos posteriores agregan `program_modules`, `program_sessions`,
 `program_activities` y `activity_assignments`. Las definiciones de actividad son
 propiedad de `program`; las asignaciones pertenecen a `participation`.
+
+En el producto se muestran **dimensiones**, no módulos. Los nombres Interior,
+Exterior y Social serán valores modificables de una futura plantilla y no se
+crean automáticamente. La API v1 conserva `/modules` y `moduleId` para no romper
+clientes existentes. Las sesiones usan el campo aditivo `objective`; las
+descripciones históricas se migran como objetivo. Las actividades admiten una URL
+HTTPS opcional y validada de YouTube, mostrada por ahora como enlace externo.
 
 Los identificadores son UUID; Hibernate genera UUIDv7 antes del `INSERT`. Los estados se almacenan por nombre simbólico y se restringen en PostgreSQL. Las referencias entre módulos se representan en JPA como UUID escalares, mientras que las claves foráneas compuestas aseguran que programas, membresías y enrollments pertenezcan a la misma organización. Las entidades y repositorios son detalles internos de persistencia de los módulos `identity`, `organization`, `program` y `participation`.
 
