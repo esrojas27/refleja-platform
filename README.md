@@ -122,6 +122,12 @@ Configuración: [Cognito/SES](infra/cognito/README.md#correo-de-invitaciones-rti
 Contrato, seguridad, evidencia automática y recorrido manual:
 [acta del 010](docs/architecture/rti-vs1-010-acceptance.md).
 
+La evolución posterior permite elegir **Colaborador**, **Líder** o **RRHH** al
+invitar desde el programa. RRHH corresponde internamente a `COMPANY_ADMIN`; no
+existe un rol `HR`. El rol se guarda en la invitación y se asigna al aceptarla, sin
+ampliar todavía la visibilidad funcional de Líder o RRHH. Detalle técnico y límites:
+[invitaciones por rol](docs/architecture/program-role-invitations.md).
+
 ### Mis programas — RTI-VS1-011
 
 Una cuenta con usuario, membresía y rol `COLLABORATOR` activos ve **Mis programas**

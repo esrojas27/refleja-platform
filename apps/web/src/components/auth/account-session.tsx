@@ -145,7 +145,7 @@ export function AccountSession() {
               </div>
             ) : <p className="mt-3 text-base font-semibold">Organización activa: {identity.organizations[0].name}</p>}
             {identity.activeOrganizationId ? (
-              <p className="mt-4 text-sm font-medium">Roles activos: {identity.roles.length ? identity.roles.join(", ") : "Sin roles asignados"}</p>
+              <p className="mt-4 text-sm font-medium">Roles activos: {identity.roles.length ? identity.roles.map(roleLabel).join(", ") : "Sin roles asignados"}</p>
             ) : null}
           </div>
         </div>
@@ -187,4 +187,13 @@ export function AccountSession() {
       </div>
     </section>
   );
+}
+
+function roleLabel(role: string) {
+  return role === "COMPANY_ADMIN" ? "RRHH"
+    : role === "LEADER" ? "Líder"
+    : role === "COLLABORATOR" ? "Colaborador"
+    : role === "CONSULTANT" ? "Consultor"
+    : role === "SUPER_ADMIN" ? "Superadministrador"
+    : role;
 }

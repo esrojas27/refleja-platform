@@ -107,7 +107,7 @@ test.describe("@mvp RTI-VS1-013 authenticated vertical slice", () => {
     await page.getByRole("link", { name: "Volver a Cuenta" }).click();
     await page.getByRole("button", { name: "Comprobar sesión" }).click();
     await expect(page.getByText("Sesión autenticada.")).toBeVisible();
-    await expect(page.getByText("Roles activos: COLLABORATOR")).toBeVisible();
+    await expect(page.getByText("Roles activos: Colaborador")).toBeVisible();
     await page.getByRole("main").getByRole("link", { name: "Mis programas" }).click();
     await expect(page.getByRole("link", { name: programName })).toBeVisible();
     await expect(page.getByText(organizationName, { exact: true })).toBeVisible();

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { acceptInvitation, listInvitations, participationErrorMessage, ParticipationRequestError,
-  type Invitation, type PageResult } from "@/lib/participation/participation-api";
+  inviteeRoleLabel, type Invitation, type PageResult } from "@/lib/participation/participation-api";
 
 const button = "rti-button-secondary";
 
@@ -45,6 +45,7 @@ export function InvitationArea() {
         <p className="rti-kicker">{invitation.status}</p>
         <h2 className="text-lg font-semibold">{invitation.programName}</h2>
         <p className="text-sm text-muted-foreground">Organización: {invitation.organizationName}</p>
+        <p className="text-sm text-muted-foreground">Rol: {inviteeRoleLabel(invitation.role)}</p>
         <p className="text-sm text-muted-foreground">Estado: {invitation.status}</p>
         <p className="text-sm text-muted-foreground">Vence: {invitation.expiresAt}</p>
         <InvitationAcceptance invitation={invitation} onAccepted={() => refresh(page, true)} />

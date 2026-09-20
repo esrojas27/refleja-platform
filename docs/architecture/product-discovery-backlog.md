@@ -25,10 +25,11 @@ modelo definitivo ni considerar que `ACTIVE` equivale a perfil completo.
 
 Al invitar una persona a un programa, el consultor debe poder indicar si será
 colaborador, líder de la empresa o integrante de RRHH. Cada tipo debe recibir los
-permisos correspondientes. El detalle de visibilidad puede evolucionar por
-iteraciones, pero antes de implementar se debe decidir si Líder y RRHH son roles de
-organización, de programa o ambos, y cómo conviven con una misma persona en varios
-programas.
+permisos correspondientes. Decisión cerrada el 2026-09-15: ambos son roles de
+organización; Líder usa `LEADER` y RRHH es la etiqueta de producto del rol técnico
+existente `COMPANY_ADMIN`. No se introduce `HR`. La invitación registra el rol
+seleccionado, mantiene su inscripción al programa y lo aplica al aceptarse. El
+detalle futuro de visibilidad continúa pendiente y no se amplía en este incremento.
 
 ### Información DISC
 
@@ -106,8 +107,9 @@ La numeración oficial debe asignarse al convertir cada bloque en ticket.
 1. **Alineación de terminología y contenido — implementado localmente:**
    dimensiones configurables, objetivo de sesión y enlace opcional de YouTube,
    con migración compatible y pruebas.
-2. **Roles e invitaciones:** modelar Líder y RRHH, elegir el rol durante la
-   invitación y aplicar permisos mínimos explícitos.
+2. **Roles e invitaciones — implementado localmente:** selección entre Colaborador,
+   Líder y RRHH, persistencia del rol solicitado y asignación al aceptar, sin ampliar
+   las políticas de visibilidad existentes.
 3. **Perfil inicial:** implementar la validación del perfil cuando Tata entregue
    los campos y reglas.
 4. **Ficha DISC:** cuatro campos por colaborador con autorización y aislamiento
@@ -130,7 +132,7 @@ La numeración oficial debe asignarse al convertir cada bloque en ticket.
 | --- | --- | --- |
 | Campos del perfil básico | Tata | Perfil inicial |
 | Preguntas de evaluaciones | Paula Rojas | Evaluaciones |
-| Alcance de Líder y RRHH | Decisión de producto y autorización | Roles, DISC y evaluaciones |
+| Alcance de Líder y RRHH | Parcialmente resuelto: roles de organización; visibilidad funcional pendiente | DISC y evaluaciones |
 | Dimensiones fijas o configurables | Resuelto: configurables; los tres nombres pertenecen a la futura plantilla | Plantillas |
 | Alcance y auditoría de DISC | Decisión de producto y privacidad | Ficha DISC |
 | Contenido y versionado de plantillas | Decisión de producto | Plantillas |

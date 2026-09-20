@@ -6,10 +6,11 @@ import java.util.UUID;
 
 /** Identity-owned invitation workflow. Call provision/create/dispatch only after scoped authorization. */
 public interface CollaboratorInvitations {
+    enum InvitedRole { COLLABORATOR, LEADER, COMPANY_ADMIN }
     record Person(String email, String firstName, String lastName) {}
     record Account(String subject, String username, boolean needsWelcome) {}
     record Participant(UUID userId, UUID membershipId, String email, String firstName, String lastName) {}
-    record Invitation(UUID id, UUID organizationId, UUID userId, UUID membershipId,
+    record Invitation(UUID id, UUID organizationId, UUID userId, UUID membershipId, InvitedRole role,
                       String cognitoSubject, String cognitoUsername, String email, String firstName,
                       String lastName, String status, Instant expiresAt, String deliveryStatus) {}
     record Page(List<Invitation> items, int page, int size, long totalElements, int totalPages) {
@@ -17,7 +18,7 @@ public interface CollaboratorInvitations {
     }
 
     Account provision(Person person);
-    Invitation create(UUID organizationId, UUID actorId, Account account, Person person);
+    Invitation create(UUID organizationId, UUID actorId, Account account, Person person, InvitedRole role);
     Invitation findOwned(String subject, UUID invitationId);
     Page listOwned(String subject, int page, int size);
     Invitation findInOrganization(UUID organizationId, UUID invitationId);

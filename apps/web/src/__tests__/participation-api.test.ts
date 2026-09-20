@@ -4,7 +4,7 @@ import { acceptInvitation, createEnrollment, getMyProgram, listEnrollments, list
   retryInvitationDelivery, ParticipationRequestError, deliveryMessage, myProgramsPath } from "@/lib/participation/participation-api";
 
 vi.mock("aws-amplify/auth", () => ({ fetchAuthSession: vi.fn() }));
-const input = { email: "participant@example.test", firstName: "Ana", lastName: "Prueba" };
+const input = { email: "participant@example.test", firstName: "Ana", lastName: "Prueba", role: "COLLABORATOR" as const };
 const session = { tokens: { accessToken: { toString: () => "test-access" } } };
 beforeEach(() => {
   vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "http://localhost:8082/");

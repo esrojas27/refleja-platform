@@ -102,6 +102,7 @@ class EnrollmentInvitationIntegrationTests extends PostgreSqlIntegrationTestSupp
                 .andExpect(jsonPath("$.status").value("INVITED"))
                 .andExpect(jsonPath("$.participant.email").value(EMAIL))
                 .andExpect(jsonPath("$.participant.firstName").value("Ana"))
+                .andExpect(jsonPath("$.invitation.role").value("COLLABORATOR"))
                 .andExpect(jsonPath("$.invitation.status").value("PENDING"))
                 .andExpect(jsonPath("$.invitation.deliveryStatus").value("SENT"))
                 .andExpect(header().string("Cache-Control", "no-store"))
@@ -119,6 +120,37 @@ class EnrollmentInvitationIntegrationTests extends PostgreSqlIntegrationTestSupp
         mvc.perform(get("/api/v1/me").header("Authorization", token(SUBJECT))).andExpect(status().isForbidden());
         verify(gateway).sendWelcomeIfRequired(any());
         verify(gateway).sendInvitation(any());
+    }
+
+    @ParameterizedTest @ValueSource(strings = {"LEADER", "COMPANY_ADMIN"})
+    void grantsTheSelectedOrganizationRoleOnlyWhenTheInvitationIsAccepted(String role) throws Exception {
+        var enrollment = json.readTree(create(organization, program, valid(EMAIL, role)).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.invitation.role").value(role))
+                .andReturn().getResponse().getContentAsString());
+        assertThat(jdbcTemplate.queryForObject("select invited_role from rti.user_invitations where id=?", String.class,
+                invitation(enrollment))).isEqualTo(role);
+        assertThat(roles(membership(enrollment))).containsExactly(role);
+        assertPending(enrollment);
+
+        accept(enrollment, SUBJECT).andExpect(status().isOk())
+                .andExpect(jsonPath("$.role").value(role));
+        assertThat(roles(membership(enrollment))).containsExactly(role);
+        mvc.perform(get("/api/v1/me").header("Authorization", token(SUBJECT)).param("organizationId", organization.toString()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.roles[0]").value(role));
+        // Existing ADR-003 policy applies: both roles can read program metadata,
+        // but this increment does not grant participant-management access.
+        mvc.perform(get("/api/v1/organizations/" + organization + "/programs/" + program)
+                        .header("Authorization", token(SUBJECT)))
+                .andExpect(status().isOk());
+        mvc.perform(get(path(organization, program)).header("Authorization", token(SUBJECT)))
+                .andExpect(status().isForbidden());
+    }
+
+    @ParameterizedTest @ValueSource(strings = {"CONSULTANT", "SUPER_ADMIN", "HR"})
+    void rejectsRolesOutsideTheInviteableAllowlist(String role) throws Exception {
+        create(organization, program, valid(EMAIL, role)).andExpect(status().isBadRequest());
+        assertThat(count("enrollments")).isZero();
+        verifyNoInteractions(gateway);
     }
 
     @Test void listsOnlyTheRequestedProgramsParticipantsWithPagination() throws Exception {
@@ -421,6 +453,9 @@ class EnrollmentInvitationIntegrationTests extends PostgreSqlIntegrationTestSupp
         return mvc.perform(post(path(org, programId) + "/" + id(enrollment) + "/invitation-delivery").header("Authorization", consultant));
     }
     private String valid(String email) { return json.writeValueAsString(Map.of("email", email, "firstName", "Ana", "lastName", "Gómez")); }
+    private String valid(String email, String role) {
+        return json.writeValueAsString(Map.of("email", email, "firstName", "Ana", "lastName", "Gómez", "role", role));
+    }
     private String token(String subject) {
         var now = Instant.now();
         var claims = JwtClaimsSet.builder().issuer(TEST_COGNITO_ISSUER).subject(subject).issuedAt(now).expiresAt(now.plusSeconds(300))

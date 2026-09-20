@@ -32,8 +32,9 @@ class JpaInvitationStore implements InvitationStore {
     }
 
     @Override @Transactional(propagation = Propagation.MANDATORY)
-    public Invitation create(UUID organizationId, UUID actorId, Account account, Person person) {
+    public Invitation create(UUID organizationId, UUID actorId, Account account, Person person, InvitedRole role) {
         activeOrganization(organizationId);
+        var membershipRole = MembershipRole.valueOf(role.name());
         if (account == null || account.subject() == null || account.subject().isBlank() || account.username() == null || account.username().isBlank()) throw new Conflict();
         var byEmail = em.createQuery("select u from UserJpaEntity u where u.emailNormalized = :email", UserJpaEntity.class)
                 .setParameter("email", person.email()).setLockMode(LockModeType.PESSIMISTIC_WRITE).getResultList();
@@ -54,9 +55,10 @@ class JpaInvitationStore implements InvitationStore {
         if (memberships.isEmpty()) {
             member = new OrganizationMembershipJpaEntity(organizationId, user.id(), MembershipStatus.PENDING, null);
             em.persist(member); em.flush();
-            em.persist(new MembershipRoleJpaEntity(member.id(), MembershipRole.COLLABORATOR));
+            em.persist(new MembershipRoleJpaEntity(member.id(), membershipRole));
         } else { member = memberships.getFirst(); enabled(member); }
-        var invitation = new UserInvitationJpaEntity(organizationId, user.id(), member.id(), actorId, account.username(), clock.instant().plus(Duration.ofDays(7)));
+        var invitation = new UserInvitationJpaEntity(organizationId, user.id(), member.id(), membershipRole,
+                actorId, account.username(), clock.instant().plus(Duration.ofDays(7)));
         em.persist(invitation); em.flush();
         return data(invitation, user);
     }
@@ -99,8 +101,8 @@ class JpaInvitationStore implements InvitationStore {
         if (invitation.status == ACCEPTED) return data(invitation, user);
         if (!clock.instant().isBefore(invitation.expiresAt) || invitation.status == EXPIRED) throw new Expired();
         user.acceptInvitation(); member.acceptInvitation(clock.instant());
-        if (em.find(MembershipRoleJpaEntity.class, new MembershipRoleId(member.id(), MembershipRole.COLLABORATOR)) == null) {
-            em.persist(new MembershipRoleJpaEntity(member.id(), MembershipRole.COLLABORATOR));
+        if (em.find(MembershipRoleJpaEntity.class, new MembershipRoleId(member.id(), invitation.invitedRole)) == null) {
+            em.persist(new MembershipRoleJpaEntity(member.id(), invitation.invitedRole));
         }
         invitation.status = ACCEPTED; invitation.acceptedAt = clock.instant();
         em.flush(); return data(invitation, user);
@@ -175,7 +177,8 @@ class JpaInvitationStore implements InvitationStore {
         if (organizations.findSummaries(Set.of(org)).stream().noneMatch(o -> o.id().equals(org) && "ACTIVE".equals(o.status()))) throw new Unavailable();
     }
     private Invitation data(UserInvitationJpaEntity row, UserJpaEntity user) {
-        return new Invitation(row.id, row.organizationId, row.userId, row.membershipId, user.cognitoSubject(), row.cognitoUsername,
+        return new Invitation(row.id, row.organizationId, row.userId, row.membershipId, InvitedRole.valueOf(row.invitedRole.name()),
+                user.cognitoSubject(), row.cognitoUsername,
                 user.email(), user.firstName(), user.lastName(), row.effectiveStatus(clock.instant()), row.expiresAt, row.deliveryStatus.name());
     }
 }

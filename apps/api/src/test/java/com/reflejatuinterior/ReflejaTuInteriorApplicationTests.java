@@ -12,7 +12,7 @@ class ReflejaTuInteriorApplicationTests extends PostgreSqlIntegrationTestSupport
 
     private static final List<String> MIGRATION_VERSIONS =
             List.of("202608240151", "202608240337", "20260909010000", "20260912010000", "20260913020000",
-                    "20260914010000", "20260914030000", "20260914050000");
+                    "20260914010000", "20260914030000", "20260914050000", "20260915010000");
 
     private static final List<String> BUSINESS_TABLES = List.of(
             "activity_assignments",
@@ -52,7 +52,7 @@ class ReflejaTuInteriorApplicationTests extends PostgreSqlIntegrationTestSupport
                 Integer.class);
         Integer symbolicStatusCount = jdbcTemplate.queryForObject(
                 "select count(*) from information_schema.columns "
-                        + "where table_schema = 'rti' and column_name in ('status', 'role') "
+                        + "where table_schema = 'rti' and column_name in ('status', 'role', 'invited_role') "
                         + "and data_type = 'character varying'",
                 Integer.class);
         Boolean runtimeHasSchemaUsage = jdbcTemplate.queryForObject(
@@ -74,7 +74,7 @@ class ReflejaTuInteriorApplicationTests extends PostgreSqlIntegrationTestSupport
         assertThat(successfulMigrations).containsExactlyElementsOf(MIGRATION_VERSIONS);
         assertThat(businessTables).containsExactlyElementsOf(BUSINESS_TABLES);
         assertThat(uuidIdentifierCount).isEqualTo(10);
-        assertThat(symbolicStatusCount).isEqualTo(8);
+        assertThat(symbolicStatusCount).isEqualTo(9);
         assertThat(runtimeHasSchemaUsage).isTrue();
         assertThat(runtimeHasSchemaCreate).isFalse();
         assertThat(migratorOwnedTableCount).isEqualTo(11);

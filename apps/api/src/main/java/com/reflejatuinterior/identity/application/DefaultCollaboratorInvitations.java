@@ -25,8 +25,9 @@ class DefaultCollaboratorInvitations implements CollaboratorInvitations {
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
-    public Invitation create(UUID organizationId, UUID actorId, Account account, Person person) {
-        return store.create(organizationId, actorId, account, validate(person));
+    public Invitation create(UUID organizationId, UUID actorId, Account account, Person person, InvitedRole role) {
+        if (role == null) throw new InvalidInput("role");
+        return store.create(organizationId, actorId, account, validate(person), role);
     }
     @Override public Invitation findOwned(String subject, UUID invitationId) { return store.findOwned(subject, invitationId); }
     @Override public Page listOwned(String subject, int page, int size) {

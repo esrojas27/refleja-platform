@@ -14,6 +14,7 @@ class UserInvitationJpaEntity {
     @Column(name = "organization_id", nullable = false) UUID organizationId;
     @Column(name = "user_id", nullable = false) UUID userId;
     @Column(name = "membership_id", nullable = false) UUID membershipId;
+    @Enumerated(EnumType.STRING) @Column(name = "invited_role", nullable = false) MembershipRole invitedRole;
     @Column(name = "invited_by", nullable = false) UUID invitedBy;
     @Column(name = "cognito_username", nullable = false) String cognitoUsername;
     @Enumerated(EnumType.STRING) @Column(nullable = false) InvitationStatus status;
@@ -29,10 +30,10 @@ class UserInvitationJpaEntity {
     @Version long version;
 
     protected UserInvitationJpaEntity() {}
-    UserInvitationJpaEntity(UUID organizationId, UUID userId, UUID membershipId, UUID invitedBy,
-                            String cognitoUsername, Instant expiresAt) {
+    UserInvitationJpaEntity(UUID organizationId, UUID userId, UUID membershipId, MembershipRole invitedRole,
+                            UUID invitedBy, String cognitoUsername, Instant expiresAt) {
         this.organizationId = organizationId; this.userId = userId; this.membershipId = membershipId;
-        this.invitedBy = invitedBy; this.cognitoUsername = cognitoUsername; this.expiresAt = expiresAt;
+        this.invitedRole = invitedRole; this.invitedBy = invitedBy; this.cognitoUsername = cognitoUsername; this.expiresAt = expiresAt;
         status = InvitationStatus.PENDING; deliveryStatus = DeliveryStatus.PENDING;
     }
     String effectiveStatus(Instant now) {

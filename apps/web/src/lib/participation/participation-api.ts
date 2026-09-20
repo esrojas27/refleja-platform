@@ -1,18 +1,19 @@
 import { fetchAuthSession } from "aws-amplify/auth";
 
 export type PageResult<T> = { items: T[]; page: number; size: number; totalElements: number; totalPages: number };
-export type EnrollmentInput = { email: string; firstName: string; lastName: string };
+export type InviteeRole = "COLLABORATOR" | "LEADER" | "COMPANY_ADMIN";
+export type EnrollmentInput = { email: string; firstName: string; lastName: string; role: InviteeRole };
 export type InvitationStatus = "PENDING" | "ACCEPTED" | "EXPIRED" | "REVOKED";
 export type Enrollment = {
   id: string; organizationId: string; programId: string; status: "INVITED" | "ACTIVE";
   participant: { userId: string; membershipId: string; email: string; firstName: string | null; lastName: string | null };
-  invitation: { id: string; status: InvitationStatus; expiresAt: string; deliveryStatus: "PENDING" | "SENDING" | "SENT" | "FAILED" } | null;
+  invitation: { id: string; role: InviteeRole; status: InvitationStatus; expiresAt: string; deliveryStatus: "PENDING" | "SENDING" | "SENT" | "FAILED" } | null;
 };
 export type Invitation = {
   id: string; organizationId: string; organizationName: string; programId: string; programName: string;
-  status: InvitationStatus; expiresAt: string;
+  role: InviteeRole; status: InvitationStatus; expiresAt: string;
 };
-export type AcceptedInvitation = { invitationId: string; status: "ACCEPTED"; enrollmentId: string; enrollmentStatus: "ACTIVE" };
+export type AcceptedInvitation = { invitationId: string; role: InviteeRole; status: "ACCEPTED"; enrollmentId: string; enrollmentStatus: "ACTIVE" };
 export type MyProgram = {
   id: string; organizationId: string; organizationName: string; name: string; description: string | null;
   status: "DRAFT" | "SCHEDULED" | "ACTIVE" | "COMPLETED" | "CANCELLED";
@@ -43,14 +44,14 @@ async function request<T>(path: string, method: "GET" | "POST", expectedStatus: 
   const response = await fetch(`${base.replace(/\/$/, "")}/api/v1${path}`, {
     method, signal, cache: "no-store",
     headers: { Authorization: `Bearer ${session.tokens.accessToken.toString()}`, ...(input ? { "Content-Type": "application/json" } : {}) },
-    // No client-chosen user, role, status, invitation or tenant fields.
-    body: input ? JSON.stringify({ email: input.email, firstName: input.firstName, lastName: input.lastName }) : undefined,
+    // No client-chosen user, status, invitation or tenant fields. Role is restricted to the inviteable organization-role contract.
+    body: input ? JSON.stringify({ email: input.email, firstName: input.firstName, lastName: input.lastName, role: input.role }) : undefined,
   });
   if (response.status !== expectedStatus) {
     const body = await response.json().catch(() => null);
     const fields = body?.code === "VALIDATION_ERROR" && Array.isArray(body.errors)
       ? body.errors.map((error: { field?: unknown }) => error?.field).filter((field: unknown): field is string =>
-        typeof field === "string" && ["email", "firstName", "lastName"].includes(field)) : [];
+        typeof field === "string" && ["email", "firstName", "lastName", "role"].includes(field)) : [];
     const id = typeof body?.requestId === "string" && /^[a-f0-9-]{36}$/i.test(body.requestId) ? body.requestId : undefined;
     throw new ParticipationRequestError(response.status, fields, id);
   }
@@ -78,12 +79,16 @@ export function participationErrorMessage(error: unknown) {
   const message = status === 401 ? "Tu sesión no está disponible. Inicia sesión de nuevo."
     : status === 403 ? "No tienes permiso para realizar esta operación."
     : status === 404 ? "La invitación o el recurso no está disponible para esta cuenta."
-    : status === 400 ? "Revisa el correo, el nombre y el apellido."
+    : status === 400 ? "Revisa el correo, el nombre, el apellido y el tipo de invitación."
     : status === 409 ? "Ya existe un registro o su estado cambió. Actualiza el listado antes de reintentar."
     : status === 410 ? "La invitación venció. Solicita al consultor que revise tu acceso."
     : status === 503 ? "El servicio de invitaciones no está disponible. Revisa el listado antes de reintentar."
     : "No se pudo completar la consulta. Inténtalo de nuevo.";
   return message + (error instanceof ParticipationRequestError && error.requestId ? ` Referencia: ${error.requestId}` : "");
+}
+
+export function inviteeRoleLabel(role: InviteeRole) {
+  return role === "COMPANY_ADMIN" ? "RRHH" : role === "LEADER" ? "Líder" : "Colaborador";
 }
 
 export function myProgramErrorMessage(error: unknown) {

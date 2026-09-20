@@ -73,6 +73,7 @@ class AwsInvitationGateway implements InvitationGateway, AutoCloseable {
             // This link grants nothing. The API lists/accepts only invitations matching the validated Access Token sub.
             String url = settings.webBase().replaceAll("/+$", "") + "/invitations";
             String text = "Tienes una invitación a Refleja Tu Interior.\n\n"
+                    + "Rol de acceso: " + roleLabel(invitation.role()) + ".\n\n"
                     + "Inicia sesión con tu cuenta de Cognito y revisa tus invitaciones pendientes:\n" + url + "\n\n"
                     + "Vence el " + invitation.expiresAt() + " (UTC). La invitación no concede acceso hasta que la aceptes.\n"
                     + "Si tu cuenta es nueva, recibirás por separado las instrucciones de acceso administradas por Cognito.\n"
@@ -101,6 +102,9 @@ class AwsInvitationGateway implements InvitationGateway, AutoCloseable {
         return new Account(sub, username, status == UserStatusType.FORCE_CHANGE_PASSWORD);
     }
     private static AttributeType attribute(String name, String value) { return AttributeType.builder().name(name).value(value).build(); }
+    private static String roleLabel(InvitedRole role) {
+        return role == InvitedRole.COMPANY_ADMIN ? "RRHH" : role == InvitedRole.LEADER ? "Líder" : "Colaborador";
+    }
     private static String value(List<AttributeType> attributes, String name) {
         return attributes.stream().filter(a -> name.equals(a.name())).map(AttributeType::value).findFirst().orElse(null);
     }

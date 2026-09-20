@@ -12,7 +12,7 @@ const identity: CurrentIdentity = { cognitoSubject: "subject", user: { id: "user
   organizations: [{ id: "org-a", name: "Empresa A", roles: ["CONSULTANT"] }], activeOrganizationId: "org-a", roles: ["CONSULTANT"] };
 const enrollment: Enrollment = { id: "enrollment-a", organizationId: "org-a", programId: "program-a", status: "INVITED",
   participant: { userId: "user-b", membershipId: "membership-b", email: "participant@example.test", firstName: "Ana", lastName: "Prueba" },
-  invitation: { id: "invite-a", status: "PENDING", expiresAt: "2026-09-16T00:00:00Z", deliveryStatus: "SENT" } };
+  invitation: { id: "invite-a", role: "COLLABORATOR", status: "PENDING", expiresAt: "2026-09-16T00:00:00Z", deliveryStatus: "SENT" } };
 const data = { items: [enrollment], page: 0, size: 20, totalElements: 1, totalPages: 1 };
 beforeEach(() => {
   vi.mocked(fetchCurrentIdentity).mockResolvedValue(identity); vi.mocked(listEnrollments).mockResolvedValue(data);
@@ -29,7 +29,8 @@ it("renders actual scoped collaborators and makes no mail delivery claim", async
   render(<EnrollmentArea organizationId="org-a" programId="program-a" />);
   await screen.findByText("participant@example.test");
   expect(screen.getByText(/no confirma recepción/)).toBeTruthy();
-  expect(screen.getByRole("form", { name: "Registrar colaborador" })).toBeTruthy();
+  expect(screen.getByText("Rol invitado: Colaborador")).toBeTruthy();
+  expect(screen.getByRole("form", { name: "Invitar persona" })).toBeTruthy();
   expect(listEnrollments).toHaveBeenCalledWith("org-a", "program-a", 0, expect.any(AbortSignal));
 });
 it("denies non-consultants without loading collaborator data", async () => {
@@ -51,8 +52,16 @@ it("registers once and refreshes the real list", async () => {
   render(<EnrollmentArea organizationId="org-a" programId="program-a" />);
   await screen.findByRole("form"); fill(); fireEvent.submit(screen.getByRole("form"));
   await screen.findByText(/Registro guardado: INVITED/);
-  expect(createEnrollment).toHaveBeenCalledWith("org-a", "program-a", { email: "participant@example.test", firstName: "Ana", lastName: "Prueba" }, expect.any(AbortSignal));
+  expect(createEnrollment).toHaveBeenCalledWith("org-a", "program-a", { email: "participant@example.test", firstName: "Ana", lastName: "Prueba", role: "COLLABORATOR" }, expect.any(AbortSignal));
   await waitFor(() => expect(listEnrollments).toHaveBeenCalledTimes(2));
+});
+it("sends the selected RRHH role as COMPANY_ADMIN", async () => {
+  render(<EnrollmentArea organizationId="org-a" programId="program-a" />);
+  await screen.findByRole("form"); fill();
+  fireEvent.change(screen.getByLabelText("Tipo de invitación"), { target: { value: "COMPANY_ADMIN" } });
+  fireEvent.submit(screen.getByRole("form"));
+  await waitFor(() => expect(createEnrollment).toHaveBeenCalledWith("org-a", "program-a",
+    { email: "participant@example.test", firstName: "Ana", lastName: "Prueba", role: "COMPANY_ADMIN" }, expect.any(AbortSignal)));
 });
 it("blocks duplicate pending registration", () => {
   vi.mocked(createEnrollment).mockReturnValue(new Promise(() => {}));
@@ -91,7 +100,7 @@ it("aborts and discards delayed data when the program context changes", async ()
   const signal = vi.mocked(listEnrollments).mock.calls[0][3]!;
   vi.mocked(listEnrollments).mockResolvedValue({ ...data, items: [], totalElements: 0, totalPages: 0 });
   view.rerender(<EnrollmentArea organizationId="org-a" programId="program-b" />);
-  await screen.findByText("No hay colaboradores en esta página.");
+  await screen.findByText("No hay personas en esta página.");
   await act(async () => resolve(data));
   expect(signal.aborted).toBe(true); expect(screen.queryByText("participant@example.test")).toBeNull();
 });

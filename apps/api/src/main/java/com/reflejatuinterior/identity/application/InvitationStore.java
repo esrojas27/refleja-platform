@@ -3,6 +3,7 @@ package com.reflejatuinterior.identity.application;
 import java.util.UUID;
 import com.reflejatuinterior.identity.CollaboratorInvitations.Account;
 import com.reflejatuinterior.identity.CollaboratorInvitations.Invitation;
+import com.reflejatuinterior.identity.CollaboratorInvitations.InvitedRole;
 import com.reflejatuinterior.identity.CollaboratorInvitations.Page;
 import com.reflejatuinterior.identity.CollaboratorInvitations.Person;
 import com.reflejatuinterior.identity.CollaboratorInvitations.Participant;
@@ -10,7 +11,7 @@ import com.reflejatuinterior.identity.CollaboratorInvitations.Participant;
 public interface InvitationStore {
     record Attempt(Invitation invitation, UUID attemptId, boolean needsWelcome) {}
     void validateCandidate(Person person);
-    Invitation create(UUID organizationId, UUID actorId, Account account, Person person);
+    Invitation create(UUID organizationId, UUID actorId, Account account, Person person, InvitedRole role);
     Invitation findOwned(String subject, UUID invitationId);
     Page listOwned(String subject, int page, int size);
     Invitation findInOrganization(UUID organizationId, UUID invitationId);

@@ -90,9 +90,22 @@ describe("Account session", () => {
     const organization = await screen.findByRole("option", { name: "Organization B" });
     fireEvent.pointerDown(organization, { pointerType: "mouse" });
     fireEvent.click(organization);
-    expect(await screen.findByText("Roles activos: CONSULTANT")).toBeDefined();
+    expect(await screen.findByText("Roles activos: Consultor")).toBeDefined();
     expect(fetchCurrentIdentity).toHaveBeenLastCalledWith("org-b", expect.any(AbortSignal));
     expect(screen.queryByText(/Roles activos:.*COLLABORATOR/)).toBeNull();
+  });
+
+  it("presents COMPANY_ADMIN with the product label RRHH", async () => {
+    fetchCurrentIdentity.mockResolvedValue({
+      ...identity,
+      organizations: [{ id: "org-a", name: "Organization A", roles: ["COMPANY_ADMIN"] }],
+      activeOrganizationId: "org-a",
+      roles: ["COMPANY_ADMIN"],
+    });
+    render(<AccountSession />);
+    fireEvent.click(screen.getByRole("button", { name: "Comprobar sesión" }));
+    expect(await screen.findByText("Roles activos: RRHH")).toBeDefined();
+    expect(screen.queryByText(/Roles activos:.*COMPANY_ADMIN/)).toBeNull();
   });
 
   it("offers self-service programs when any active organization has the collaborator role", async () => {

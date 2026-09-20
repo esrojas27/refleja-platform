@@ -3,6 +3,7 @@ package com.reflejatuinterior.participation.api;
 import java.net.URI;
 import java.util.UUID;
 import com.reflejatuinterior.participation.application.EnrollmentService;
+import com.reflejatuinterior.identity.CollaboratorInvitations.InvitedRole;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -33,7 +34,8 @@ class EnrollmentController {
     EnrollmentController(EnrollmentService service) { this.service = service; }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
-    @Operation(summary = "Enroll and invite a collaborator", description = "CONSULTANT only. Email up to 254 and first/last name 1–100 characters. "
+    @Operation(summary = "Enroll and invite a program participant", description = "CONSULTANT only. Role may be COLLABORATOR, LEADER or COMPANY_ADMIN; omitted role defaults to COLLABORATOR. "
+            + "COMPANY_ADMIN is presented as RRHH in the product. Email up to 254 and first/last name 1–100 characters. "
             + "Actual Cognito sub is resolved before the atomic internal creation. New User INVITED, membership PENDING and enrollment INVITED. "
             + "Existing active access/profile is preserved; suspended or revoked access is never restored. "
             + "Invitation expires in seven days. Email is requested after commit; 201 does not guarantee delivery. "
@@ -43,7 +45,7 @@ class EnrollmentController {
             @PathVariable UUID organizationId, @PathVariable UUID programId, @Valid @RequestBody CreateRequest input,
             HttpServletRequest request) {
         String id = requestId(request);
-        var result = service.create(jwt.getSubject(), organizationId, programId, input.email(), input.firstName(), input.lastName(), id);
+        var result = service.create(jwt.getSubject(), organizationId, programId, input.email(), input.firstName(), input.lastName(), input.role(), id);
         return ResponseEntity.created(URI.create("/api/v1/organizations/" + organizationId + "/programs/" + programId + "/enrollments/" + result.id()))
                 .cacheControl(CacheControl.noStore()).header("X-Request-ID", id).body(result);
     }
@@ -77,5 +79,6 @@ class EnrollmentController {
     }
 
     record CreateRequest(@NotBlank @Email @Size(max = 254) String email,
-                         @NotBlank @Size(max = 100) String firstName, @NotBlank @Size(max = 100) String lastName) {}
+                         @NotBlank @Size(max = 100) String firstName, @NotBlank @Size(max = 100) String lastName,
+                         InvitedRole role) {}
 }

@@ -47,18 +47,20 @@ public class EnrollmentService {
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public EnrollmentResponse create(String subject, UUID organizationId, UUID programId,
-                                     String email, String firstName, String lastName, String requestId) {
+                                     String email, String firstName, String lastName,
+                                     CollaboratorInvitations.InvitedRole role, String requestId) {
         // No external side effect before authorization, resource scoping and validation.
         transactions.execute(status -> authorize(subject, organizationId, programId, requestId));
         var input = new NewCollaborator(email, firstName, lastName);
         var person = new CollaboratorInvitations.Person(input.email(), input.firstName(), input.lastName());
+        var invitedRole = role == null ? CollaboratorInvitations.InvitedRole.COLLABORATOR : role;
         var account = invitations.provision(person);
         var created = transactions.execute(status -> {
             // The external round trip must not preserve a stale authorization decision.
             var context = authorize(subject, organizationId, programId, requestId);
-            var invitation = invitations.create(organizationId, context.userId(), account, person);
+            var invitation = invitations.create(organizationId, context.userId(), account, person, invitedRole);
             var enrollment = enrollments.create(organizationId, programId, invitation.membershipId(), invitation.id());
-            auditAfterCommit("COLLABORATOR_ENROLLED", context.userId(), organizationId, enrollment.id(), requestId);
+            auditAfterCommit("PROGRAM_PARTICIPANT_INVITED", context.userId(), organizationId, enrollment.id(), requestId);
             return response(enrollment);
         });
         return deliver(created, requestId);
@@ -96,7 +98,7 @@ public class EnrollmentService {
                     .findFirst().orElseThrow(EnrollmentNotFound::new);
             var program = programs.find(invitation.organizationId(), enrollment.programId()).orElseThrow(EnrollmentNotFound::new);
             return new InvitationResponse(invitation.id(), organization.id(), organization.name(), program.id(), program.name(),
-                    invitation.status(), invitation.expiresAt());
+                    invitation.role().name(), invitation.status(), invitation.expiresAt());
         }).toList();
         return new InvitationPage(items, page, size, result.totalElements(), result.totalPages());
     }
@@ -116,7 +118,7 @@ public class EnrollmentService {
         if (!"ACCEPTED".equals(owned.status())) {
             auditAfterCommit("INVITATION_ACCEPTED", accepted.userId(), accepted.organizationId(), activated.id(), requestId);
         }
-        return new AcceptanceResponse(accepted.id(), accepted.status(), activated.id(), activated.status());
+        return new AcceptanceResponse(accepted.id(), accepted.role().name(), accepted.status(), activated.id(), activated.status());
     }
 
     @Transactional(readOnly = true)
@@ -247,7 +249,7 @@ public class EnrollmentService {
     }
 
     private static InvitationInfo invitationInfo(CollaboratorInvitations.Invitation i) {
-        return new InvitationInfo(i.id(), i.status(), i.expiresAt(), i.deliveryStatus());
+        return new InvitationInfo(i.id(), i.role().name(), i.status(), i.expiresAt(), i.deliveryStatus());
     }
 
     private static void validatePage(int page, int size) {
@@ -271,18 +273,18 @@ public class EnrollmentService {
                 actor, organizationId, programId, requestId, Instant.now());
     }
 
-    public record InvitationInfo(UUID id, String status, Instant expiresAt, String deliveryStatus) {}
+    public record InvitationInfo(UUID id, String role, String status, Instant expiresAt, String deliveryStatus) {}
     public record EnrollmentResponse(UUID id, UUID organizationId, UUID programId, String status,
                                      CollaboratorInvitations.Participant participant, InvitationInfo invitation) {}
     public record EnrollmentPage(List<EnrollmentResponse> items, int page, int size, long totalElements, int totalPages) {
         public EnrollmentPage { items = List.copyOf(items); }
     }
     public record InvitationResponse(UUID id, UUID organizationId, String organizationName, UUID programId,
-                                     String programName, String status, Instant expiresAt) {}
+                                     String programName, String role, String status, Instant expiresAt) {}
     public record InvitationPage(List<InvitationResponse> items, int page, int size, long totalElements, int totalPages) {
         public InvitationPage { items = List.copyOf(items); }
     }
-    public record AcceptanceResponse(UUID invitationId, String status, UUID enrollmentId, String enrollmentStatus) {}
+    public record AcceptanceResponse(UUID invitationId, String role, String status, UUID enrollmentId, String enrollmentStatus) {}
     public record MyProgramResponse(UUID id, UUID organizationId, String organizationName, String name,
                                     String description, String status, java.time.LocalDate startDate,
                                     java.time.LocalDate endDate, long version) {}

@@ -10,6 +10,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import com.reflejatuinterior.identity.CollaboratorInvitations.Invitation;
+import com.reflejatuinterior.identity.CollaboratorInvitations.InvitedRole;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import software.amazon.awssdk.services.cognitoidentityprovider.CognitoIdentityProviderClient;
@@ -37,7 +38,7 @@ class AwsInvitationGatewayTests {
         var gateway = new AwsInvitationGateway(cognito, ses,
                 new InvitationAwsConfiguration.Settings("us-east-1", "us-east-1_pool",
                         "sender@example.test", "http://localhost:3000"), null);
-        var invitation = new Invitation(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+        var invitation = new Invitation(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), InvitedRole.COLLABORATOR,
                 "cognito-subject", "cognito-username", "collaborator@example.test", "Collab", "Orator",
                 "PENDING", Instant.parse("2026-09-20T00:00:00Z"), "FAILED");
 
