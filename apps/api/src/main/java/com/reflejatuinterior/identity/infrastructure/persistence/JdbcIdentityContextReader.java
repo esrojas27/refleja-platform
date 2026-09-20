@@ -35,7 +35,7 @@ class JdbcIdentityContextReader implements IdentityContextReader {
     @Override
     public List<MembershipData> findMembershipsByUserId(UUID userId) {
         var rows = jdbcTemplate.query("""
-                select m.id as membership_id, m.organization_id, m.status, r.role
+                select m.id as membership_id, m.organization_id, m.status, m.profile_status, r.role
                 from rti.organization_memberships m
                 left join rti.membership_roles r on r.membership_id = m.id
                 where m.user_id = ?
@@ -43,22 +43,25 @@ class JdbcIdentityContextReader implements IdentityContextReader {
                 """, (rs, row) -> new MembershipRow(
                         rs.getObject("membership_id", UUID.class),
                         rs.getObject("organization_id", UUID.class),
-                        rs.getString("status"), rs.getString("role")), userId);
+                        rs.getString("status"), rs.getString("profile_status"), rs.getString("role")), userId);
         var roles = new LinkedHashMap<UUID, Set<String>>();
         var statuses = new LinkedHashMap<UUID, String>();
+        var profileStatuses = new LinkedHashMap<UUID, String>();
         var membershipIds = new LinkedHashMap<UUID, UUID>();
         for (var row : rows) {
             membershipIds.put(row.organizationId(), row.id());
             statuses.put(row.organizationId(), row.status());
+            profileStatuses.put(row.organizationId(), row.profileStatus());
             var organizationRoles = roles.computeIfAbsent(row.organizationId(), ignored -> new LinkedHashSet<>());
             if (row.role() != null) {
                 organizationRoles.add(row.role());
             }
         }
         return roles.entrySet().stream().map(entry -> new MembershipData(
-                membershipIds.get(entry.getKey()), entry.getKey(), statuses.get(entry.getKey()), entry.getValue())).toList();
+                membershipIds.get(entry.getKey()), entry.getKey(), statuses.get(entry.getKey()),
+                profileStatuses.get(entry.getKey()), entry.getValue())).toList();
     }
 
-    private record MembershipRow(UUID id, UUID organizationId, String status, String role) {
+    private record MembershipRow(UUID id, UUID organizationId, String status, String profileStatus, String role) {
     }
 }

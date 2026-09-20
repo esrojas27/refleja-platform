@@ -104,11 +104,22 @@ test.describe("@mvp RTI-VS1-013 authenticated vertical slice", () => {
     await invitation.getByRole("button", { name: "Aceptar invitación" }).click();
     await expect(page.getByRole("status").filter({ hasText: "Invitación aceptada." })).toBeVisible();
 
-    await page.getByRole("link", { name: "Volver a Cuenta" }).click();
+    await page.getByRole("navigation", { name: "Secciones de la cuenta" })
+      .getByRole("link", { name: "Cuenta", exact: true }).click();
     await page.getByRole("button", { name: "Comprobar sesión" }).click();
-    await expect(page.getByText("Sesión autenticada.")).toBeVisible();
-    await expect(page.getByText("Roles activos: Colaborador")).toBeVisible();
-    await page.getByRole("main").getByRole("link", { name: "Mis programas" }).click();
+    await page.waitForURL((url) => url.pathname === "/profile" && url.searchParams.has("organizationId"));
+    await expect(page.getByRole("heading", { name: "Perfil del colaborador" })).toBeVisible();
+    await expect(page.getByText(collaboratorEmail, { exact: true })).toBeVisible();
+    await expect(page.getByText(organizationName, { exact: true })).toBeVisible();
+    await page.getByLabel("Nombre completo").fill("Colaborador MVP");
+    await page.getByLabel("Fecha de nacimiento").fill("1990-05-12");
+    await page.getByLabel("Teléfono").fill("+57 300 123 4567");
+    await page.getByLabel("Ciudad").fill("Bogotá");
+    await page.getByLabel("País").fill("Colombia");
+    await page.getByLabel("Cargo").fill("Participante E2E");
+    await page.getByRole("button", { name: "Completar perfil" }).click();
+    await expect(page.getByRole("status")).toContainText("Perfil completo.");
+    await page.getByRole("link", { name: "Ir a mis programas" }).click();
     await expect(page.getByRole("link", { name: programName })).toBeVisible();
     await expect(page.getByText(organizationName, { exact: true })).toBeVisible();
     await page.getByRole("link", { name: programName }).click();

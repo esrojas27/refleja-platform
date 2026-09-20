@@ -29,9 +29,6 @@ export function MyProgramArea({ mode, programId }: { mode: "list" | "summary" | 
           : "Programas asociados a tus inscripciones activas o completadas."}
     </p>
     {detail && programId ? <MyProgramDetail programId={programId} section={mode} /> : <MyProgramList />}
-    <nav aria-label="Navegación de mis programas" className="mt-8 flex flex-wrap gap-4 border-t border-border/70 pt-6 text-sm">
-      <Link href="/account" className="rti-link">Volver a Cuenta</Link>
-    </nav>
   </section>;
 }
 

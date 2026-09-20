@@ -5,7 +5,10 @@ test("invitation route is responsive and requires the invited Cognito account", 
   await page.goto("/invitations");
   await expect(page.getByRole("heading", { name: "Invitaciones", exact: true })).toBeVisible();
   await expect(page.getByRole("status")).toContainText("Tu sesión no está disponible");
-  await expect(page.getByRole("link", { name: "Volver a Cuenta" })).toBeVisible();
+  const accountNavigation = page.getByRole("navigation", { name: "Secciones de la cuenta" });
+  await expect(accountNavigation).toBeVisible();
+  await expect(accountNavigation.getByRole("link", { name: "Cuenta", exact: true })).toBeVisible();
+  await expect(accountNavigation.getByRole("link", { name: "Mis programas" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Aceptar invitación" })).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });

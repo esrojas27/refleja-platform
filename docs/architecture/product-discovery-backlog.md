@@ -16,10 +16,18 @@ El siguiente backlog extiende esa base sin alterar el comportamiento aceptado.
 
 ### Perfil inicial del colaborador
 
-Después de su primer inicio de sesión, el colaborador debe completar información
-básica antes de que su cuenta quede validada. La lista de campos, sus reglas y cuáles
-son obligatorios serán suministrados por Tata. Hasta recibirla no se debe diseñar el
-modelo definitivo ni considerar que `ACTIVE` equivale a perfil completo.
+Decisión implementada localmente el 2026-09-20: después de aceptar una invitación,
+el colaborador debe completar nombre completo, fecha de nacimiento, teléfono,
+ciudad, país y cargo antes de acceder a sus programas. El correo proviene de su
+identidad interna y la empresa de su membresía; ninguno puede ser modificado desde
+el formulario.
+
+El estado del perfil es independiente de la membresía y se persiste por nombre
+simbólico como `PENDING` o `COMPLETE`. Una membresía `ACTIVE` con perfil pendiente
+permite consultar la cuenta, aceptar invitaciones y completar el perfil, pero no
+habilita las operaciones propias del colaborador sobre programas y actividades.
+Los datos personales son globales al usuario; el cargo y el estado de completitud
+pertenecen a su membresía en la organización.
 
 ### Roles de Líder y RRHH
 
@@ -116,8 +124,8 @@ La numeración oficial debe asignarse al convertir cada bloque en ticket.
 2. **Roles e invitaciones — implementado localmente:** selección entre Colaborador,
    Líder y RRHH, persistencia del rol solicitado y asignación al aceptar, sin ampliar
    las políticas de visibilidad existentes.
-3. **Perfil inicial:** implementar la validación del perfil cuando Tata entregue
-   los campos y reglas.
+3. **Perfil inicial — implementado localmente:** formulario obligatorio, estado
+   pendiente/completo y bloqueo de programas hasta completar los datos aprobados.
 4. **Ficha DISC:** cuatro campos por colaborador con autorización y aislamiento
    tenant, una vez definido el alcance y la auditoría.
 5. **Progreso inicial — implementado localmente:** resumen del colaborador, vista
@@ -137,7 +145,7 @@ La numeración oficial debe asignarse al convertir cada bloque en ticket.
 
 | Tema | Responsable o decisión necesaria | Bloquea |
 | --- | --- | --- |
-| Campos del perfil básico | Tata | Perfil inicial |
+| Campos del perfil básico | Resuelto: nombre completo, fecha de nacimiento, teléfono, ciudad, país y cargo; correo y empresa derivados | Implementado |
 | Preguntas de evaluaciones | Paula Rojas | Evaluaciones |
 | Alcance de Líder y RRHH | Parcialmente resuelto: roles de organización; visibilidad funcional pendiente | DISC y evaluaciones |
 | Dimensiones fijas o configurables | Resuelto: configurables; los tres nombres pertenecen a la futura plantilla | Plantillas |

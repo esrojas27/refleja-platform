@@ -40,7 +40,7 @@ class ActuatorHealthSecurityConfiguration {
                         writeSecurityError(response, objectMapper, 403, "FORBIDDEN", "Access is denied.")))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(EndpointRequest.to("health")).permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/me").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/me", "/api/v1/me/profile").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/me/programs",
                                 "/api/v1/me/programs/{programId}",
                                 "/api/v1/me/programs/{programId}/activities").authenticated()
@@ -61,6 +61,7 @@ class ActuatorHealthSecurityConfiguration {
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/enrollments/{enrollmentId}/invitation-delivery",
                                 "/api/v1/invitations/{invitationId}/accept",
                                 "/api/v1/me/programs/{programId}/activities/{activityId}/submission").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/me/profile").authenticated()
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(resourceServer ->
                         resourceServer.jwt(Customizer.withDefaults())
@@ -100,7 +101,8 @@ class ActuatorHealthSecurityConfiguration {
 
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(origins);
-        configuration.setAllowedMethods(List.of(HttpMethod.GET.name(), HttpMethod.POST.name(), HttpMethod.OPTIONS.name()));
+        configuration.setAllowedMethods(List.of(HttpMethod.GET.name(), HttpMethod.POST.name(), HttpMethod.PUT.name(),
+                HttpMethod.OPTIONS.name()));
         configuration.setAllowedHeaders(List.of(HttpHeaders.AUTHORIZATION, HttpHeaders.CONTENT_TYPE));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

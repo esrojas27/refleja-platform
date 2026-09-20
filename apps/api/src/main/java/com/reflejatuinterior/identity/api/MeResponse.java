@@ -14,13 +14,13 @@ public record MeResponse(String cognitoSubject, UserResponse user,
         return new MeResponse(principal.cognitoSubject(),
                 new UserResponse(user.id(), user.email(), user.firstName(), user.lastName()),
                 principal.organizations().stream().map(org ->
-                        new OrganizationResponse(org.id(), org.name(), org.roles())).toList(),
+                        new OrganizationResponse(org.id(), org.name(), org.roles(), org.profileStatus())).toList(),
                 principal.activeOrganizationId(), principal.roles(), canCreateOrganizations);
     }
 
     public record UserResponse(UUID id, String email, String firstName, String lastName) {
     }
 
-    public record OrganizationResponse(UUID id, String name, Set<String> roles) {
+    public record OrganizationResponse(UUID id, String name, Set<String> roles, String profileStatus) {
     }
 }

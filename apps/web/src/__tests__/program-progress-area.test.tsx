@@ -12,7 +12,7 @@ vi.mock("@/lib/participation/activity-api", async original => ({
 }));
 
 const identity = { cognitoSubject: "subject", user: { id: "user", email: "consultant@example.test", firstName: null, lastName: null },
-  organizations: [{ id: "org-a", name: "Empresa A", roles: ["CONSULTANT"] }], activeOrganizationId: "org-a", roles: ["CONSULTANT"] };
+  organizations: [{ id: "org-a", name: "Empresa A", roles: ["CONSULTANT"], profileStatus: "COMPLETE" as const }], activeOrganizationId: "org-a", roles: ["CONSULTANT"] };
 const activity: ProgramActivity = { id: "activity-a", organizationId: "org-a", programId: "program-a",
   moduleId: "dimension-a", sessionId: "session-a", dimensionName: "Interior", sessionName: "Autoconocimiento",
   title: "Reflexión inicial", instructions: "Describe", youtubeUrl: null, dueDate: "2020-01-01",

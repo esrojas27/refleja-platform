@@ -8,7 +8,9 @@ El repositorio contiene la base técnica inicial (001–005), autenticación con
 desarrollo local después de validar el recorrido completo con Cognito y SES reales.
 La vista de programas propios del colaborador (011) y el aislamiento RLS (012)
 están cerrados para desarrollo local. El gate CI y el journey E2E real del 013
-ya fueron validados en GitHub con sus tres gates en verde.
+ya fueron validados en GitHub con sus tres gates en verde. Los incrementos
+posteriores agregan la operación de actividades, el seguimiento de progreso y el
+perfil inicial obligatorio del colaborador.
 
 ## Estructura del repositorio
 
@@ -128,6 +130,19 @@ existe un rol `HR`. El rol se guarda en la invitación y se asigna al aceptarla,
 ampliar todavía la visibilidad funcional de Líder o RRHH. Detalle técnico y límites:
 [invitaciones por rol](docs/architecture/program-role-invitations.md).
 
+### Perfil inicial del colaborador
+
+Después de aceptar una invitación, un colaborador con perfil `PENDING` completa
+nombre completo, fecha de nacimiento, teléfono, ciudad, país y cargo en `/profile`.
+El correo y la empresa se derivan en el backend y no son editables. El estado del
+perfil es independiente de la membresía: aunque la membresía esté `ACTIVE`, el
+backend no habilita programas ni actividades hasta que el perfil sea `COMPLETE`.
+
+API: `GET` y `PUT /api/v1/me/profile?organizationId=<uuid>`. La consulta y escritura
+son exclusivamente sobre el usuario autenticado, usan `Cache-Control: no-store` y
+vuelven a comprobar la membresía colaboradora de la organización. Modelo, seguridad,
+límites y recorrido manual: [perfil inicial del colaborador](docs/architecture/collaborator-profile.md).
+
 ### Mis programas — RTI-VS1-011
 
 Una cuenta con usuario, membresía y rol `COLLABORATOR` activos ve **Mis programas**
@@ -221,7 +236,8 @@ Después de aplicar Terraform, copia sus salidas no secretas a las variables Cog
 
 `GET /api/v1/me` conserva `cognitoSubject` y agrega `user` (`id`, `email`,
 `firstName`, `lastName`), `organizations` (`id`, `name`, `roles`),
-`activeOrganizationId` y los `roles` de esa organización activa.
+`activeOrganizationId` y los `roles` de esa organización activa. Cada organización
+incluye además `profileStatus`, utilizado para orientar el flujo del colaborador.
 
 - Sin token válido: `401`. Sin usuario interno o con estado distinto de `ACTIVE`: `403`.
 - Usuario activo sin organizaciones: `200`, lista vacía, organización activa nula y ningún rol.
@@ -332,6 +348,11 @@ almacena contraseñas, códigos OAuth ni tokens de aceptación.
 Los incrementos posteriores agregan `program_modules`, `program_sessions`,
 `program_activities` y `activity_assignments`. Las definiciones de actividad son
 propiedad de `program`; las asignaciones pertenecen a `participation`.
+
+El perfil inicial agrega datos personales a `users` y conserva `job_title` y
+`profile_status` en `organization_memberships`. El estado se persiste por nombre
+simbólico (`PENDING` o `COMPLETE`) y no sustituye el estado operativo de la
+membresía.
 
 En el producto se muestran **dimensiones**, no módulos. Los nombres Interior,
 Exterior y Social serán valores modificables de una futura plantilla y no se

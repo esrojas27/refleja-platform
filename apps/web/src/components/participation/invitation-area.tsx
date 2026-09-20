@@ -39,7 +39,9 @@ export function InvitationArea() {
     <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">Sólo se muestran las invitaciones asociadas a tu identidad. Abrir esta página no acepta ninguna invitación.</p>
     {notice && <p role="status" className="mt-5 rounded-2xl border border-accent bg-accent/60 px-4 py-3 text-sm">{notice}</p>}
     {message && <p role="status" className="mt-5 rounded-2xl bg-muted/60 px-4 py-3 text-sm">{message}</p>}
-    {needsLogin && <p className="mt-3 text-sm">Inicia sesión con la cuenta invitada. Después del acceso, vuelve desde Cuenta → Invitaciones.</p>}
+    {needsLogin && <p className="mt-3 text-sm">Inicia sesión con la cuenta invitada. Después del acceso, vuelve desde Cuenta → Invitaciones.{" "}
+      <Link href="/login" className="rti-link">Iniciar sesión</Link>
+    </p>}
     {result && <>
       <ul className="mt-6 grid gap-4 sm:grid-cols-2">{result.items.map(invitation => <li key={invitation.id} className="space-y-3 break-words rounded-2xl border border-border/70 bg-background/70 p-5">
         <p className="rti-kicker">{invitation.status}</p>
@@ -57,10 +59,6 @@ export function InvitationArea() {
       </div>
     </>}
     <button className={`${button} mt-4`} disabled={pending} onClick={() => refresh()}>Actualizar invitaciones</button>
-    <nav aria-label="Navegación de invitaciones" className="mt-8 flex flex-wrap gap-4 border-t border-border/70 pt-6 text-sm">
-      <Link href="/account" className="rti-link">Volver a Cuenta</Link>
-      {!result && <Link href="/login" className="rti-link">Iniciar sesión</Link>}
-    </nav>
   </section>;
 }
 

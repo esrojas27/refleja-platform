@@ -6,6 +6,10 @@ test("my programs routes are responsive and require a Cognito session", async ({
   await expect(page.getByRole("heading", { name: "Mis programas", exact: true })).toBeVisible();
   await expect(page.getByRole("status")).toContainText("Tu sesión no está disponible");
   await expect(page.getByRole("link", { name: "Iniciar sesión" })).toBeVisible();
+  const accountNavigation = page.getByRole("navigation", { name: "Secciones de la cuenta" });
+  await expect(accountNavigation).toBeVisible();
+  await expect(accountNavigation.getByRole("link", { name: "Cuenta", exact: true })).toBeVisible();
+  await expect(accountNavigation.getByRole("link", { name: "Invitaciones" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
   await page.goto("/my-programs/not-assigned");

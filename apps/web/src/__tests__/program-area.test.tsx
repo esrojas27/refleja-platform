@@ -8,7 +8,7 @@ vi.mock("@/lib/auth/authenticated-api", async importOriginal => ({ ...await impo
 vi.mock("@/lib/programs/program-api", async importOriginal => ({ ...await importOriginal<typeof import("@/lib/programs/program-api")>(), createProgram: vi.fn(), listPrograms: vi.fn(), getProgram: vi.fn() }));
 const program = { id: "program-a", organizationId: "org-a", name: "Programa real", description: "Descripción", status: "DRAFT" as const, startDate: "2026-09-01", endDate: "2026-12-01", version: 0 };
 const identity = { cognitoSubject: "subject", user: { id: "user", email: "test@example.test", firstName: null, lastName: null },
-  organizations: [{ id: "org-a", name: "Empresa A", roles: ["CONSULTANT"] }], activeOrganizationId: "org-a", roles: ["CONSULTANT"] };
+  organizations: [{ id: "org-a", name: "Empresa A", roles: ["CONSULTANT"], profileStatus: "COMPLETE" as const }], activeOrganizationId: "org-a", roles: ["CONSULTANT"] };
 beforeEach(() => {
   vi.mocked(fetchCurrentIdentity).mockResolvedValue(identity);
   vi.mocked(listPrograms).mockResolvedValue({ items: [program], page: 0, size: 20, totalElements: 1, totalPages: 1 });

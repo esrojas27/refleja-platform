@@ -25,6 +25,7 @@ class ResolveCollaboratorAccess implements CollaboratorAccess {
         var memberships = identities.findMembershipsByUserId(user.id()).stream()
                 .filter(membership -> "ACTIVE".equals(membership.status()))
                 .filter(membership -> membership.roles().contains("COLLABORATOR"))
+                .filter(membership -> "COMPLETE".equals(membership.profileStatus()))
                 .toList();
         var organizationsById = organizations.findSummaries(memberships.stream()
                         .map(IdentityContextReader.MembershipData::organizationId).collect(Collectors.toSet())).stream()

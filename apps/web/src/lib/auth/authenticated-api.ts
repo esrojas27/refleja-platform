@@ -3,7 +3,7 @@ import { fetchAuthSession } from "aws-amplify/auth";
 export type CurrentIdentity = {
   cognitoSubject: string;
   user: { id: string; email: string; firstName: string | null; lastName: string | null };
-  organizations: { id: string; name: string; roles: string[] }[];
+  organizations: { id: string; name: string; roles: string[]; profileStatus: "PENDING" | "COMPLETE" }[];
   activeOrganizationId: string | null;
   roles: string[];
   canCreateOrganizations?: boolean;

@@ -1,6 +1,7 @@
 package com.reflejatuinterior.identity.infrastructure.persistence;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 
 import org.hibernate.annotations.CreationTimestamp;
@@ -40,6 +41,21 @@ class UserJpaEntity {
 
     @Column(name = "last_name")
     private String lastName;
+
+    @Column(name = "full_name")
+    private String fullName;
+
+    @Column(name = "date_of_birth")
+    private LocalDate dateOfBirth;
+
+    @Column(name = "phone")
+    private String phone;
+
+    @Column(name = "city")
+    private String city;
+
+    @Column(name = "country")
+    private String country;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
@@ -92,5 +108,17 @@ class UserJpaEntity {
     String emailNormalized() { return emailNormalized; }
     String firstName() { return firstName; }
     String lastName() { return lastName; }
+    String fullName() { return fullName; }
+    LocalDate dateOfBirth() { return dateOfBirth; }
+    String phone() { return phone; }
+    String city() { return city; }
+    String country() { return country; }
+    void completeProfile(String fullName, LocalDate dateOfBirth, String phone, String city, String country) {
+        this.fullName = fullName;
+        this.dateOfBirth = dateOfBirth;
+        this.phone = phone;
+        this.city = city;
+        this.country = country;
+    }
     void acceptInvitation() { if (status == UserStatus.INVITED) status = UserStatus.ACTIVE; }
 }

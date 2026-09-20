@@ -42,9 +42,13 @@ public record AuthenticatedPrincipal(
             UUID id, String cognitoSubject, String email, String firstName, String lastName) {
     }
 
-    public record OrganizationAccess(UUID id, String name, Set<String> roles) {
+    public record OrganizationAccess(UUID id, String name, Set<String> roles, String profileStatus) {
         public OrganizationAccess {
             roles = Set.copyOf(roles);
+        }
+
+        public OrganizationAccess(UUID id, String name, Set<String> roles) {
+            this(id, name, roles, "COMPLETE");
         }
     }
 }

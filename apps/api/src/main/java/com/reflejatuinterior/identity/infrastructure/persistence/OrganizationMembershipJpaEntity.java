@@ -45,6 +45,13 @@ class OrganizationMembershipJpaEntity {
     @Column(name = "joined_at")
     private Instant joinedAt;
 
+    @Column(name = "job_title")
+    private String jobTitle;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "profile_status", nullable = false)
+    private ProfileStatus profileStatus = ProfileStatus.PENDING;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -88,6 +95,12 @@ class OrganizationMembershipJpaEntity {
     }
 
     UUID userId() { return userId; }
+    String jobTitle() { return jobTitle; }
+    ProfileStatus profileStatus() { return profileStatus; }
+    void completeProfile(String jobTitle) {
+        this.jobTitle = jobTitle;
+        this.profileStatus = ProfileStatus.COMPLETE;
+    }
     void acceptInvitation(Instant now) {
         if (status == MembershipStatus.PENDING) { status = MembershipStatus.ACTIVE; joinedAt = now; }
     }

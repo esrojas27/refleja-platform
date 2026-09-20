@@ -47,8 +47,10 @@ Este archivo registra el punto de continuación; no reemplaza los tickets ni los
   asignación masiva o individual, enlace opcional de YouTube, respuesta textual,
   solicitud de cambios y aprobación. La API v1 conserva `/modules` como contrato
   legado. El progreso agregado por programa, dimensión, sesión y colaborador está
-  implementado localmente a partir de las asignaciones existentes. Evaluaciones y
-  archivos continúan pendientes.
+  implementado localmente a partir de las asignaciones existentes. El perfil inicial
+  del colaborador también está implementado localmente: conserva un estado separado
+  de la membresía y bloquea programas hasta completar los datos aprobados.
+  Evaluaciones y archivos continúan pendientes.
 - **Primer operador:** mecanismo administrativo implementado y aplicado localmente
   con aprobación expresa: organización operadora real, membresía activa y rol
   `CONSULTANT` acotado. [Procedimiento y evidencia](first-operator-bootstrap.md).
@@ -86,10 +88,10 @@ evaluaciones inicial/final, identidad visual, idioma y progreso. Las decisiones,
 dependencias y una secuencia propuesta están registradas en el
 [backlog de descubrimiento posterior al MVP](product-discovery-backlog.md).
 
-La alineación inicial de terminología y contenido ya fue implementada de forma
-compatible; los demás elementos aún no son tickets aprobados. En especial, no se deben inferir los
-campos que entregará Tata, las preguntas que entregará Paula Rojas ni el alcance de
-autorización de Líder y RRHH.
+La alineación inicial de terminología y contenido, los roles de invitación, el
+seguimiento de progreso y el perfil inicial ya fueron implementados de forma
+compatible. Continúan pendientes las preguntas que entregará Paula Rojas y el
+alcance funcional detallado de Líder y RRHH.
 
 ## Distancia al MVP validable
 

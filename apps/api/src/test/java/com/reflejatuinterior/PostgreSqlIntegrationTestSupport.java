@@ -84,9 +84,9 @@ public abstract class PostgreSqlIntegrationTestSupport {
     protected void insertMembership(UUID id, UUID organizationId, UUID userId) {
         jdbcTemplate.update(
                 "insert into rti.organization_memberships "
-                        + "(id, organization_id, user_id, status, joined_at, "
+                        + "(id, organization_id, user_id, status, profile_status, joined_at, "
                         + "created_at, updated_at, version) "
-                        + "values (?, ?, ?, 'ACTIVE', now(), now(), now(), 0)",
+                        + "values (?, ?, ?, 'ACTIVE', 'COMPLETE', now(), now(), now(), 0)",
                 id,
                 organizationId,
                 userId);

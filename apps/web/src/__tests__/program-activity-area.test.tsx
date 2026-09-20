@@ -22,7 +22,7 @@ vi.mock("@/lib/programs/program-content-api", async original => ({
 }));
 
 const identity = { cognitoSubject: "subject", user: { id: "user", email: "consultant@example.test", firstName: null, lastName: null },
-  organizations: [{ id: "org-a", name: "Empresa A", roles: ["CONSULTANT"] }], activeOrganizationId: "org-a", roles: ["CONSULTANT"] };
+  organizations: [{ id: "org-a", name: "Empresa A", roles: ["CONSULTANT"], profileStatus: "COMPLETE" as const }], activeOrganizationId: "org-a", roles: ["CONSULTANT"] };
 const enrollment = { id: "enrollment-a", organizationId: "org-a", programId: "program-a", status: "ACTIVE" as const,
   participant: { userId: "user-a", membershipId: "membership-a", email: "ana@example.test", firstName: "Ana", lastName: "Prueba" }, invitation: null };
 const activity: ProgramActivity = { id: "activity-a", organizationId: "org-a", programId: "program-a", moduleId: "module-a",

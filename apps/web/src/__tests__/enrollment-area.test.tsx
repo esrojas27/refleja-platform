@@ -2,14 +2,16 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { EnrollmentArea, EnrollmentForm } from "@/components/participation/enrollment-area";
 import { AccountSession } from "@/components/auth/account-session";
+import { AccountWorkspace } from "@/components/auth/account-workspace";
 import { fetchCurrentIdentity, IdentityRequestError, type CurrentIdentity } from "@/lib/auth/authenticated-api";
 import { createEnrollment, listEnrollments, retryInvitationDelivery, ParticipationRequestError, type Enrollment } from "@/lib/participation/participation-api";
 
 vi.mock("aws-amplify/auth", () => ({ signOut: vi.fn() }));
+vi.mock("next/navigation", () => ({ usePathname: () => "/account", useRouter: () => ({ replace: vi.fn() }) }));
 vi.mock("@/lib/auth/authenticated-api", async original => ({ ...await original<typeof import("@/lib/auth/authenticated-api")>(), fetchCurrentIdentity: vi.fn() }));
 vi.mock("@/lib/participation/participation-api", async original => ({ ...await original<typeof import("@/lib/participation/participation-api")>(), createEnrollment: vi.fn(), listEnrollments: vi.fn(), retryInvitationDelivery: vi.fn() }));
 const identity: CurrentIdentity = { cognitoSubject: "subject", user: { id: "user", email: "consultant@example.test", firstName: null, lastName: null },
-  organizations: [{ id: "org-a", name: "Empresa A", roles: ["CONSULTANT"] }], activeOrganizationId: "org-a", roles: ["CONSULTANT"] };
+  organizations: [{ id: "org-a", name: "Empresa A", roles: ["CONSULTANT"], profileStatus: "COMPLETE" as const }], activeOrganizationId: "org-a", roles: ["CONSULTANT"] };
 const enrollment: Enrollment = { id: "enrollment-a", organizationId: "org-a", programId: "program-a", status: "INVITED",
   participant: { userId: "user-b", membershipId: "membership-b", email: "participant@example.test", firstName: "Ana", lastName: "Prueba" },
   invitation: { id: "invite-a", role: "COLLABORATOR", status: "PENDING", expiresAt: "2026-09-16T00:00:00Z", deliveryStatus: "SENT" } };
@@ -106,7 +108,7 @@ it("aborts and discards delayed data when the program context changes", async ()
 });
 it("keeps invitations reachable from Account when an invited user gets /me 403", async () => {
   vi.mocked(fetchCurrentIdentity).mockRejectedValue(new IdentityRequestError(403));
-  render(<AccountSession />); fireEvent.click(screen.getByRole("button", { name: "Comprobar sesión" }));
+  render(<AccountWorkspace><AccountSession /></AccountWorkspace>);
   await screen.findByText(/no tienes acceso interno habilitado/);
   expect(screen.getByRole("link", { name: "Invitaciones" }).getAttribute("href")).toBe("/invitations");
 });
