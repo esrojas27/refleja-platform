@@ -72,7 +72,7 @@ test.describe("@mvp RTI-VS1-013 authenticated vertical slice", () => {
     await expect(page.getByText("Sesión autenticada.")).toBeVisible();
     await page.getByRole("combobox", { name: "Organización activa" }).click();
     await page.getByRole("option", { name: organizationName, exact: true }).click();
-    await expect(page.getByText("Roles activos: CONSULTANT")).toBeVisible();
+    await expect(page.getByText("Roles activos: Consultor")).toBeVisible();
     await page.getByRole("link", { name: "Ver programas" }).click();
 
     await page.getByRole("link", { name: "Crear programa" }).click();
