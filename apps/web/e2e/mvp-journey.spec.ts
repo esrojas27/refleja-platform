@@ -112,7 +112,7 @@ test.describe("@mvp RTI-VS1-013 authenticated vertical slice", () => {
     await expect(page.getByRole("link", { name: programName })).toBeVisible();
     await expect(page.getByText(organizationName, { exact: true })).toBeVisible();
     await page.getByRole("link", { name: programName }).click();
-    await expect(page.getByRole("heading", { name: "Detalle del programa" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Resumen del programa", exact: true })).toBeVisible();
     await expect(page.getByText(programName, { exact: true })).toBeVisible();
     await expect(page.getByText(organizationName, { exact: true })).toBeVisible();
   });
