@@ -100,6 +100,12 @@ revisión, con cambios solicitados, completadas y vencidas. Las evaluaciones pod
 enriquecer el progreso más adelante, sin cambiar retroactivamente la semántica de
 actividad completada.
 
+Decisión implementada localmente el 2026-09-20: el primer cálculo usa únicamente
+asignaciones de actividades, considera completada sólo una asignación `COMPLETED`
+y presenta vencimiento como alerta derivada adicional. Incluye resumen de programa,
+dimensión y sesión para el colaborador, además de una vista operativa por persona
+para el consultor. No incluye evaluaciones, ponderaciones ni notificaciones.
+
 ## Secuencia propuesta de incrementos
 
 La numeración oficial debe asignarse al convertir cada bloque en ticket.
@@ -114,8 +120,9 @@ La numeración oficial debe asignarse al convertir cada bloque en ticket.
    los campos y reglas.
 4. **Ficha DISC:** cuatro campos por colaborador con autorización y aislamiento
    tenant, una vez definido el alcance y la auditoría.
-5. **Progreso inicial:** resumen del colaborador y vista operativa del consultor a
-   partir de estados de actividades.
+5. **Progreso inicial — implementado localmente:** resumen del colaborador, vista
+   operativa del consultor y desglose por programa, dimensión y sesión a partir de
+   estados de actividades.
 6. **Ambiente compartido de validación:** desplegar una versión pequeña y controlada
    para recibir retroalimentación de usuarios reales.
 7. **Evaluaciones inicial/final:** comenzar cuando Paula entregue las preguntas y

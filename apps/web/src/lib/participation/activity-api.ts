@@ -9,6 +9,7 @@ export type ActivityAssignee = {
 export type ActivityAssignmentStatus = "ASSIGNED" | "SUBMITTED" | "CHANGES_REQUESTED" | "COMPLETED";
 export type ProgramActivity = {
   id: string; organizationId: string; programId: string; moduleId: string; sessionId: string;
+  dimensionName: string; sessionName: string;
   title: string; instructions: string; youtubeUrl: string | null; dueDate: string; position: number; version: number;
   assignees: ActivityAssignee[];
 };
@@ -29,6 +30,7 @@ export class ActivityRequestError extends Error {
     this.name = "ActivityRequestError";
   }
 }
+
 
 export function programActivitiesPath(organizationId: string, programId: string) {
   return `${programsPath(organizationId)}/${encodeURIComponent(programId)}/activities`;

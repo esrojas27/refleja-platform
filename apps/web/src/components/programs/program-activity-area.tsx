@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { CheckCircle2, ClipboardCheck, X } from "lucide-react";
 import { fetchCurrentIdentity, IdentityRequestError } from "@/lib/auth/authenticated-api";
 import { listEnrollments, ParticipationRequestError, type Enrollment } from "@/lib/participation/participation-api";
 import { ActivityRequestError, activityErrorMessage, createProgramActivity, listProgramActivities,
   isYoutubeVideoUrl, reviewActivityAssignment, type ActivityAssignee, type ActivityInput, type ProgramActivity }
   from "@/lib/participation/activity-api";
 import { listProgramDimensions, ProgramContentRequestError, type ProgramDimension } from "@/lib/programs/program-content-api";
+import { ActivityStatusBadges } from "@/components/participation/progress-overview";
 
 type SessionOption = { id: string; label: string };
 
@@ -23,6 +25,7 @@ function ActivityContent({ organizationId, programId }: { organizationId: string
   const [pending, setPending] = useState(true);
   const [message, setMessage] = useState("Comprobando acceso y cargando actividades…");
   const [notice, setNotice] = useState("");
+  const [createOpen, setCreateOpen] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -65,20 +68,30 @@ function ActivityContent({ organizationId, programId }: { organizationId: string
     setAttempt(value => value + 1);
   }
 
+  function reviewed(activityId: string, assignee: ActivityAssignee) {
+    setActivities(current => current?.map(activity => activity.id !== activityId ? activity : {
+      ...activity,
+      assignees: activity.assignees.map(item => item.assignmentId === assignee.assignmentId ? assignee : item),
+    }));
+  }
+
   return <section className="rti-surface w-full p-6 sm:p-8 lg:p-10">
-    <p className="rti-kicker">Ejecución del programa</p>
-    <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Actividades</h1>
-    <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
-      Crea una actividad dentro de una sesión y asígnala a colaboradores con inscripción activa.
-    </p>
+    <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+      <div><p className="rti-kicker">Ejecución del programa</p>
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Actividades</h1>
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
+          Crea actividades, consulta su alcance y revisa las respuestas pendientes.
+        </p>
+      </div>
+      {dimensions && enrollments && activities && <button type="button" className="rti-button-primary shrink-0"
+        onClick={() => setCreateOpen(true)}>Crear y asignar</button>}
+    </div>
     {notice && <p role="status" className="mt-5 rounded-2xl border border-accent bg-accent/60 px-4 py-3 text-sm">{notice}</p>}
     {message && <p role="status" className="mt-5 rounded-2xl bg-muted/60 px-4 py-3 text-sm">{message}</p>}
-    {dimensions && enrollments && activities && <div className="mt-7 grid gap-8 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-      <div className="rounded-2xl border border-border/70 bg-background/70 p-5 sm:p-6">
-        <ActivityForm organizationId={organizationId} programId={programId} sessions={sessions}
-          enrollments={enrollments} activities={activities} onSaved={refresh} />
-      </div>
-      <section aria-labelledby="activity-list-title">
+    {dimensions && enrollments && activities && <div className="mt-7 space-y-8">
+      <ReviewQueue organizationId={organizationId} programId={programId} activities={activities}
+        onReviewed={reviewed} />
+      <section aria-labelledby="activity-list-title" className="border-t border-border/70 pt-7">
         <h2 id="activity-list-title" className="text-xl font-semibold">Actividades creadas</h2>
         {activities.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">Aún no hay actividades en este programa.</p>
           : <ol className="mt-4 space-y-4">{activities.map(activity => <li key={activity.id}
@@ -89,14 +102,19 @@ function ActivityContent({ organizationId, programId }: { organizationId: string
             {activity.youtubeUrl && <a href={activity.youtubeUrl} target="_blank" rel="noopener noreferrer"
               className="rti-link mt-3 inline-block text-sm">Ver video en YouTube</a>}
             <p className="mt-3 text-sm font-medium">Fecha límite: {activity.dueDate}</p>
-            <div className="mt-4 space-y-3"><p className="text-sm font-medium">Seguimiento por colaborador</p>
-              {activity.assignees.map(assignee => <ReviewPanel key={assignee.assignmentId}
-                organizationId={organizationId} programId={programId} activityId={activity.id}
-                assignee={assignee} onReviewed={() => refresh()} />)}
+            <div className="mt-4 flex flex-wrap gap-2" aria-label={`Estado de asignaciones de ${activity.title}`}>
+              {assignmentSummary(activity).map(item => <span key={item.label}
+                className="rounded-full border border-border/70 bg-card px-3 py-1 text-xs font-semibold text-muted-foreground">
+                {item.label}: {item.count}
+              </span>)}
             </div>
           </li>)}</ol>}
       </section>
     </div>}
+    {createOpen && dimensions && enrollments && activities && <ActivityDialog onClose={() => setCreateOpen(false)}>
+      <ActivityForm organizationId={organizationId} programId={programId} sessions={sessions}
+        enrollments={enrollments} activities={activities} onSaved={saved => { setCreateOpen(false); refresh(saved); }} />
+    </ActivityDialog>}
     <button className="rti-button-secondary mt-6" disabled={pending} onClick={() => refresh()}>Actualizar actividades</button>
     <nav aria-label="Navegación de actividades" className="mt-8 flex flex-wrap gap-4 border-t border-border/70 pt-6 text-sm">
       <Link href={`/organizations/${encodeURIComponent(organizationId)}/programs/${encodeURIComponent(programId)}`} className="rti-link">Volver al programa</Link>
@@ -155,7 +173,7 @@ export function ActivityForm({ organizationId, programId, sessions, enrollments,
 
   const unavailable = sessions.length === 0 || enrollments.length === 0;
   return <form aria-label="Crear actividad" onSubmit={submit} noValidate className="space-y-5">
-    <div><p className="rti-kicker">Nueva actividad</p><h2 className="mt-2 text-xl font-semibold">Crear y asignar</h2></div>
+    <div><p className="rti-kicker">Nueva actividad</p><h2 id="create-activity-title" className="mt-2 text-xl font-semibold">Crear y asignar</h2></div>
     {message && <p role="status" className="rounded-xl bg-muted/60 px-3 py-2 text-sm">{message}</p>}
     {sessions.length === 0 && <p className="text-sm text-muted-foreground">Crea primero una sesión en Contenido.</p>}
     {enrollments.length === 0 && <p className="text-sm text-muted-foreground">Necesitas al menos un colaborador con inscripción activa.</p>}
@@ -202,10 +220,82 @@ export function ActivityForm({ organizationId, programId, sessions, enrollments,
   </form>;
 }
 
-function ReviewPanel({ organizationId, programId, activityId, assignee, onReviewed }: {
-  organizationId: string; programId: string; activityId: string; assignee: ActivityAssignee;
-  onReviewed: () => void;
+function ActivityDialog({ children, onClose }: { children: ReactNode; onClose: () => void }) {
+  const dialog = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    dialog.current?.focus();
+    function closeOnEscape(event: KeyboardEvent) { if (event.key === "Escape") onClose(); }
+    document.addEventListener("keydown", closeOnEscape);
+    return () => { document.body.style.overflow = previous; document.removeEventListener("keydown", closeOnEscape); };
+  }, [onClose]);
+
+  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/35 p-0 backdrop-blur-sm sm:items-center sm:p-6"
+    onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
+    <div ref={dialog} role="dialog" aria-modal="true" aria-labelledby="create-activity-title" tabIndex={-1}
+      className="w-full overflow-hidden rounded-t-3xl border border-border bg-card shadow-2xl outline-none sm:max-w-2xl sm:rounded-3xl">
+      <div className="rti-modal-scroll max-h-[92vh] overflow-y-auto p-6 sm:p-8">
+        <div className="mb-5 flex justify-end">
+          <button type="button" onClick={onClose} className="inline-flex size-10 items-center justify-center rounded-full border border-border text-muted-foreground hover:bg-secondary hover:text-foreground"
+            aria-label="Cerrar creación de actividad"><X aria-hidden="true" className="size-5" /></button>
+        </div>
+        {children}
+      </div>
+    </div>
+  </div>;
+}
+
+type ReviewItem = { activity: ProgramActivity; assignee: ActivityAssignee };
+
+function ReviewQueue({ organizationId, programId, activities, onReviewed }: {
+  organizationId: string; programId: string; activities: ProgramActivity[];
+  onReviewed: (activityId: string, assignee: ActivityAssignee) => void;
 }) {
+  const queue = useMemo(() => activities.flatMap(activity => activity.assignees
+    .filter(assignee => assignee.status === "SUBMITTED")
+    .map(assignee => ({ activity, assignee }))), [activities]);
+  const [open, setOpen] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+
+  function complete(item: ReviewItem, saved: ActivityAssignee) {
+    setLeaving(true);
+    window.setTimeout(() => {
+      onReviewed(item.activity.id, saved);
+      if (queue.length === 1) setOpen(false);
+      setLeaving(false);
+    }, 220);
+  }
+
+  return <section aria-labelledby="review-queue-title" className="rounded-3xl border border-primary/15 bg-accent/25 p-5 sm:p-7">
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div><p className="rti-kicker">Bandeja de revisión</p>
+        <h2 id="review-queue-title" className="mt-2 text-xl font-semibold">Revisar actividades</h2>
+      </div>
+      {queue.length > 0 && !open && <button type="button" className="rti-button-primary"
+        onClick={() => setOpen(true)}>Revisar actividades ({queue.length})</button>}
+    </div>
+    {queue.length === 0 ? <div className="mt-5 flex items-center gap-3 rounded-2xl border border-border/70 bg-background/70 px-4 py-4 text-sm text-muted-foreground">
+      <CheckCircle2 aria-hidden="true" className="size-5 shrink-0 text-primary" />
+      <p>No hay actividades pendientes por revisar.</p>
+    </div> : !open ? <p className="mt-4 text-sm text-muted-foreground">
+      Tienes {queue.length} {queue.length === 1 ? "respuesta pendiente" : "respuestas pendientes"}. Revísalas una por una.
+    </p> : <div className="mt-5 overflow-hidden">
+      <p aria-live="polite" className="mb-3 text-sm font-medium text-muted-foreground">
+        {queue.length} {queue.length === 1 ? "pendiente" : "pendientes"} en la bandeja
+      </p>
+      <ReviewCard key={queue[0].assignee.assignmentId} item={queue[0]} organizationId={organizationId}
+        programId={programId} leaving={leaving} onReviewed={saved => complete(queue[0], saved)} />
+    </div>}
+  </section>;
+}
+
+function ReviewCard({ organizationId, programId, item, leaving, onReviewed }: {
+  organizationId: string; programId: string; item: ReviewItem; leaving: boolean;
+  onReviewed: (assignee: ActivityAssignee) => void;
+}) {
+  const { activity, assignee } = item;
   const [comment, setComment] = useState("");
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
@@ -218,39 +308,50 @@ function ReviewPanel({ organizationId, programId, activityId, assignee, onReview
     }
     setPending(true); setMessage("Guardando revisión…");
     try {
-      await reviewActivityAssignment(organizationId, programId, activityId, assignee.assignmentId,
+      const saved = await reviewActivityAssignment(organizationId, programId, activity.id, assignee.assignmentId,
         { decision, comment: cleanComment || null });
       setMessage(decision === "APPROVE" ? "Actividad aprobada." : "Cambios solicitados.");
-      onReviewed();
+      onReviewed(saved);
     } catch (error) {
       setMessage(activityErrorMessage(error));
     } finally { setPending(false); }
   }
 
-  return <article className="rounded-xl border border-border/70 bg-card/80 p-4 text-sm">
+  return <article className={`animate-in slide-in-from-bottom-6 fade-in rounded-2xl border border-border/70 bg-card p-5 text-sm shadow-sm transition duration-200 motion-reduce:animate-none motion-reduce:transition-none sm:p-6 ${leaving ? "-translate-y-6 opacity-0" : "translate-y-0 opacity-100"}`}>
+    <div className="mb-5 flex items-start gap-3 border-b border-border/70 pb-4">
+      <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+        <ClipboardCheck aria-hidden="true" className="size-5" />
+      </span>
+      <div><p className="rti-kicker">{activity.dimensionName} · {activity.sessionName}</p>
+        <h3 className="mt-1 text-lg font-semibold">{activity.title}</h3></div>
+    </div>
     <div className="flex flex-wrap items-center justify-between gap-2">
       <div><p className="font-medium">{name}</p><p className="text-muted-foreground">{assignee.email}</p></div>
-      <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium">{assignmentStatusLabel(assignee.status)}</span>
+      <ActivityStatusBadges status={assignee.status} dueDate={activity.dueDate} />
     </div>
     {assignee.responseText && <div className="mt-3"><p className="font-medium">Respuesta</p>
       <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{assignee.responseText}</p></div>}
     {assignee.reviewComment && <p className="mt-3 text-muted-foreground">Comentario de revisión: {assignee.reviewComment}</p>}
-    {assignee.status === "SUBMITTED" && <div className="mt-4 space-y-3">
+    <div className="mt-4 space-y-3">
       <label className="block font-medium" htmlFor={`review-${assignee.assignmentId}`}>Comentario de revisión</label>
       <textarea id={`review-${assignee.assignmentId}`} className="rti-field min-h-24 resize-y" maxLength={5000}
-        value={comment} onChange={event => setComment(event.target.value)} disabled={pending} />
+        value={comment} onChange={event => setComment(event.target.value)} disabled={pending || leaving} />
       {message && <p role="status" className="rounded-xl bg-muted/60 px-3 py-2">{message}</p>}
       <div className="flex flex-wrap gap-3">
-        <button type="button" className="rti-button-primary" disabled={pending}
+        <button type="button" className="rti-button-primary" disabled={pending || leaving}
           onClick={() => void review("APPROVE")}>Aprobar actividad</button>
-        <button type="button" className="rti-button-secondary" disabled={pending}
+        <button type="button" className="rti-button-secondary" disabled={pending || leaving}
           onClick={() => void review("REQUEST_CHANGES")}>Solicitar cambios</button>
       </div>
-    </div>}
+    </div>
   </article>;
 }
 
-function assignmentStatusLabel(status: ActivityAssignee["status"]) {
-  return { ASSIGNED: "Pendiente", SUBMITTED: "Por revisar", CHANGES_REQUESTED: "Requiere cambios",
-    COMPLETED: "Completada" }[status];
+function assignmentSummary(activity: ProgramActivity) {
+  const labels: Record<ActivityAssignee["status"], string> = {
+    ASSIGNED: "Pendientes", SUBMITTED: "En revisión", CHANGES_REQUESTED: "Con cambios", COMPLETED: "Completadas",
+  };
+  return (Object.keys(labels) as ActivityAssignee["status"][]).map(status => ({
+    label: labels[status], count: activity.assignees.filter(assignee => assignee.status === status).length,
+  })).filter(item => item.count > 0);
 }

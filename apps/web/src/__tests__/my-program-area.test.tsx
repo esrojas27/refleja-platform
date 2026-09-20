@@ -1,9 +1,9 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { MyProgramArea } from "@/components/participation/my-program-area";
 import { getMyProgram, listMyPrograms, ParticipationRequestError, type MyProgram } from "@/lib/participation/participation-api";
-import { listMyProgramActivities, submitMyActivity } from "@/lib/participation/activity-api";
+import { listMyProgramActivities, submitMyActivity, type AssignedActivity } from "@/lib/participation/activity-api";
 
 vi.mock("@/lib/participation/participation-api", async original => ({
   ...await original<typeof import("@/lib/participation/participation-api")>(),
@@ -20,22 +20,20 @@ const program: MyProgram = {
   startDate: "2026-09-01", endDate: "2026-12-01", version: 0,
 };
 const page = { items: [program], page: 0, size: 20, totalElements: 1, totalPages: 1 };
+const assignedActivity: AssignedActivity = { id: "activity-a", organizationId: "org-a",
+  programId: "program-a", moduleId: "module-a", sessionId: "session-a",
+  dimensionName: "Interior", sessionName: "Autoconocimiento", title: "Reflexión inicial",
+  instructions: "Describe tu punto de partida.", youtubeUrl: "https://youtu.be/dQw4w9WgXcQ",
+  dueDate: "2026-10-08", position: 1, version: 0,
+  assignmentId: "assignment-a", assignmentStatus: "ASSIGNED", responseText: null, submittedAt: null,
+  reviewComment: null, reviewedAt: null, assignmentVersion: 0 };
 
 beforeEach(() => {
   vi.mocked(listMyPrograms).mockResolvedValue(page);
   vi.mocked(getMyProgram).mockResolvedValue(program);
-  vi.mocked(listMyProgramActivities).mockResolvedValue({ items: [{ id: "activity-a", organizationId: "org-a",
-    programId: "program-a", moduleId: "module-a", sessionId: "session-a", title: "Reflexión inicial",
-    instructions: "Describe tu punto de partida.", youtubeUrl: "https://youtu.be/dQw4w9WgXcQ",
-    dueDate: "2026-10-08", position: 1, version: 0,
-    assignmentId: "assignment-a", assignmentStatus: "ASSIGNED", responseText: null, submittedAt: null,
-    reviewComment: null, reviewedAt: null, assignmentVersion: 0 }] });
-  vi.mocked(submitMyActivity).mockResolvedValue({ id: "activity-a", organizationId: "org-a",
-    programId: "program-a", moduleId: "module-a", sessionId: "session-a", title: "Reflexión inicial",
-    instructions: "Describe tu punto de partida.", youtubeUrl: "https://youtu.be/dQw4w9WgXcQ",
-    dueDate: "2026-10-08", position: 1, version: 0,
-    assignmentId: "assignment-a", assignmentStatus: "SUBMITTED", responseText: "Mi reflexión",
-    submittedAt: "2026-10-07T12:00:00Z", reviewComment: null, reviewedAt: null, assignmentVersion: 1 });
+  vi.mocked(listMyProgramActivities).mockResolvedValue({ items: [assignedActivity] });
+  vi.mocked(submitMyActivity).mockResolvedValue({ ...assignedActivity, assignmentStatus: "SUBMITTED",
+    responseText: "Mi reflexión", submittedAt: "2026-10-07T12:00:00Z", assignmentVersion: 1 });
 });
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 
@@ -49,22 +47,41 @@ it("renders only the collaborator's returned programs with basic metadata", asyn
   expect(screen.queryByText(/progreso/i)).toBeNull();
 });
 
-it("opens basic detail without requesting a participant or organization identifier", async () => {
-  render(<MyProgramArea mode="detail" programId="program-a" />);
+it("opens the program summary with progress without requesting participant identifiers", async () => {
+  render(<MyProgramArea mode="summary" programId="program-a" />);
   expect(await screen.findByText("Programa asignado")).toBeTruthy();
   expect(screen.getByText("Empresa A")).toBeTruthy();
   expect(getMyProgram).toHaveBeenCalledWith("program-a", expect.any(AbortSignal));
-  expect(await screen.findByText("Reflexión inicial")).toBeTruthy();
-  expect(screen.getByRole("link", { name: "Ver video en YouTube" }).getAttribute("href")).toBe("https://youtu.be/dQw4w9WgXcQ");
+  expect(await screen.findByRole("heading", { name: "Progreso del programa" })).toBeTruthy();
+  expect(screen.queryByText("Reflexión inicial")).toBeNull();
   expect(listMyProgramActivities).toHaveBeenCalledWith("program-a", expect.any(AbortSignal));
 });
 
+it("shows assigned work only in the activities section", async () => {
+  render(<MyProgramArea mode="activities" programId="program-a" />);
+  expect(await screen.findByText("Reflexión inicial")).toBeTruthy();
+  expect(screen.getByText("Interior · Autoconocimiento · Actividad 1")).toBeTruthy();
+  expect(screen.getByRole("link", { name: "Ver video en YouTube" }).getAttribute("href")).toBe("https://youtu.be/dQw4w9WgXcQ");
+  expect(screen.queryByRole("heading", { name: "Progreso del programa" })).toBeNull();
+  expect(listMyProgramActivities).toHaveBeenCalledWith("program-a", expect.any(AbortSignal));
+});
+
+it("shows overdue as a visual activity label without replacing its workflow state", async () => {
+  vi.mocked(listMyProgramActivities).mockResolvedValue({ items: [{
+    ...assignedActivity,
+    dueDate: "2020-01-01", assignmentStatus: "CHANGES_REQUESTED",
+  }] });
+  render(<MyProgramArea mode="activities" programId="program-a" />);
+  expect(await screen.findByText("Requiere cambios")).toBeTruthy();
+  expect(screen.getByText("Vencida")).toBeTruthy();
+});
+
 it("lets the collaborator complete an assigned activity with a textual response", async () => {
-  render(<MyProgramArea mode="detail" programId="program-a" />);
+  render(<MyProgramArea mode="activities" programId="program-a" />);
   fireEvent.change(await screen.findByLabelText("Tu respuesta"), { target: { value: " Mi reflexión " } });
   fireEvent.click(screen.getByRole("button", { name: "Completar actividad" }));
   await waitFor(() => expect(submitMyActivity).toHaveBeenCalledWith("program-a", "activity-a", "Mi reflexión"));
-  expect(await screen.findByText("En revisión")).toBeTruthy();
+  expect(within(screen.getByLabelText("Estado de la actividad")).getByText("En revisión")).toBeTruthy();
 });
 
 it.each([

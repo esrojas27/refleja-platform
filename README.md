@@ -144,7 +144,8 @@ pruebas y validación manual: [acta del 011](docs/architecture/rti-vs1-011-accep
 ### Actividades asignadas
 
 Un `CONSULTANT` puede abrir **Actividades** dentro del espacio de trabajo de un
-programa, escoger una sesión, definir título, instrucciones, un enlace opcional
+programa y usar **Crear y asignar** para abrir un formulario modal, escoger una
+sesión, definir título, instrucciones, un enlace opcional
 de YouTube y fecha límite, y
 asignar la actividad a todas las inscripciones `ACTIVE` o seleccionar destinatarios
 individuales. La creación y las asignaciones se confirman en una sola transacción.
@@ -152,11 +153,17 @@ individuales. La creación y las asignaciones se confirman en una sola transacci
 El colaborador ve únicamente sus actividades en el detalle de **Mis programas**.
 La API deriva su inscripción del Access Token; no acepta identificadores de
 usuario, membresía u organización elegidos por el navegador. Puede enviar una
-respuesta textual; el consultor la aprueba o solicita cambios y la actividad queda
-completada únicamente tras la aprobación. Archivos, calificaciones y progreso
-agregado y reproducción embebida siguen fuera de alcance. Contrato, persistencia
+respuesta textual; el consultor revisa las entregas pendientes en una bandeja
+secuencial, donde las aprueba o solicita cambios, y la actividad queda completada
+únicamente tras la aprobación. **Mis programas** ofrece al colaborador navegación
+lateral separada entre **Resumen** y **Actividades**. El resumen muestra progreso general
+y por dimensión/sesión, conteos por estado y una alerta visual de vencimiento. El
+consultor dispone de una vista operativa en **Progreso** dentro del espacio de
+trabajo del programa. Archivos, calificaciones y reproducción embebida siguen fuera
+de alcance. Contrato, persistencia
 y recorrido manual:
 [entrega y revisión de actividades](docs/architecture/activity-completion-review.md).
+Semántica del avance: [seguimiento de progreso](docs/architecture/program-progress-tracking.md).
 
 ### Gate CI y journey del MVP — RTI-VS1-013
 
@@ -400,7 +407,7 @@ Todas las implementaciones futuras deberán respetar las decisiones aceptadas. C
 
 Todavía no existen:
 
-- entregas de actividades, progreso o planes de acción dentro de los programas;
+- archivos, evidencias, evaluaciones o planes de acción dentro de los programas;
 - edición o administración general de organizaciones y programas;
 - registro público o administración de usuarios;
 - infraestructura de hosting para web, API o PostgreSQL;

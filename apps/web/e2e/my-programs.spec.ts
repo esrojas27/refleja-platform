@@ -9,7 +9,13 @@ test("my programs routes are responsive and require a Cognito session", async ({
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
   await page.goto("/my-programs/not-assigned");
-  await expect(page.getByRole("heading", { name: "Detalle del programa", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Resumen del programa", exact: true })).toBeVisible();
   await expect(page.getByRole("status")).toContainText("Tu sesión no está disponible");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+  await page.goto("/my-programs/not-assigned/activities");
+  await expect(page.getByRole("heading", { name: "Actividades", exact: true })).toBeVisible();
+  await expect(page.getByRole("status")).toContainText("Tu sesión no está disponible");
+  await expect(page.getByRole("navigation", { name: "Secciones de tu programa" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });

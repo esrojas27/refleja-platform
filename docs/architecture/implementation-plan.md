@@ -46,7 +46,9 @@ Este archivo registra el punto de continuación; no reemplaza los tickets ni los
   dimensiones configurables, sesiones con objetivo y el ciclo de actividades:
   asignación masiva o individual, enlace opcional de YouTube, respuesta textual,
   solicitud de cambios y aprobación. La API v1 conserva `/modules` como contrato
-  legado. Progreso agregado, evaluaciones y archivos continúan pendientes.
+  legado. El progreso agregado por programa, dimensión, sesión y colaborador está
+  implementado localmente a partir de las asignaciones existentes. Evaluaciones y
+  archivos continúan pendientes.
 - **Primer operador:** mecanismo administrativo implementado y aplicado localmente
   con aprobación expresa: organización operadora real, membresía activa y rol
   `CONSULTANT` acotado. [Procedimiento y evidencia](first-operator-bootstrap.md).

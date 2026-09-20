@@ -188,8 +188,9 @@ public class ActivityService {
             assignees.add(assignee(activity.organizationId(), activity.programId(), assignment));
         }
         return new ActivityResponse(activity.id(), activity.organizationId(), activity.programId(),
-                activity.moduleId(), activity.sessionId(), activity.title(), activity.instructions(),
-                activity.youtubeUrl(), activity.dueDate(), activity.position(), activity.version(), assignees);
+                activity.moduleId(), activity.sessionId(), activity.dimensionName(), activity.sessionName(),
+                activity.title(), activity.instructions(), activity.youtubeUrl(), activity.dueDate(),
+                activity.position(), activity.version(), assignees);
     }
 
     private AssigneeResponse assignee(UUID organizationId, UUID programId, ActivityAssignments.Data assignment) {
@@ -222,19 +223,21 @@ public class ActivityService {
             String lastName, String status, String responseText, Instant submittedAt,
             String reviewComment, Instant reviewedAt, long version) {}
     public record ActivityResponse(UUID id, UUID organizationId, UUID programId, UUID moduleId, UUID sessionId,
-            String title, String instructions, String youtubeUrl, LocalDate dueDate, int position, long version,
+            String dimensionName, String sessionName, String title, String instructions, String youtubeUrl,
+            LocalDate dueDate, int position, long version,
             List<AssigneeResponse> assignees) {
         public ActivityResponse { assignees = List.copyOf(assignees); }
     }
     public record AssignedActivityResponse(UUID id, UUID organizationId, UUID programId, UUID moduleId,
-            UUID sessionId, String title, String instructions, String youtubeUrl, LocalDate dueDate,
-            int position, long version,
+            UUID sessionId, String dimensionName, String sessionName, String title, String instructions,
+            String youtubeUrl, LocalDate dueDate, int position, long version,
             UUID assignmentId, String assignmentStatus, String responseText, Instant submittedAt,
             String reviewComment, Instant reviewedAt, long assignmentVersion) {
         static AssignedActivityResponse from(ProgramActivities.Activity activity, ActivityAssignments.Data assignment) {
             return new AssignedActivityResponse(activity.id(), activity.organizationId(), activity.programId(),
-                    activity.moduleId(), activity.sessionId(), activity.title(), activity.instructions(),
-                    activity.youtubeUrl(), activity.dueDate(), activity.position(), activity.version(),
+                    activity.moduleId(), activity.sessionId(), activity.dimensionName(), activity.sessionName(),
+                    activity.title(), activity.instructions(), activity.youtubeUrl(), activity.dueDate(),
+                    activity.position(), activity.version(),
                     assignment.id(), assignment.status(),
                     assignment.responseText(), assignment.submittedAt(), assignment.reviewComment(),
                     assignment.reviewedAt(), assignment.version());

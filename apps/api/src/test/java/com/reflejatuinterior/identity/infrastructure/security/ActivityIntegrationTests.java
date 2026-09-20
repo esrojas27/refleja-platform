@@ -72,6 +72,8 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 .andExpect(jsonPath("$.instructions").value("Describe tu punto de partida."))
                 .andExpect(jsonPath("$.youtubeUrl").value("https://youtu.be/dQw4w9WgXcQ"))
                 .andExpect(jsonPath("$.sessionId").value(session.toString()))
+                .andExpect(jsonPath("$.dimensionName").value("Fundamentos"))
+                .andExpect(jsonPath("$.sessionName").value("Sesión inicial"))
                 .andExpect(jsonPath("$.assignees[0].enrollmentId").value(enrollment.toString()))
                 .andReturn().getResponse();
         var activityId = UUID.fromString(json.readTree(createdResponse.getContentAsString()).path("id").asText());
@@ -83,6 +85,8 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
         mvc.perform(get(collaboratorPath()).header("Authorization", token(collaborator)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(1))
                 .andExpect(jsonPath("$.items[0].id").value(activityId.toString()))
+                .andExpect(jsonPath("$.items[0].dimensionName").value("Fundamentos"))
+                .andExpect(jsonPath("$.items[0].sessionName").value("Sesión inicial"))
                 .andExpect(jsonPath("$.items[0].youtubeUrl").value("https://youtu.be/dQw4w9WgXcQ"))
                 .andExpect(jsonPath("$.items[0].assignees").doesNotExist());
         mvc.perform(get(collaboratorPath()).header("Authorization", token(otherCollaborator)))

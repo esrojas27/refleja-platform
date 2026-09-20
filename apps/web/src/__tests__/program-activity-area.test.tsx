@@ -26,7 +26,8 @@ const identity = { cognitoSubject: "subject", user: { id: "user", email: "consul
 const enrollment = { id: "enrollment-a", organizationId: "org-a", programId: "program-a", status: "ACTIVE" as const,
   participant: { userId: "user-a", membershipId: "membership-a", email: "ana@example.test", firstName: "Ana", lastName: "Prueba" }, invitation: null };
 const activity: ProgramActivity = { id: "activity-a", organizationId: "org-a", programId: "program-a", moduleId: "module-a",
-  sessionId: "session-a", title: "Reflexión inicial", instructions: "Describe tu punto de partida.",
+  sessionId: "session-a", dimensionName: "Fundamentos", sessionName: "Sesión inicial",
+  title: "Reflexión inicial", instructions: "Describe tu punto de partida.",
   youtubeUrl: "https://youtu.be/dQw4w9WgXcQ", dueDate: "2026-10-08",
   position: 1, version: 0, assignees: [{ assignmentId: "assignment-a", enrollmentId: "enrollment-a",
     email: "ana@example.test", firstName: "Ana", lastName: "Prueba", status: "SUBMITTED", responseText: "Mi avance",
@@ -49,15 +50,18 @@ it("renders real sessions, assignments and existing activities", async () => {
   render(<ProgramActivityArea organizationId="org-a" programId="program-a" />);
   expect(await screen.findByText("Reflexión inicial")).toBeTruthy();
   expect(screen.getByText(/Fundamentos · Sesión inicial · Actividad 1/)).toBeTruthy();
-  expect(screen.getByText("Ana Prueba")).toBeTruthy();
-  expect(screen.getByText("Por revisar")).toBeTruthy();
+  expect(screen.getByText("En revisión: 1")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Revisar actividades (1)" })).toBeTruthy();
+  expect(screen.queryByRole("form", { name: "Crear actividad" })).toBeNull();
   expect(screen.getByRole("link", { name: "Ver video en YouTube" }).getAttribute("href")).toBe("https://youtu.be/dQw4w9WgXcQ");
   expect(listEnrollments).toHaveBeenCalledWith("org-a", "program-a", 0, expect.any(AbortSignal), 100);
 });
 
 it("assigns the next activity to every active enrollment by default", async () => {
   render(<ProgramActivityArea organizationId="org-a" programId="program-a" />);
+  fireEvent.click(await screen.findByRole("button", { name: "Crear y asignar" }));
   const form = await screen.findByRole("form", { name: "Crear actividad" });
+  expect(screen.getByRole("dialog", { name: "Crear y asignar" })).toBeTruthy();
   fireEvent.change(within(form).getByLabelText("Título"), { target: { value: "Práctica consciente" } });
   fireEvent.change(within(form).getByLabelText("Instrucciones"), { target: { value: "Registra tres hallazgos" } });
   fireEvent.change(within(form).getByLabelText("Video de YouTube (opcional)"), { target: { value: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" } });
@@ -73,6 +77,7 @@ it("assigns the next activity to every active enrollment by default", async () =
 
 it("reveals individual collaborators when assigning to everyone is disabled", async () => {
   render(<ProgramActivityArea organizationId="org-a" programId="program-a" />);
+  fireEvent.click(await screen.findByRole("button", { name: "Crear y asignar" }));
   const form = await screen.findByRole("form", { name: "Crear actividad" });
   fireEvent.click(within(form).getByRole("checkbox", { name: /^Asignar a todos los colaboradores activos/ }));
   fireEvent.change(within(form).getByLabelText("Título"), { target: { value: "Práctica individual" } });
@@ -86,11 +91,21 @@ it("reveals individual collaborators when assigning to everyone is disabled", as
 
 it("lets the consultant approve a submitted response", async () => {
   render(<ProgramActivityArea organizationId="org-a" programId="program-a" />);
+  fireEvent.click(await screen.findByRole("button", { name: "Revisar actividades (1)" }));
   expect(await screen.findByText("Mi avance")).toBeTruthy();
   fireEvent.change(screen.getByLabelText("Comentario de revisión"), { target: { value: "Buen trabajo" } });
   fireEvent.click(screen.getByRole("button", { name: "Aprobar actividad" }));
   await waitFor(() => expect(reviewActivityAssignment).toHaveBeenCalledWith("org-a", "program-a", "activity-a",
     "assignment-a", { decision: "APPROVE", comment: "Buen trabajo" }));
+});
+
+it("states clearly when the review queue is empty", async () => {
+  vi.mocked(listProgramActivities).mockResolvedValue({ items: [{
+    ...activity, assignees: [{ ...activity.assignees[0], status: "ASSIGNED", responseText: null }],
+  }] });
+  render(<ProgramActivityArea organizationId="org-a" programId="program-a" />);
+  expect(await screen.findByText("No hay actividades pendientes por revisar.")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /Revisar actividades \(/ })).toBeNull();
 });
 
 it("does not expose management data to a non-consultant", async () => {
