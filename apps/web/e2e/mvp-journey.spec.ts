@@ -45,7 +45,7 @@ test.describe("@mvp RTI-VS1-013 authenticated vertical slice", () => {
   test.describe.configure({ mode: "serial", retries: 0 });
   test.skip(missingCredentials.length > 0, `Live Cognito credentials not configured: ${missingCredentials.join(", ")}`);
 
-  test("consultant creates the assignment and the collaborator accepts and views it", async ({ page }) => {
+  test("consultant creates the assignment and the collaborator accepts and views it", async ({ page, browser, baseURL }) => {
     test.setTimeout(180_000);
     const suffix = `${process.env.GITHUB_RUN_ID ?? Date.now()}-${process.env.GITHUB_RUN_ATTEMPT ?? "local"}`;
     const organizationName = `MVP E2E ${suffix}`;
@@ -97,34 +97,41 @@ test.describe("@mvp RTI-VS1-013 authenticated vertical slice", () => {
     await page.getByRole("button", { name: "Cerrar sesión" }).click();
     await page.waitForURL((url) => url.hostname === "localhost" && url.pathname === "/login", { timeout: 60_000 });
 
-    await cognitoLogin(page, collaboratorEmail, collaboratorPassword);
-    await page.getByRole("main").getByRole("link", { name: "Invitaciones" }).click();
-    const invitation = page.getByRole("listitem").filter({ hasText: programName });
-    await expect(invitation).toContainText(organizationName);
-    await invitation.getByRole("button", { name: "Aceptar invitación" }).click();
-    await expect(page.getByRole("status").filter({ hasText: "Invitación aceptada." })).toBeVisible();
+    if (!baseURL) throw new Error("Playwright baseURL is required for the isolated collaborator context");
+    const collaboratorContext = await browser.newContext({ baseURL });
+    try {
+      const collaboratorPage = await collaboratorContext.newPage();
+      await cognitoLogin(collaboratorPage, collaboratorEmail, collaboratorPassword);
+      await collaboratorPage.getByRole("main").getByRole("link", { name: "Invitaciones" }).click();
+      const invitation = collaboratorPage.getByRole("listitem").filter({ hasText: programName });
+      await expect(invitation).toContainText(organizationName);
+      await invitation.getByRole("button", { name: "Aceptar invitación" }).click();
+      await expect(collaboratorPage.getByRole("status").filter({ hasText: "Invitación aceptada." })).toBeVisible();
 
-    await page.getByRole("navigation", { name: "Secciones de la cuenta" })
-      .getByRole("link", { name: "Cuenta", exact: true }).click();
-    await page.getByRole("button", { name: "Comprobar sesión" }).click();
-    await page.waitForURL((url) => url.pathname === "/profile" && url.searchParams.has("organizationId"));
-    await expect(page.getByRole("heading", { name: "Perfil del colaborador" })).toBeVisible();
-    await expect(page.getByText(collaboratorEmail, { exact: true })).toBeVisible();
-    await expect(page.getByText(organizationName, { exact: true })).toBeVisible();
-    await page.getByLabel("Nombre completo").fill("Colaborador MVP");
-    await page.getByLabel("Fecha de nacimiento").fill("1990-05-12");
-    await page.getByLabel("Teléfono").fill("+57 300 123 4567");
-    await page.getByLabel("Ciudad").fill("Bogotá");
-    await page.getByLabel("País").fill("Colombia");
-    await page.getByLabel("Cargo").fill("Participante E2E");
-    await page.getByRole("button", { name: "Completar perfil" }).click();
-    await expect(page.getByRole("status")).toContainText("Perfil completo.");
-    await page.getByRole("link", { name: "Ir a mis programas" }).click();
-    await expect(page.getByRole("link", { name: programName })).toBeVisible();
-    await expect(page.getByText(organizationName, { exact: true })).toBeVisible();
-    await page.getByRole("link", { name: programName }).click();
-    await expect(page.getByRole("heading", { name: "Resumen del programa", exact: true })).toBeVisible();
-    await expect(page.getByText(programName, { exact: true })).toBeVisible();
-    await expect(page.getByText(organizationName, { exact: true })).toBeVisible();
+      await collaboratorPage.getByRole("navigation", { name: "Secciones de la cuenta" })
+        .getByRole("link", { name: "Cuenta", exact: true }).click();
+      await collaboratorPage.getByRole("button", { name: "Comprobar sesión" }).click();
+      await collaboratorPage.waitForURL((url) => url.pathname === "/profile" && url.searchParams.has("organizationId"));
+      await expect(collaboratorPage.getByRole("heading", { name: "Perfil del colaborador" })).toBeVisible();
+      await expect(collaboratorPage.getByText(collaboratorEmail, { exact: true })).toBeVisible();
+      await expect(collaboratorPage.getByText(organizationName, { exact: true })).toBeVisible();
+      await collaboratorPage.getByLabel("Nombre completo").fill("Colaborador MVP");
+      await collaboratorPage.getByLabel("Fecha de nacimiento").fill("1990-05-12");
+      await collaboratorPage.getByLabel("Teléfono").fill("+57 300 123 4567");
+      await collaboratorPage.getByLabel("Ciudad").fill("Bogotá");
+      await collaboratorPage.getByLabel("País").fill("Colombia");
+      await collaboratorPage.getByLabel("Cargo").fill("Participante E2E");
+      await collaboratorPage.getByRole("button", { name: "Completar perfil" }).click();
+      await expect(collaboratorPage.getByRole("status")).toContainText("Perfil completo.");
+      await collaboratorPage.getByRole("link", { name: "Ir a mis programas" }).click();
+      await expect(collaboratorPage.getByRole("link", { name: programName })).toBeVisible();
+      await expect(collaboratorPage.getByText(organizationName, { exact: true })).toBeVisible();
+      await collaboratorPage.getByRole("link", { name: programName }).click();
+      await expect(collaboratorPage.getByRole("heading", { name: "Resumen del programa", exact: true })).toBeVisible();
+      await expect(collaboratorPage.getByText(programName, { exact: true })).toBeVisible();
+      await expect(collaboratorPage.getByText(organizationName, { exact: true })).toBeVisible();
+    } finally {
+      await collaboratorContext.close();
+    }
   });
 });
