@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { CheckCircle2, ChevronRight, CircleDashed, Sparkles, UserRound } from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { fetchCurrentIdentity } from "@/lib/auth/authenticated-api";
-import { DiscProfileInput, ProgramDiscParticipant, discErrorMessage,
+import { fetchCurrentIdentity, IdentityRequestError } from "@/lib/auth/authenticated-api";
+import { DiscProfileInput, DiscRequestError, ProgramDiscParticipant, discErrorMessage,
   listProgramDiscProfiles, saveProgramDiscProfile } from "@/lib/participation/disc-api";
 
 export function ProgramDiscArea({ organizationId, programId }: { organizationId: string; programId: string }) {
@@ -29,7 +29,11 @@ export function ProgramDiscArea({ organizationId, programId }: { organizationId:
         setItems(response.items);
         setMessage(response.items.length === 0 ? "No hay colaboradores activos disponibles en este programa." : "");
       } catch (error) {
-        if (!controller.signal.aborted) setMessage(discErrorMessage(error));
+        if (!controller.signal.aborted) {
+          const normalized = error instanceof IdentityRequestError
+            ? new DiscRequestError(error.status) : error;
+          setMessage(discErrorMessage(normalized));
+        }
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }

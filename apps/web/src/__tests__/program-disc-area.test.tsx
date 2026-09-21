@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { ProgramDiscArea } from "@/components/programs/program-disc-area";
-import { fetchCurrentIdentity } from "@/lib/auth/authenticated-api";
+import { fetchCurrentIdentity, IdentityRequestError } from "@/lib/auth/authenticated-api";
 import { listProgramDiscProfiles, saveProgramDiscProfile } from "@/lib/participation/disc-api";
 
-vi.mock("@/lib/auth/authenticated-api", () => ({ fetchCurrentIdentity: vi.fn() }));
+vi.mock("@/lib/auth/authenticated-api", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/auth/authenticated-api")>(), fetchCurrentIdentity: vi.fn(),
+}));
 vi.mock("@/lib/participation/disc-api", async importOriginal => {
   const actual = await importOriginal<typeof import("@/lib/participation/disc-api")>();
   return { ...actual, listProgramDiscProfiles: vi.fn(), saveProgramDiscProfile: vi.fn() };
@@ -45,6 +47,16 @@ it("does not request private DISC data for an unauthorized organization role", a
   vi.mocked(fetchCurrentIdentity).mockResolvedValue({ ...identity, roles: ["COMPANY_ADMIN"] });
   render(<ProgramDiscArea organizationId="org-a" programId="program-a" />);
   expect(await screen.findByText(/Sólo consultores y líderes autorizados/)).toBeTruthy();
+  expect(listProgramDiscProfiles).not.toHaveBeenCalled();
+  expect(screen.queryByRole("form")).toBeNull();
+});
+
+it("reports a missing Cognito session consistently without requesting DISC data", async () => {
+  vi.mocked(fetchCurrentIdentity).mockRejectedValue(new IdentityRequestError(401));
+
+  render(<ProgramDiscArea organizationId="org-a" programId="program-a" />);
+
+  expect(await screen.findByText(/Tu sesión no está disponible/)).toBeTruthy();
   expect(listProgramDiscProfiles).not.toHaveBeenCalled();
   expect(screen.queryByRole("form")).toBeNull();
 });
