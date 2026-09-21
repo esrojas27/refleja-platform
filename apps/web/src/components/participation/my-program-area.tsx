@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import {
@@ -15,6 +16,7 @@ import {
 import { activityErrorMessage, listMyProgramActivities, submitMyActivity,
   type AssignedActivity } from "@/lib/participation/activity-api";
 import { ActivityStatusBadges, CollaboratorProgressOverview } from "@/components/participation/progress-overview";
+import { ActivitySurveyForm } from "@/components/participation/activity-survey-form";
 
 const button = "rti-button-secondary";
 
@@ -116,6 +118,34 @@ function MyProgramDetail({ programId, section }: { programId: string; section: "
   </div>;
 }
 
+type ActivitySessionGroup = { id: string; name: string; activities: AssignedActivity[] };
+type ActivityDimensionGroup = { id: string; name: string; sessions: ActivitySessionGroup[] };
+
+function groupAssignedActivities(activities: AssignedActivity[]): ActivityDimensionGroup[] {
+  const dimensions = new Map<string, ActivityDimensionGroup & { sessionMap: Map<string, ActivitySessionGroup> }>();
+  for (const activity of activities) {
+    let dimension = dimensions.get(activity.moduleId);
+    if (!dimension) {
+      dimension = { id: activity.moduleId, name: activity.dimensionName, sessions: [], sessionMap: new Map() };
+      dimensions.set(activity.moduleId, dimension);
+    }
+    let session = dimension.sessionMap.get(activity.sessionId);
+    if (!session) {
+      session = { id: activity.sessionId, name: activity.sessionName, activities: [] };
+      dimension.sessionMap.set(activity.sessionId, session);
+      dimension.sessions.push(session);
+    }
+    session.activities.push(activity);
+  }
+  return [...dimensions.values()].map(dimension => ({
+    id: dimension.id,
+    name: dimension.name,
+    sessions: dimension.sessions.map(session => ({
+      ...session, activities: [...session.activities].sort((left, right) => left.position - right.position),
+    })),
+  }));
+}
+
 function AssignedActivityList({ programId, section }: { programId: string; section: "summary" | "activities" }) {
   const [activities, setActivities] = useState<AssignedActivity[]>();
   const [message, setMessage] = useState("Cargando actividades asignadas…");
@@ -137,12 +167,60 @@ function AssignedActivityList({ programId, section }: { programId: string; secti
     {section === "activities" && <section aria-labelledby="assigned-activities-title">
     <h2 id="assigned-activities-title" className="text-xl font-semibold">Actividades asignadas</h2>
     {message && <p role="status" className="mt-3 rounded-2xl bg-muted/60 px-4 py-3 text-sm">{message}</p>}
-    {activities && activities.length > 0 && <ol className="mt-4 grid gap-4 sm:grid-cols-2">
-      {activities.map(activity => <AssignedActivityCard key={activity.id} programId={programId} activity={activity}
-        onSubmitted={updated => setActivities(current => current?.map(item => item.id === updated.id ? updated : item))} />)}
-    </ol>}
+    {activities && activities.length > 0 && <div className="mt-4 space-y-4">
+      {groupAssignedActivities(activities).map(dimension => {
+        const dimensionTotal = dimension.sessions.reduce((total, session) => total + session.activities.length, 0);
+        return <details key={dimension.id} className="group/dimension overflow-hidden rounded-2xl border border-border/70 bg-background/65">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-4 marker:hidden sm:px-5 [&::-webkit-details-marker]:hidden">
+            <span><span className="rti-kicker block">Dimensión</span>
+              <span className="mt-1 block text-lg font-semibold">{dimension.name}</span></span>
+            <span className="flex shrink-0 items-center gap-3 text-sm text-muted-foreground">
+              {dimensionTotal} {dimensionTotal === 1 ? "actividad" : "actividades"}
+              <ChevronDown aria-hidden="true" className="size-5 transition-transform group-open/dimension:rotate-180" />
+            </span>
+          </summary>
+          <div className="space-y-3 border-t border-border/70 bg-muted/20 p-3 sm:p-4">
+            {dimension.sessions.map(session => <details key={session.id}
+              className="group/session overflow-hidden rounded-xl border border-border/70 bg-card">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 marker:hidden [&::-webkit-details-marker]:hidden">
+                <span><span className="rti-kicker block">Sesión</span>
+                  <span className="mt-1 block font-semibold">{session.name}</span></span>
+                <span className="flex shrink-0 items-center gap-3 text-sm text-muted-foreground">
+                  {session.activities.length} {session.activities.length === 1 ? "actividad" : "actividades"}
+                  <ChevronDown aria-hidden="true" className="size-4 transition-transform group-open/session:rotate-180" />
+                </span>
+              </summary>
+              <ol className="space-y-3 border-t border-border/70 p-3 sm:p-4">
+                {session.activities.map(activity => <AssignedActivityAccordion key={activity.id} programId={programId}
+                  activity={activity} onSubmitted={updated => setActivities(current => current?.map(item =>
+                    item.id === updated.id ? updated : item))} />)}
+              </ol>
+            </details>)}
+          </div>
+        </details>;
+      })}
+    </div>}
     </section>}
   </div>;
+}
+
+function AssignedActivityAccordion({ programId, activity, onSubmitted }: {
+  programId: string; activity: AssignedActivity; onSubmitted: (activity: AssignedActivity) => void;
+}) {
+  return <li><details className="group/activity overflow-hidden rounded-xl border border-border/70 bg-background">
+    <summary className="flex cursor-pointer list-none flex-col gap-3 px-4 py-3 marker:hidden sm:flex-row sm:items-center sm:justify-between [&::-webkit-details-marker]:hidden">
+      <span><span className="rti-kicker block">Actividad {activity.position}</span>
+        <span className="mt-1 block font-semibold">{activity.title}</span></span>
+      <span className="flex items-center justify-between gap-3 sm:justify-end">
+        <ActivityStatusBadges status={activity.assignmentStatus} dueDate={activity.dueDate}
+          surveyStatus={activity.survey?.status} />
+        <ChevronDown aria-hidden="true" className="size-4 shrink-0 transition-transform group-open/activity:rotate-180" />
+      </span>
+    </summary>
+    <div className="border-t border-border/70 p-4">
+      <AssignedActivityCard programId={programId} activity={activity} onSubmitted={onSubmitted} />
+    </div>
+  </details></li>;
 }
 
 function AssignedActivityCard({ programId, activity, onSubmitted }: {
@@ -159,23 +237,33 @@ function AssignedActivityCard({ programId, activity, onSubmitted }: {
     setPending(true); setMessage("Enviando actividad…");
     try {
       const saved = await submitMyActivity(programId, activity.id, clean);
-      setMessage("Actividad enviada para revisión.");
+      setMessage(saved.survey?.status === "PENDING"
+        ? "Entrega enviada. Completa la encuesta para finalizar la actividad."
+        : "Actividad enviada para revisión.");
       onSubmitted(saved);
     } catch (error) {
       setMessage(activityErrorMessage(error));
     } finally { setPending(false); }
   }
 
-  return <li className="rounded-2xl border border-border/70 bg-background/70 p-5">
-    <div className="flex flex-wrap items-center justify-between gap-2">
-      <p className="rti-kicker">{activity.dimensionName} · {activity.sessionName} · Actividad {activity.position}</p>
-      <ActivityStatusBadges status={activity.assignmentStatus} dueDate={activity.dueDate} />
-    </div>
-    <h3 className="mt-2 text-lg font-semibold">{activity.title}</h3>
-    <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{activity.instructions}</p>
+  return <div>
+    <p className="whitespace-pre-wrap text-sm text-muted-foreground">{activity.instructions}</p>
     {activity.youtubeUrl && <a href={activity.youtubeUrl} target="_blank" rel="noopener noreferrer"
       className="rti-link mt-3 inline-block text-sm">Ver video en YouTube</a>}
     <p className="mt-3 text-sm font-medium">Fecha límite: {activity.dueDate}</p>
+    <div className="mt-4 rounded-xl border border-border/70 bg-muted/35 p-3">
+      <div className="flex items-center justify-between gap-3 text-sm"><span className="font-medium">Avance de la actividad</span>
+        <strong className="text-primary">{activity.completionPercentage}%</strong></div>
+      <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted" role="progressbar"
+        aria-label={`Avance de ${activity.title}: ${activity.completionPercentage}%`}
+        aria-valuemin={0} aria-valuemax={100} aria-valuenow={activity.completionPercentage}>
+        <div className="h-full rounded-full bg-primary transition-[width] duration-500"
+          style={{ width: `${activity.completionPercentage}%` }} />
+      </div>
+      {activity.survey && <p className="mt-2 text-xs text-muted-foreground">
+        Entrega de la actividad: 50% · Encuesta: 50%
+      </p>}
+    </div>
     {activity.reviewComment && <p className="mt-4 rounded-xl border border-primary/20 bg-accent/40 px-3 py-2 text-sm">
       Comentario del consultor: {activity.reviewComment}</p>}
     {editable ? <div className="mt-4 space-y-3">
@@ -183,10 +271,21 @@ function AssignedActivityCard({ programId, activity, onSubmitted }: {
       <textarea id={`response-${activity.id}`} className="rti-field min-h-32 resize-y" maxLength={10000}
         value={response} onChange={event => setResponse(event.target.value)} disabled={pending} />
       <button type="button" className="rti-button-primary" disabled={pending} onClick={() => void submit()}>
-        {pending ? "Enviando…" : activity.assignmentStatus === "CHANGES_REQUESTED" ? "Enviar corrección" : "Completar actividad"}
+        {pending ? "Enviando…" : activity.assignmentStatus === "CHANGES_REQUESTED" ? "Enviar corrección"
+          : activity.survey ? "Enviar actividad (50%)" : "Completar actividad"}
       </button>
     </div> : activity.responseText && <div className="mt-4 text-sm"><p className="font-medium">Tu respuesta</p>
       <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{activity.responseText}</p></div>}
     {message && <p role="status" className="mt-3 rounded-xl bg-muted/60 px-3 py-2 text-sm">{message}</p>}
-  </li>;
+    {activity.survey?.status === "LOCKED" && <p className="mt-4 rounded-xl border border-border/70 bg-muted/45 px-3 py-3 text-sm text-muted-foreground">
+      La encuesta se habilitará después de enviar la actividad y completará el 50% restante.
+    </p>}
+    {activity.survey?.status === "PENDING" && <ActivitySurveyForm programId={programId} activityId={activity.id}
+      survey={activity.survey} onCompleted={submission => onSubmitted({ ...activity,
+        survey: { ...activity.survey!, status: "COMPLETED", completedAt: submission.completedAt },
+        completionPercentage: 100 })} />}
+    {activity.survey?.status === "COMPLETED" && <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm font-medium text-emerald-900">
+      Encuesta completada. Cumpliste los dos pasos de la actividad.
+    </p>}
+  </div>;
 }

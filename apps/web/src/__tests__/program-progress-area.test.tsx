@@ -19,10 +19,10 @@ const activity: ProgramActivity = { id: "activity-a", organizationId: "org-a", p
   position: 1, version: 0, assignees: [
     { assignmentId: "assignment-a", enrollmentId: "enrollment-a", email: "ana@example.test", firstName: "Ana",
       lastName: "Prueba", status: "SUBMITTED", responseText: "Mi avance", submittedAt: null,
-      reviewComment: null, reviewedAt: null, version: 1 },
+      reviewComment: null, reviewedAt: null, surveyStatus: "PENDING", completionPercentage: 50, version: 1 },
     { assignmentId: "assignment-b", enrollmentId: "enrollment-b", email: "bea@example.test", firstName: "Bea",
       lastName: "Prueba", status: "COMPLETED", responseText: "Listo", submittedAt: null,
-      reviewComment: null, reviewedAt: null, version: 1 },
+      reviewComment: null, reviewedAt: null, surveyStatus: "COMPLETED", completionPercentage: 100, version: 1 },
   ] };
 
 beforeEach(() => {

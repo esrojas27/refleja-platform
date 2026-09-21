@@ -282,8 +282,11 @@ function ReviewQueue({ organizationId, programId, activities, onReviewed }: {
   onReviewed: (activityId: string, assignee: ActivityAssignee) => void;
 }) {
   const queue = useMemo(() => activities.flatMap(activity => activity.assignees
-    .filter(assignee => assignee.status === "SUBMITTED")
+    .filter(assignee => assignee.status === "SUBMITTED"
+      && (assignee.surveyStatus === "NOT_REQUIRED" || assignee.surveyStatus === "COMPLETED"))
     .map(assignee => ({ activity, assignee }))), [activities]);
+  const waitingForSurvey = useMemo(() => activities.flatMap(activity => activity.assignees)
+    .filter(assignee => assignee.status === "SUBMITTED" && assignee.surveyStatus === "PENDING").length, [activities]);
   const [open, setOpen] = useState(false);
   const [leaving, setLeaving] = useState(false);
 
@@ -306,7 +309,9 @@ function ReviewQueue({ organizationId, programId, activities, onReviewed }: {
     </div>
     {queue.length === 0 ? <div className="mt-5 flex items-center gap-3 rounded-2xl border border-border/70 bg-background/70 px-4 py-4 text-sm text-muted-foreground">
       <CheckCircle2 aria-hidden="true" className="size-5 shrink-0 text-primary" />
-      <p>No hay actividades pendientes por revisar.</p>
+      <p>{waitingForSurvey > 0
+        ? `No hay actividades listas para revisar. ${waitingForSurvey} ${waitingForSurvey === 1 ? "entrega espera" : "entregas esperan"} que se complete la encuesta.`
+        : "No hay actividades pendientes por revisar."}</p>
     </div> : !open ? <p className="mt-4 text-sm text-muted-foreground">
       Tienes {queue.length} {queue.length === 1 ? "respuesta pendiente" : "respuestas pendientes"}. Revísalas una por una.
     </p> : <div className="mt-5 overflow-hidden">
@@ -379,7 +384,9 @@ function assignmentSummary(activity: ProgramActivity) {
   const labels: Record<ActivityAssignee["status"], string> = {
     ASSIGNED: "Pendientes", SUBMITTED: "En revisión", CHANGES_REQUESTED: "Con cambios", COMPLETED: "Completadas",
   };
-  return (Object.keys(labels) as ActivityAssignee["status"][]).map(status => ({
+  const workflow = (Object.keys(labels) as ActivityAssignee["status"][]).map(status => ({
     label: labels[status], count: activity.assignees.filter(assignee => assignee.status === status).length,
   })).filter(item => item.count > 0);
+  const pendingSurveys = activity.assignees.filter(assignee => assignee.surveyStatus === "PENDING").length;
+  return pendingSurveys ? [...workflow, { label: "Encuestas pendientes", count: pendingSurveys }] : workflow;
 }

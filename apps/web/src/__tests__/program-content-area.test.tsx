@@ -4,6 +4,7 @@ import { DimensionForm, ProgramContentArea, SessionForm } from "@/components/pro
 import { fetchCurrentIdentity } from "@/lib/auth/authenticated-api";
 import { listEnrollments } from "@/lib/participation/participation-api";
 import { createProgramActivity, listProgramActivities, type ProgramActivity } from "@/lib/participation/activity-api";
+import { createActivityEvaluation, listActivityEvaluations } from "@/lib/participation/evaluation-api";
 import { createProgramDimension, createProgramSession, listProgramDimensions, type ProgramDimension } from "@/lib/programs/program-content-api";
 
 vi.mock("@/lib/auth/authenticated-api", async original => ({
@@ -19,6 +20,10 @@ vi.mock("@/lib/participation/participation-api", async original => ({
 vi.mock("@/lib/participation/activity-api", async original => ({
   ...await original<typeof import("@/lib/participation/activity-api")>(),
   createProgramActivity: vi.fn(), listProgramActivities: vi.fn(),
+}));
+vi.mock("@/lib/participation/evaluation-api", async original => ({
+  ...await original<typeof import("@/lib/participation/evaluation-api")>(),
+  createActivityEvaluation: vi.fn(), listActivityEvaluations: vi.fn(),
 }));
 
 const identity = { cognitoSubject: "subject", user: { id: "user", email: "consultant@example.test", firstName: null, lastName: null },
@@ -38,8 +43,12 @@ beforeEach(() => {
   vi.mocked(createProgramDimension).mockResolvedValue({ ...dimensionData, id: "new-module", position: 3, sessions: [] });
   vi.mocked(createProgramSession).mockResolvedValue({ ...dimensionData.sessions[0], id: "new-session", position: 4 });
   vi.mocked(listProgramActivities).mockResolvedValue({ items: [activity] });
+  vi.mocked(listActivityEvaluations).mockResolvedValue({ items: [] });
   vi.mocked(listEnrollments).mockResolvedValue({ items: [], page: 0, size: 100, totalElements: 0, totalPages: 0 });
   vi.mocked(createProgramActivity).mockResolvedValue({ ...activity, id: "new-activity", position: 2 });
+  vi.mocked(createActivityEvaluation).mockResolvedValue({ id: "evaluation-a", organizationId: "org-a",
+    programId: "program-a", activityId: "activity-a", title: "Encuesta de cierre", instructions: null, version: 0,
+    questions: [{ id: "question-a", prompt: "¿Qué tan de acuerdo estás?", type: "AGREEMENT_SCALE", position: 1, version: 0 }] });
 });
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 
@@ -82,6 +91,43 @@ it("appends sessions inside their module using the next visible position", async
   fireEvent.submit(form);
   await waitFor(() => expect(createProgramSession).toHaveBeenCalledWith("org-a", "program-a", "module-a",
     { name: "Segunda sesión", objective: "Practicar lo aprendido", scheduledDate: "2026-10-08", position: 4 }, expect.any(AbortSignal)));
+});
+
+it("creates a visual post-activity evaluation with the four supported question types", async () => {
+  render(<ProgramContentArea organizationId="org-a" programId="program-a" />);
+  fireEvent.click(await screen.findByRole("button", { name: /Fundamentos/ }));
+  fireEvent.click(screen.getByRole("button", { name: /Sesión inicial/ }));
+  fireEvent.click(await screen.findByRole("button", { name: "Crear encuesta" }));
+  const form = await screen.findByRole("form", { name: "Crear encuesta" });
+  expect(screen.getByRole("dialog", { name: "Crear encuesta" })).toBeTruthy();
+
+  fireEvent.change(within(form).getByLabelText("Enunciado"), { target: { value: "¿Qué tan de acuerdo estás?" } });
+  const add = within(form).getByRole("button", { name: "Agregar pregunta" });
+  fireEvent.click(add); fireEvent.click(add); fireEvent.click(add);
+  const prompts = within(form).getAllByLabelText("Enunciado");
+  const types = within(form).getAllByLabelText("Tipo de respuesta");
+  expect(Boolean(prompts[3].compareDocumentPosition(add) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+  fireEvent.change(prompts[1], { target: { value: "¿Qué tan probable es que lo apliques?" } });
+  fireEvent.change(types[1], { target: { value: "LIKELIHOOD_SCALE" } });
+  fireEvent.change(prompts[2], { target: { value: "¿Qué te llevas?" } });
+  fireEvent.change(types[2], { target: { value: "OPEN_TEXT" } });
+  fireEvent.change(prompts[3], { target: { value: "¿Cómo te sentiste?" } });
+  fireEvent.change(types[3], { target: { value: "EMOTION_MULTI_SELECT" } });
+
+  expect(within(form).getByText("Totalmente en desacuerdo")).toBeTruthy();
+  expect(within(form).getByText("Muy probable")).toBeTruthy();
+  expect(within(form).getByPlaceholderText("El colaborador escribirá aquí su respuesta")).toBeTruthy();
+  expect(within(form).getByText("Inspirado(a)")).toBeTruthy();
+  expect(within(form).getByText("Máximo 2")).toBeTruthy();
+  fireEvent.submit(form);
+
+  await waitFor(() => expect(createActivityEvaluation).toHaveBeenCalledWith("org-a", "program-a", "activity-a",
+    expect.objectContaining({ questions: [
+      { prompt: "¿Qué tan de acuerdo estás?", type: "AGREEMENT_SCALE", position: 1 },
+      { prompt: "¿Qué tan probable es que lo apliques?", type: "LIKELIHOOD_SCALE", position: 2 },
+      { prompt: "¿Qué te llevas?", type: "OPEN_TEXT", position: 3 },
+      { prompt: "¿Cómo te sentiste?", type: "EMOTION_MULTI_SELECT", position: 4 },
+    ] }), expect.any(AbortSignal)));
 });
 
 it("does not expose content or forms to a non-consultant", async () => {

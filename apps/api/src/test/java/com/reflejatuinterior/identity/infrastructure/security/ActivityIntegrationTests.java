@@ -183,6 +183,76 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 "select count(*) from rti.activity_assignments where activity_id=?", Long.class, activityId)).isZero();
     }
 
+    @Test void consultantCreatesAndListsAnEvaluationWithEverySupportedQuestionType() throws Exception {
+        var activityResponse = mvc.perform(post(consultantPath()).header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(allBody()))
+                .andExpect(status().isCreated()).andReturn().getResponse();
+        var activityTree = json.readTree(activityResponse.getContentAsString());
+        var activityId = UUID.fromString(activityTree.path("id").asText());
+        var collaboratorAssignment = java.util.stream.StreamSupport.stream(
+                activityTree.path("assignees").spliterator(), false)
+                .filter(item -> item.path("enrollmentId").asText().equals(enrollment.toString()))
+                .findFirst().orElseThrow();
+        var assignmentId = UUID.fromString(collaboratorAssignment.path("assignmentId").asText());
+        var evaluationBody = """
+                {"title":"Encuesta de cierre","instructions":"Responde desde tu experiencia.","questions":[
+                  {"prompt":"¿Qué tan de acuerdo estás?","type":"AGREEMENT_SCALE","position":1},
+                  {"prompt":"¿Qué tan probable es que lo apliques?","type":"LIKELIHOOD_SCALE","position":2},
+                  {"prompt":"¿Qué te llevas de la actividad?","type":"OPEN_TEXT","position":3},
+                  {"prompt":"¿Cómo te sentiste?","type":"EMOTION_MULTI_SELECT","position":4}
+                ]}
+                """;
+
+        var evaluationResponse = mvc.perform(post(evaluationPath(activityId)).header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(evaluationBody))
+                .andExpect(status().isCreated()).andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.activityId").value(activityId.toString()))
+                .andExpect(jsonPath("$.questions.length()").value(4))
+                .andExpect(jsonPath("$.questions[0].type").value("AGREEMENT_SCALE"))
+                .andExpect(jsonPath("$.questions[3].type").value("EMOTION_MULTI_SELECT"))
+                .andReturn().getResponse();
+        var evaluationTree = json.readTree(evaluationResponse.getContentAsString());
+
+        mvc.perform(get(evaluationsPath()).header("Authorization", token(consultant)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].title").value("Encuesta de cierre"));
+        mvc.perform(get(evaluationsPath()).header("Authorization", token(collaborator)))
+                .andExpect(status().isForbidden());
+        mvc.perform(post(surveyResponsePath(activityId)).header("Authorization", token(collaborator))
+                .contentType(MediaType.APPLICATION_JSON).content(surveyResponseBody(evaluationTree)))
+                .andExpect(status().isConflict());
+
+        mvc.perform(post(collaboratorPath() + "/" + activityId + "/submission")
+                .header("Authorization", token(collaborator)).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"responseText\":\"Mi reflexión para la encuesta.\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.assignmentStatus").value("SUBMITTED"))
+                .andExpect(jsonPath("$.survey.status").value("PENDING"))
+                .andExpect(jsonPath("$.completionPercentage").value(50));
+
+        mvc.perform(post(reviewPath(activityId, assignmentId)).header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"decision\":\"APPROVE\",\"comment\":\"Buen trabajo.\"}"))
+                .andExpect(status().isConflict());
+
+        mvc.perform(post(surveyResponsePath(activityId)).header("Authorization", token(collaborator))
+                .contentType(MediaType.APPLICATION_JSON).content(surveyResponseBody(evaluationTree)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("COMPLETED"));
+        mvc.perform(post(surveyResponsePath(activityId)).header("Authorization", token(collaborator))
+                .contentType(MediaType.APPLICATION_JSON).content(surveyResponseBody(evaluationTree)))
+                .andExpect(status().isConflict());
+
+        mvc.perform(get(collaboratorPath()).header("Authorization", token(collaborator)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].survey.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.items[0].completionPercentage").value(100));
+        mvc.perform(post(reviewPath(activityId, assignmentId)).header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"decision\":\"APPROVE\",\"comment\":\"Buen trabajo.\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("COMPLETED"));
+        mvc.perform(post(evaluationPath(activityId)).header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(evaluationBody))
+                .andExpect(status().isConflict());
+    }
+
     @Test void requiresAuthenticationAndDoesNotExposeUnknownSessions() throws Exception {
         mvc.perform(get(consultantPath())).andExpect(status().isUnauthorized());
         mvc.perform(get(collaboratorPath())).andExpect(status().isUnauthorized());
@@ -196,6 +266,15 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
         return "/api/v1/organizations/" + organization + "/programs/" + program + "/activities";
     }
     private String collaboratorPath() { return "/api/v1/me/programs/" + program + "/activities"; }
+    private String evaluationsPath() {
+        return "/api/v1/organizations/" + organization + "/programs/" + program + "/evaluations";
+    }
+    private String evaluationPath(UUID activityId) {
+        return consultantPath() + "/" + activityId + "/evaluation";
+    }
+    private String surveyResponsePath(UUID activityId) {
+        return collaboratorPath() + "/" + activityId + "/survey-response";
+    }
     private String reviewPath(UUID activityId, UUID assignmentId) {
         return consultantPath() + "/" + activityId + "/assignments/" + assignmentId + "/review";
     }
@@ -211,6 +290,13 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
         return "{\"sessionId\":\"" + session + "\",\"title\":\"Reflexión general\","
                 + "\"instructions\":\"Describe tu avance.\",\"youtubeUrl\":null,\"dueDate\":\"2026-10-08\","
                 + "\"position\":1,\"assignToAll\":true,\"enrollmentIds\":[]}";
+    }
+    private String surveyResponseBody(tools.jackson.databind.JsonNode evaluation) {
+        return "{\"answers\":["
+                + "{\"questionId\":\"" + evaluation.path("questions").get(0).path("id").asText() + "\",\"values\":[\"4\"]},"
+                + "{\"questionId\":\"" + evaluation.path("questions").get(1).path("id").asText() + "\",\"values\":[\"5\"]},"
+                + "{\"questionId\":\"" + evaluation.path("questions").get(2).path("id").asText() + "\",\"values\":[\"Aprendí a reconocer mis fortalezas.\"]},"
+                + "{\"questionId\":\"" + evaluation.path("questions").get(3).path("id").asText() + "\",\"values\":[\"Inspirado(a)\",\"Reflexivo(a)\"]}]}";
     }
     private String token(UUID userId) {
         var now = Instant.now();

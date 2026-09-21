@@ -14,9 +14,10 @@ export function CollaboratorProgressOverview({ activities }: { activities: Assig
     <div>
       <p className="rti-kicker">Tu avance</p>
       <h2 id="collaborator-progress-title" className="mt-2 text-2xl font-semibold">Progreso del programa</h2>
-      <p className="mt-2 text-sm text-muted-foreground">Cada actividad aprobada hace avanzar tu recorrido.</p>
+      <p className="mt-2 text-sm text-muted-foreground">Cada entrega aporta 50% y su encuesta completa el 50% restante.</p>
     </div>
-    <ProgressSummaryCard progress={progress} subject="Tu progreso general" />
+    <ProgressSummaryCard progress={progress} subject="Tu progreso general"
+      detail="El porcentaje refleja las entregas y encuestas completadas." />
     {progress.total > 0 && <ProgressBreakdown dimensions={progress.dimensions} />}
   </section>;
 }
@@ -24,7 +25,8 @@ export function CollaboratorProgressOverview({ activities }: { activities: Assig
 export function ConsultantProgressOverview({ activities }: { activities: ProgramActivity[] }) {
   const progress = consultantProgress(activities);
   return <div className="space-y-8">
-    <ProgressSummaryCard progress={progress.program} subject="Progreso general del programa" />
+    <ProgressSummaryCard progress={progress.program} subject="Progreso general del programa"
+      detail={`${progress.program.completed} de ${progress.program.total} actividades aprobadas.`} />
     {progress.program.total > 0 && <>
       <section aria-labelledby="participant-progress-title">
         <div className="flex flex-wrap items-end justify-between gap-3">
@@ -52,9 +54,10 @@ export function ConsultantProgressOverview({ activities }: { activities: Program
   </div>;
 }
 
-export function ActivityStatusBadges({ status, dueDate }: {
+export function ActivityStatusBadges({ status, dueDate, surveyStatus }: {
   status: ActivityAssignmentStatus;
   dueDate: string;
+  surveyStatus?: "LOCKED" | "PENDING" | "COMPLETED";
 }) {
   const styles = {
     ASSIGNED: "bg-amber-100 text-amber-900",
@@ -64,12 +67,18 @@ export function ActivityStatusBadges({ status, dueDate }: {
   }[status];
   return <div className="flex flex-wrap justify-end gap-2" aria-label="Estado de la actividad">
     <span className={`rounded-full px-3 py-1 text-xs font-semibold ${styles}`}>{activityStatusLabel(status)}</span>
+    {surveyStatus === "PENDING" &&
+      <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-900">Encuesta pendiente</span>}
+    {surveyStatus === "COMPLETED" &&
+      <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-900">Encuesta lista</span>}
     {isActivityOverdue(dueDate, status) &&
       <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-900">Vencida</span>}
   </div>;
 }
 
-function ProgressSummaryCard({ progress, subject }: { progress: ProgressSummary; subject: string }) {
+function ProgressSummaryCard({ progress, subject, detail }: {
+  progress: ProgressSummary; subject: string; detail: string;
+}) {
   return <div className="overflow-hidden rounded-3xl border border-primary/15 bg-gradient-to-br from-primary/10 via-card to-accent/35 p-5 sm:p-7">
     <div className="grid gap-6 lg:grid-cols-[12rem_minmax(0,1fr)] lg:items-center">
       <div className="mx-auto flex size-40 items-center justify-center rounded-full p-3"
@@ -81,7 +90,7 @@ function ProgressSummaryCard({ progress, subject }: { progress: ProgressSummary;
       </div>
       <div>
         <h3 className="text-xl font-semibold">{subject}</h3>
-        <p className="mt-2 text-sm text-muted-foreground">{progress.completed} de {progress.total} actividades aprobadas.</p>
+        <p className="mt-2 text-sm text-muted-foreground">{detail}</p>
         <ProgressMeter progress={progress} />
         <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
           <Metric label="Pendientes" value={progress.pending} tone="amber" />

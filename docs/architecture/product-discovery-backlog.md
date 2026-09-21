@@ -125,6 +125,20 @@ y presenta vencimiento como alerta derivada adicional. Incluye resumen de progra
 dimensión y sesión para el colaborador, además de una vista operativa por persona
 para el consultor. No incluye evaluaciones, ponderaciones ni notificaciones.
 
+### Encuestas posteriores a actividades — fundación local 2026-09-20
+
+El consultor puede crear una encuesta directamente dentro de cada actividad del
+acordeón de contenido. Se soportan escalas de acuerdo, escalas de probabilidad,
+respuesta abierta y selección de máximo dos emociones. La interfaz previsualiza
+cómo verá cada tipo de respuesta el colaborador. Las definiciones y preguntas
+quedan persistidas y aisladas por organización, incluso antes de inscribir
+participantes.
+
+Extensión local del 2026-09-21: el colaborador responde la encuesta después de enviar
+su actividad. La entrega representa 50% del avance y la encuesta el 50% restante; una
+encuesta pendiente persiste entre sesiones y bloquea la entrada de la entrega a la
+bandeja de revisión. Queda pendiente la consulta agregada de resultados.
+
 ## Secuencia propuesta de incrementos
 
 La numeración oficial debe asignarse al convertir cada bloque en ticket.

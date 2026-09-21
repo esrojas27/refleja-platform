@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchAuthSession } from "aws-amplify/auth";
 import { createProgramActivity, listMyProgramActivities, listProgramActivities,
-  isYoutubeVideoUrl, reviewActivityAssignment, submitMyActivity } from "@/lib/participation/activity-api";
+  isYoutubeVideoUrl, reviewActivityAssignment, submitMyActivity,
+  submitMyActivitySurvey } from "@/lib/participation/activity-api";
 
 vi.mock("aws-amplify/auth", () => ({ fetchAuthSession: vi.fn() }));
 const session = { tokens: { accessToken: { toString: () => "activity-access" } } };
@@ -39,15 +40,20 @@ describe("activity API", () => {
   it("uses self-service submission and tenant-scoped review commands", async () => {
     const fetcher = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ assignmentStatus: "SUBMITTED" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status: "COMPLETED" }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ status: "COMPLETED" }), { status: 200 }));
     vi.stubGlobal("fetch", fetcher);
     await submitMyActivity("program/a", "activity a", "Mi respuesta");
+    await submitMyActivitySurvey("program/a", "activity a", [{ questionId: "question/a", values: ["5"] }]);
     await reviewActivityAssignment("org a", "program/a", "activity a", "assignment/a",
       { decision: "APPROVE", comment: "Buen trabajo" });
     expect(fetcher.mock.calls[0][0]).toBe("http://localhost:8082/api/v1/me/programs/program%2Fa/activities/activity%20a/submission");
     expect(fetcher.mock.calls[0][1]).toEqual(expect.objectContaining({ method: "POST",
       body: JSON.stringify({ responseText: "Mi respuesta" }) }));
-    expect(fetcher.mock.calls[1][0]).toBe("http://localhost:8082/api/v1/organizations/org%20a/programs/program%2Fa/activities/activity%20a/assignments/assignment%2Fa/review");
+    expect(fetcher.mock.calls[1][0]).toBe("http://localhost:8082/api/v1/me/programs/program%2Fa/activities/activity%20a/survey-response");
+    expect(fetcher.mock.calls[1][1]).toEqual(expect.objectContaining({ method: "POST",
+      body: JSON.stringify({ answers: [{ questionId: "question/a", values: ["5"] }] }) }));
+    expect(fetcher.mock.calls[2][0]).toBe("http://localhost:8082/api/v1/organizations/org%20a/programs/program%2Fa/activities/activity%20a/assignments/assignment%2Fa/review");
   });
 
   it("derives collaborator ownership exclusively from the access token", async () => {

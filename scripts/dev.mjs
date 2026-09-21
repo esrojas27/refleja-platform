@@ -16,6 +16,18 @@ const logStreams = [];
 let stopping = false;
 let secrets = [];
 
+// Keep local Maven and Spring Boot JVMs from sizing themselves against all host
+// memory. On Windows that can exhaust the page-file commit limit before the API
+// has even started, especially while Docker and the frontend are also running.
+const defaultLocalJavaOptions = [
+  '-Xms32m',
+  '-Xmx384m',
+  '-Xss512k',
+  '-XX:+UseSerialGC',
+  '-XX:MaxMetaspaceSize=256m',
+  '-XX:ReservedCodeCacheSize=64m',
+].join(' ');
+
 export function redact(text, values = []) {
   let result = String(text);
   for (const value of values.filter(Boolean).sort((a, b) => b.length - a.length)) {
@@ -309,7 +321,9 @@ async function main() {
     const apiOrigin = `http://localhost:${apiPort}`;
     const dbUrl = `jdbc:postgresql://127.0.0.1:${dbPort}/${dbName}`;
     const invitations = invitationEnvironment(backend, auth.publicEnv);
-    const apiEnv = { ...process.env, DB_URL: dbUrl, DB_USERNAME: 'rti_app', DB_PASSWORD: backend.RTI_APP_PASSWORD,
+    const apiEnv = { ...process.env,
+      JAVA_TOOL_OPTIONS: process.env.RTI_DEV_JAVA_TOOL_OPTIONS?.trim() || defaultLocalJavaOptions,
+      DB_URL: dbUrl, DB_USERNAME: 'rti_app', DB_PASSWORD: backend.RTI_APP_PASSWORD,
       DB_MIGRATION_URL: dbUrl, DB_MIGRATION_USERNAME: 'rti_migrator', DB_MIGRATION_PASSWORD: backend.RTI_MIGRATOR_PASSWORD,
       COGNITO_ISSUER_URI: backend.COGNITO_ISSUER_URI, COGNITO_JWK_SET_URI: backend.COGNITO_JWK_SET_URI,
       COGNITO_APP_CLIENT_ID: backend.COGNITO_APP_CLIENT_ID, CORS_ALLOWED_ORIGINS: auth.origin,

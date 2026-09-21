@@ -50,6 +50,7 @@ class ActuatorHealthSecurityConfiguration {
                                 "/api/v1/organizations/{organizationId}/programs/{programId}",
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/modules",
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/disc-profiles",
+                                "/api/v1/organizations/{organizationId}/programs/{programId}/evaluations",
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/activities").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/organizations/{organizationId}/programs/{programId}/enrollments",
                                 "/api/v1/invitations").authenticated()
@@ -58,7 +59,9 @@ class ActuatorHealthSecurityConfiguration {
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/modules",
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/modules/{moduleId}/sessions",
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/activities",
+                                "/api/v1/organizations/{organizationId}/programs/{programId}/activities/{activityId}/evaluation",
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/activities/{activityId}/assignments/{assignmentId}/review",
+                                "/api/v1/me/programs/{programId}/activities/{activityId}/survey-response",
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/enrollments/{enrollmentId}/invitation-delivery",
                                 "/api/v1/invitations/{invitationId}/accept",
                                 "/api/v1/me/programs/{programId}/activities/{activityId}/submission").authenticated()

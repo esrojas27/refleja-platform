@@ -1,23 +1,26 @@
 "use client";
 
-import { ChevronDown, Plus } from "lucide-react";
+import { BarChart3, ChevronDown, Plus } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import { fetchCurrentIdentity, IdentityRequestError } from "@/lib/auth/authenticated-api";
 import { listEnrollments, ParticipationRequestError, type Enrollment } from "@/lib/participation/participation-api";
 import { ActivityRequestError, listProgramActivities, type ProgramActivity } from "@/lib/participation/activity-api";
+import { EvaluationRequestError, listActivityEvaluations, type ActivityEvaluation } from "@/lib/participation/evaluation-api";
 import {
   createProgramDimension, createProgramSession, listProgramDimensions, programContentErrorMessage,
   ProgramContentRequestError, type ProgramDimension, type ProgramDimensionInput, type ProgramSession,
   type ProgramSessionInput,
 } from "@/lib/programs/program-content-api";
 import { ActivityForm } from "@/components/programs/program-activity-area";
+import { ActivityEvaluationForm } from "@/components/programs/activity-evaluation-form";
 import { ProgramModal } from "@/components/programs/program-modal";
 
 type ContentDialog = { kind: "dimension" }
   | { kind: "session"; dimension: ProgramDimension }
-  | { kind: "activity"; dimensionName: string; session: ProgramSession };
+  | { kind: "activity"; dimensionName: string; session: ProgramSession }
+  | { kind: "evaluation"; activity: ProgramActivity };
 
 export function ProgramContentArea({ organizationId, programId }: { organizationId: string; programId: string }) {
   return <ProgramContent key={`${organizationId}/${programId}`} organizationId={organizationId} programId={programId} />;
@@ -26,6 +29,7 @@ export function ProgramContentArea({ organizationId, programId }: { organization
 function ProgramContent({ organizationId, programId }: { organizationId: string; programId: string }) {
   const [dimensions, setDimensions] = useState<ProgramDimension[]>();
   const [activities, setActivities] = useState<ProgramActivity[]>();
+  const [evaluations, setEvaluations] = useState<ActivityEvaluation[]>();
   const [enrollments, setEnrollments] = useState<Enrollment[]>();
   const [attempt, setAttempt] = useState(0);
   const [pending, setPending] = useState(true);
@@ -45,20 +49,23 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
           setMessage("Sólo un consultor autorizado puede gestionar el contenido.");
           return;
         }
-        const [structure, activityList, enrollmentPage] = await Promise.all([
+        const [structure, activityList, evaluationList, enrollmentPage] = await Promise.all([
           listProgramDimensions(organizationId, programId, controller.signal),
           listProgramActivities(organizationId, programId, controller.signal),
+          listActivityEvaluations(organizationId, programId, controller.signal),
           listEnrollments(organizationId, programId, 0, controller.signal, 100),
         ]);
         if (!controller.signal.aborted) {
           setDimensions(structure.items);
           setActivities(activityList.items);
+          setEvaluations(evaluationList.items);
           setEnrollments(enrollmentPage.items.filter(enrollment => enrollment.status === "ACTIVE"));
           setMessage(structure.items.length ? "" : "Este programa todavía no tiene dimensiones.");
         }
       } catch (error) {
         if (!controller.signal.aborted) {
           const status = error instanceof IdentityRequestError || error instanceof ActivityRequestError
+            || error instanceof EvaluationRequestError
             || error instanceof ParticipationRequestError ? error.status : undefined;
           setMessage(programContentErrorMessage(status === undefined ? error : new ProgramContentRequestError(status)));
         }
@@ -79,17 +86,13 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
   }, [activities]);
 
   function refresh(saved: string) {
-    setDimensions(undefined); setActivities(undefined); setEnrollments(undefined);
+    setDimensions(undefined); setActivities(undefined); setEvaluations(undefined); setEnrollments(undefined);
     setPending(true); setMessage("Actualizando contenido…"); setNotice(saved);
     setAttempt(value => value + 1);
   }
 
-  function toggleDimension(dimensionId: string) {
-    setOpenDimensionId(current => current === dimensionId ? undefined : dimensionId);
-    setOpenSessionId(undefined);
-  }
-
-  const ready = dimensions !== undefined && activities !== undefined && enrollments !== undefined;
+  const ready = dimensions !== undefined && activities !== undefined && evaluations !== undefined
+    && enrollments !== undefined;
   const nextDimensionPosition = dimensions ? Math.max(0, ...dimensions.map(dimension => dimension.position)) + 1 : 1;
 
   return <section className="rti-surface mx-auto w-full max-w-6xl p-6 sm:p-8 lg:p-10">
@@ -164,8 +167,9 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
                       </button>
                     </div>
                     {sessionActivities.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">Esta sesión todavía no tiene actividades.</p>
-                      : <ol className="mt-3 grid gap-3 lg:grid-cols-2">{sessionActivities.map(activity => <li key={activity.id}
-                        className="rounded-xl border border-border/70 bg-background/70 p-4">
+                      : <ol className="mt-3 grid gap-3 lg:grid-cols-2">{sessionActivities.map(activity => {
+                        const evaluation = evaluations?.find(item => item.activityId === activity.id);
+                        return <li key={activity.id} className="rounded-xl border border-border/70 bg-background/70 p-4">
                         <p className="rti-kicker">Actividad {activity.position}</p>
                         <p className="mt-2 font-semibold">{activity.title}</p>
                         <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{activity.instructions}</p>
@@ -173,7 +177,18 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
                         <p className="mt-1 text-xs font-medium text-muted-foreground">Asignaciones: {activity.assignees.length}</p>
                         {activity.youtubeUrl && <a href={activity.youtubeUrl} target="_blank" rel="noopener noreferrer"
                           className="rti-link mt-3 inline-block text-sm">Ver video en YouTube</a>}
-                      </li>)}</ol>}
+                        {evaluation ? <div className="mt-4 rounded-xl border border-primary/20 bg-accent/35 p-3">
+                          <div className="flex items-center gap-2"><BarChart3 aria-hidden="true" className="size-4 text-primary" />
+                            <p className="text-sm font-semibold">{evaluation.title}</p></div>
+                          <p className="mt-1 text-xs text-muted-foreground">{evaluation.questions.length} {evaluation.questions.length === 1 ? "pregunta" : "preguntas"}</p>
+                          <ol className="mt-2 space-y-1">{evaluation.questions.map(question => <li key={question.id}
+                            className="text-xs text-muted-foreground">{question.position}. {question.prompt}</li>)}</ol>
+                        </div> : <button type="button" className="rti-button-secondary mt-4 w-full"
+                          onClick={() => setDialog({ kind: "evaluation", activity })}>
+                          <BarChart3 aria-hidden="true" className="size-4" />Crear encuesta
+                        </button>}
+                      </li>;
+                      })}</ol>}
                   </div>}
                 </li>;
               })}</ol>}
@@ -201,6 +216,12 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
         onSaved={saved => { setDialog(null); refresh(saved.assignees.length
           ? `Actividad creada y asignada a ${saved.assignees.length} colaborador${saved.assignees.length === 1 ? "" : "es"}.`
           : "Actividad creada sin asignaciones."); }} />
+    </ProgramModal>}
+    {dialog?.kind === "evaluation" && <ProgramModal titleId="create-evaluation-title"
+      closeLabel="Cerrar creación de encuesta" onClose={() => setDialog(null)}>
+      <ActivityEvaluationForm organizationId={organizationId} programId={programId}
+        activityId={dialog.activity.id} activityTitle={dialog.activity.title}
+        onSaved={saved => { setDialog(null); refresh(`Encuesta “${saved.title}” creada.`); }} />
     </ProgramModal>}
 
     <button className="rti-button-secondary mt-6" disabled={pending} onClick={() => refresh("")}>Actualizar contenido</button>

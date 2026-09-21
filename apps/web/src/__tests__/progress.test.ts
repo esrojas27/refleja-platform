@@ -13,10 +13,12 @@ describe("progress calculation", () => {
   it("derives collaborator totals and groups without persisting percentages", () => {
     const activities: AssignedActivity[] = [
       { ...base, assignmentId: "one", assignmentStatus: "COMPLETED", responseText: "Lista",
-        submittedAt: null, reviewComment: null, reviewedAt: null, assignmentVersion: 1 },
+        submittedAt: null, reviewComment: null, reviewedAt: null, assignmentVersion: 1,
+        survey: null, completionPercentage: 100 },
       { ...base, id: "activity-b", sessionId: "session-b", sessionName: "Propósito", dueDate: "2026-09-18",
         assignmentId: "two", assignmentStatus: "ASSIGNED", responseText: null,
-        submittedAt: null, reviewComment: null, reviewedAt: null, assignmentVersion: 0 },
+        submittedAt: null, reviewComment: null, reviewedAt: null, assignmentVersion: 0,
+        survey: null, completionPercentage: 0 },
     ];
 
     const progress = collaboratorProgress(activities, "2026-09-20");
@@ -29,10 +31,10 @@ describe("progress calculation", () => {
     const activities: ProgramActivity[] = [{ ...base, assignees: [
       { assignmentId: "one", enrollmentId: "enrollment-a", email: "ana@example.test", firstName: "Ana",
         lastName: null, status: "SUBMITTED", responseText: "Lista", submittedAt: null,
-        reviewComment: null, reviewedAt: null, version: 1 },
+        reviewComment: null, reviewedAt: null, surveyStatus: "NOT_REQUIRED", completionPercentage: 100, version: 1 },
       { assignmentId: "two", enrollmentId: "enrollment-b", email: "bea@example.test", firstName: "Bea",
         lastName: null, status: "COMPLETED", responseText: "Lista", submittedAt: null,
-        reviewComment: null, reviewedAt: null, version: 1 },
+        reviewComment: null, reviewedAt: null, surveyStatus: "NOT_REQUIRED", completionPercentage: 100, version: 1 },
     ] }];
 
     const progress = consultantProgress(activities, "2026-09-20");

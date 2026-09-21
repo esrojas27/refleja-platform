@@ -31,7 +31,8 @@ const activity: ProgramActivity = { id: "activity-a", organizationId: "org-a", p
   youtubeUrl: "https://youtu.be/dQw4w9WgXcQ", dueDate: "2026-10-08",
   position: 1, version: 0, assignees: [{ assignmentId: "assignment-a", enrollmentId: "enrollment-a",
     email: "ana@example.test", firstName: "Ana", lastName: "Prueba", status: "SUBMITTED", responseText: "Mi avance",
-    submittedAt: "2026-10-07T12:00:00Z", reviewComment: null, reviewedAt: null, version: 1 }] };
+    submittedAt: "2026-10-07T12:00:00Z", reviewComment: null, reviewedAt: null,
+    surveyStatus: "COMPLETED", completionPercentage: 100, version: 1 }] };
 
 beforeEach(() => {
   vi.mocked(fetchCurrentIdentity).mockResolvedValue(identity);
@@ -142,6 +143,16 @@ it("states clearly when the review queue is empty", async () => {
   render(<ProgramActivityArea organizationId="org-a" programId="program-a" />);
   expect(await screen.findByText("No hay actividades pendientes por revisar.")).toBeTruthy();
   expect(screen.queryByRole("button", { name: /Revisar actividades \(/ })).toBeNull();
+});
+
+it("keeps a submitted activity out of review until its survey is complete", async () => {
+  vi.mocked(listProgramActivities).mockResolvedValue({ items: [{ ...activity, assignees: [{
+    ...activity.assignees[0], surveyStatus: "PENDING", completionPercentage: 50,
+  }] }] });
+  render(<ProgramActivityArea organizationId="org-a" programId="program-a" />);
+  expect(await screen.findByText(/1 entrega espera que se complete la encuesta/)).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /Revisar actividades \(/ })).toBeNull();
+  expect(screen.getByText("Encuestas pendientes: 1")).toBeTruthy();
 });
 
 it("does not expose management data to a non-consultant", async () => {

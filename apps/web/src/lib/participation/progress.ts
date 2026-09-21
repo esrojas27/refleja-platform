@@ -48,6 +48,7 @@ type ProgressItem = {
   sessionName: string;
   dueDate: string;
   status: ActivityAssignmentStatus;
+  completionPercentage?: number;
 };
 
 type ParticipantItem = ProgressItem & {
@@ -82,6 +83,7 @@ export function collaboratorProgress(
     sessionName: activity.sessionName,
     dueDate: activity.dueDate,
     status: activity.assignmentStatus,
+    completionPercentage: activity.completionPercentage,
   })), today);
 }
 
@@ -154,7 +156,9 @@ function summary(items: ProgressItem[], today: string): ProgressSummary {
     if (item.status === "COMPLETED") counts.completed += 1;
     if (isActivityOverdue(item.dueDate, item.status, today)) counts.overdue += 1;
   }
-  return { ...counts, percentage: counts.total ? Math.round((counts.completed / counts.total) * 100) : 0 };
+  const earned = items.reduce((total, item) => total
+    + (item.completionPercentage ?? (item.status === "COMPLETED" ? 100 : 0)), 0);
+  return { ...counts, percentage: counts.total ? Math.round(earned / counts.total) : 0 };
 }
 
 export function activityStatusLabel(status: ActivityAssignmentStatus) {

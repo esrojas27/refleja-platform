@@ -1,10 +1,19 @@
 import { fetchAuthSession } from "aws-amplify/auth";
 import { programsPath } from "@/lib/programs/program-api";
+import type { EvaluationQuestionType } from "@/lib/participation/evaluation-api";
+
+export type ActivitySurveyStatus = "LOCKED" | "PENDING" | "COMPLETED";
+export type ActivitySurvey = {
+  id: string; title: string; instructions: string | null; status: ActivitySurveyStatus;
+  completedAt: string | null;
+  questions: Array<{ id: string; prompt: string; type: EvaluationQuestionType; position: number }>;
+};
 
 export type ActivityAssignee = {
   assignmentId: string; enrollmentId: string; email: string; firstName: string | null; lastName: string | null;
   status: ActivityAssignmentStatus; responseText: string | null; submittedAt: string | null;
-  reviewComment: string | null; reviewedAt: string | null; version: number;
+  reviewComment: string | null; reviewedAt: string | null; surveyStatus: ActivitySurveyStatus | "NOT_REQUIRED";
+  completionPercentage: number; version: number;
 };
 export type ActivityAssignmentStatus = "ASSIGNED" | "SUBMITTED" | "CHANGES_REQUESTED" | "COMPLETED";
 export type ProgramActivity = {
@@ -16,13 +25,15 @@ export type ProgramActivity = {
 export type AssignedActivity = Omit<ProgramActivity, "assignees"> & {
   assignmentId: string; assignmentStatus: ActivityAssignmentStatus; responseText: string | null;
   submittedAt: string | null; reviewComment: string | null; reviewedAt: string | null;
-  assignmentVersion: number;
+  assignmentVersion: number; survey: ActivitySurvey | null; completionPercentage: number;
 };
 export type ActivityInput = {
   sessionId: string; title: string; instructions: string; youtubeUrl: string | null; dueDate: string;
   position: number; assignToAll: boolean; enrollmentIds: string[];
 };
 export type ActivityReviewInput = { decision: "APPROVE" | "REQUEST_CHANGES"; comment: string | null };
+export type ActivitySurveyAnswerInput = { questionId: string; values: string[] };
+export type ActivitySurveySubmission = { evaluationId: string; status: "COMPLETED"; completedAt: string };
 
 export class ActivityRequestError extends Error {
   constructor(public readonly status: number, public readonly fields: string[] = [], public readonly requestId?: string) {
@@ -53,6 +64,7 @@ async function request<T>(path: string, method: "GET" | "POST", expected: number
     const body = await response.json().catch(() => null);
     const allowed = ["sessionId", "title", "instructions", "youtubeUrl", "dueDate", "position", "enrollmentIds",
       "responseText", "decision", "comment"];
+    allowed.push("answers");
     const fields = body?.code === "VALIDATION_ERROR" && Array.isArray(body.errors)
       ? body.errors.map((error: { field?: unknown }) => error?.field)
         .filter((field: unknown): field is string => typeof field === "string" && allowed.includes(field))
@@ -79,6 +91,11 @@ export const submitMyActivity = (programId: string, activityId: string, response
   signal?: AbortSignal) => request<AssignedActivity>(
     `/me/programs/${encodeURIComponent(programId)}/activities/${encodeURIComponent(activityId)}/submission`,
     "POST", 200, { responseText }, signal);
+
+export const submitMyActivitySurvey = (programId: string, activityId: string,
+  answers: ActivitySurveyAnswerInput[], signal?: AbortSignal) => request<ActivitySurveySubmission>(
+    `/me/programs/${encodeURIComponent(programId)}/activities/${encodeURIComponent(activityId)}/survey-response`,
+    "POST", 200, { answers }, signal);
 
 export const reviewActivityAssignment = (organizationId: string, programId: string, activityId: string,
   assignmentId: string, input: ActivityReviewInput, signal?: AbortSignal) => request<ActivityAssignee>(
