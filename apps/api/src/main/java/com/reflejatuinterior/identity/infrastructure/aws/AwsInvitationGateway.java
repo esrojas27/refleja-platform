@@ -1,5 +1,7 @@
 package com.reflejatuinterior.identity.infrastructure.aws;
 
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
 import com.reflejatuinterior.identity.CollaboratorInvitations.*;
@@ -21,6 +23,9 @@ import software.amazon.awssdk.services.sesv2.model.SendEmailRequest;
 /** Native AWS clients; no credential generation, logging or persistence in the application. */
 class AwsInvitationGateway implements InvitationGateway, AutoCloseable {
     private static final Logger LOGGER = LoggerFactory.getLogger(AwsInvitationGateway.class);
+    private static final DateTimeFormatter INVITATION_DATE = DateTimeFormatter
+            .ofPattern("d 'de' MMMM 'de' uuuu", Locale.forLanguageTag("es-CO"))
+            .withZone(ZoneOffset.UTC);
     private final CognitoIdentityProviderClient cognito;
     private final SesV2Client ses;
     private final InvitationAwsConfiguration.Settings settings;
@@ -72,20 +77,117 @@ class AwsInvitationGateway implements InvitationGateway, AutoCloseable {
         try {
             // This link grants nothing. The API lists/accepts only invitations matching the validated Access Token sub.
             String url = settings.webBase().replaceAll("/+$", "") + "/invitations";
-            String text = "Tienes una invitación a Refleja Tu Interior.\n\n"
-                    + "Rol de acceso: " + roleLabel(invitation.role()) + ".\n\n"
-                    + "Inicia sesión con tu cuenta de Cognito y revisa tus invitaciones pendientes:\n" + url + "\n\n"
-                    + "Vence el " + invitation.expiresAt() + " (UTC). La invitación no concede acceso hasta que la aceptes.\n"
-                    + "Si tu cuenta es nueva, recibirás por separado las instrucciones de acceso administradas por Cognito.\n"
-                    + "Si no esperabas esta invitación, no la aceptes.\n";
+            boolean collaborator = invitation.role() == InvitedRole.COLLABORATOR;
+            String text = collaborator ? invitationText(invitation, url) : accessInvitationText(invitation, url);
+            var body = Body.builder().text(Content.builder().data(text).charset("UTF-8").build());
+            if (collaborator) {
+                body.html(Content.builder().data(invitationHtml(invitation, url)).charset("UTF-8").build());
+            }
             var response = ses.sendEmail(SendEmailRequest.builder().fromEmailAddress(settings.sender())
                     .destination(Destination.builder().toAddresses(invitation.email()).build())
                     .content(EmailContent.builder().simple(Message.builder()
-                            .subject(Content.builder().data("Invitación a Refleja Tu Interior").charset("UTF-8").build())
-                            .body(Body.builder().text(Content.builder().data(text).charset("UTF-8").build()).build()).build()).build()).build());
+                            .subject(Content.builder().data(collaborator
+                                    ? "Bienvenido(a) a tu espacio en Refleja Tu Interior"
+                                    : "Invitación a Refleja Tu Interior").charset("UTF-8").build())
+                            .body(body.build()).build()).build()).build());
             if (response.messageId() == null || response.messageId().isBlank()) throw new DeliveryUnavailable();
             return response.messageId();
         } catch (RuntimeException exception) { throw deliveryFailure("INVITATION", exception); }
+    }
+
+    private static String invitationText(Invitation invitation, String url) {
+        return """
+                Hola, %s:
+
+                ¡Te damos la bienvenida a Refleja Tu Interior!
+
+                Hemos creado un espacio personal para acompañarte durante todo este proceso. En tu dashboard podrás:
+
+                - Consultar el avance de tu proceso.
+                - Acceder a las sesiones y actividades asignadas.
+                - Compartir tus reflexiones y comentarios.
+                - Recibir retroalimentación sobre las actividades realizadas.
+                - Revisar tus aprendizajes y la evolución alcanzada durante la consultoría.
+
+                De esta manera, el acompañamiento no estará presente únicamente en las sesiones con Paula. También contarás con un espacio digital que te permitirá dar continuidad al proceso, hacer una mirada retrospectiva de lo vivido y reconocer los avances que vayas alcanzando.
+
+                Para comenzar, haz clic en el siguiente enlace:
+
+                [CREAR MI USUARIO]
+                %s
+
+                Una vez ingreses, crea tu usuario y completa los datos solicitados en tu perfil. Esto nos permitirá conocerte mejor y brindarte una experiencia más cercana y personalizada.
+
+                Te invitamos a completar tu registro antes del %s.
+
+                Nos alegra acompañarte en este camino de autoconocimiento, crecimiento y fortalecimiento de tu marca personal.
+
+                Cordial saludo,
+
+                Equipo Refleja Tu Interior
+                Tu historia, tu mayor diferencial
+                """.formatted(invitationName(invitation), url, invitationDate(invitation));
+    }
+
+    private static String accessInvitationText(Invitation invitation, String url) {
+        return "Tienes una invitación a Refleja Tu Interior.\n\n"
+                + "Rol de acceso: " + roleLabel(invitation.role()) + ".\n\n"
+                + "Inicia sesión con tu cuenta de Cognito y revisa tus invitaciones pendientes:\n" + url + "\n\n"
+                + "Vence el " + invitation.expiresAt() + " (UTC). La invitación no concede acceso hasta que la aceptes.\n"
+                + "Si tu cuenta es nueva, recibirás por separado las instrucciones de acceso administradas por Cognito.\n"
+                + "Si no esperabas esta invitación, no la aceptes.\n";
+    }
+
+    private static String invitationHtml(Invitation invitation, String url) {
+        String name = escapeHtml(invitationName(invitation));
+        String safeUrl = escapeHtml(url);
+        String date = escapeHtml(invitationDate(invitation));
+        return """
+                <!doctype html>
+                <html lang="es">
+                  <body style="margin:0;background:#f7f2ee;color:#2b1b19;font-family:Arial,sans-serif;">
+                    <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="background:#f7f2ee;padding:32px 16px;">
+                      <tr><td align="center">
+                        <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="max-width:680px;background:#fffdfa;border:1px solid #ead8cd;border-radius:24px;overflow:hidden;">
+                          <tr><td style="padding:40px 44px;line-height:1.6;">
+                            <p style="margin:0 0 24px;font-size:18px;">Hola, <strong>%s</strong>:</p>
+                            <h1 style="margin:0 0 24px;color:#922f3b;font-size:28px;line-height:1.25;">¡Te damos la bienvenida a Refleja Tu Interior!</h1>
+                            <p>Hemos creado un espacio personal para acompañarte durante todo este proceso. En tu dashboard podrás:</p>
+                            <ul style="padding-left:22px;">
+                              <li>Consultar el avance de tu proceso.</li>
+                              <li>Acceder a las sesiones y actividades asignadas.</li>
+                              <li>Compartir tus reflexiones y comentarios.</li>
+                              <li>Recibir retroalimentación sobre las actividades realizadas.</li>
+                              <li>Revisar tus aprendizajes y la evolución alcanzada durante la consultoría.</li>
+                            </ul>
+                            <p>De esta manera, el acompañamiento no estará presente únicamente en las sesiones con Paula. También contarás con un espacio digital que te permitirá dar continuidad al proceso, hacer una mirada retrospectiva de lo vivido y reconocer los avances que vayas alcanzando.</p>
+                            <p style="margin-top:28px;">Para comenzar, haz clic en el siguiente enlace:</p>
+                            <p style="margin:24px 0;text-align:center;"><a href="%s" style="display:inline-block;border-radius:999px;background:#922f3b;color:#ffffff;padding:14px 28px;font-weight:bold;text-decoration:none;">CREAR MI USUARIO</a></p>
+                            <p>Una vez ingreses, crea tu usuario y completa los datos solicitados en tu perfil. Esto nos permitirá conocerte mejor y brindarte una experiencia más cercana y personalizada.</p>
+                            <p>Te invitamos a completar tu registro antes del <strong>%s</strong>.</p>
+                            <p>Nos alegra acompañarte en este camino de autoconocimiento, crecimiento y fortalecimiento de tu marca personal.</p>
+                            <p style="margin:28px 0 0;">Cordial saludo,</p>
+                            <p style="margin:8px 0 0;"><strong>Equipo Refleja Tu Interior</strong><br>Tu historia, tu mayor diferencial</p>
+                          </td></tr>
+                        </table>
+                      </td></tr>
+                    </table>
+                  </body>
+                </html>
+                """.formatted(name, safeUrl, date);
+    }
+
+    private static String invitationName(Invitation invitation) {
+        return (invitation.firstName() + " " + invitation.lastName()).strip();
+    }
+
+    private static String invitationDate(Invitation invitation) {
+        return INVITATION_DATE.format(invitation.expiresAt());
+    }
+
+    private static String escapeHtml(String value) {
+        return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                .replace("\"", "&quot;").replace("'", "&#39;");
     }
 
     private AdminGetUserResponse get(String username) {

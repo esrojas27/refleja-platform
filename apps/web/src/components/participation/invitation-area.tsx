@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { acceptInvitation, listInvitations, participationErrorMessage, ParticipationRequestError,
   inviteeRoleLabel, type Invitation, type PageResult } from "@/lib/participation/participation-api";
@@ -8,6 +9,7 @@ import { acceptInvitation, listInvitations, participationErrorMessage, Participa
 const button = "rti-button-secondary";
 
 export function InvitationArea() {
+  const router = useRouter();
   const [result, setResult] = useState<PageResult<Invitation>>();
   const [page, setPage] = useState(0);
   const [attempt, setAttempt] = useState(0);
@@ -23,11 +25,13 @@ export function InvitationArea() {
     }).catch(error => {
       if (!controller.signal.aborted) {
         setMessage(participationErrorMessage(error));
-        setNeedsLogin(error instanceof ParticipationRequestError && error.status === 401);
+        const unauthenticated = error instanceof ParticipationRequestError && error.status === 401;
+        setNeedsLogin(unauthenticated);
+        if (unauthenticated) router.replace("/login?returnTo=%2Finvitations");
       }
     }).finally(() => { if (!controller.signal.aborted) setPending(false); });
     return () => controller.abort();
-  }, [page, attempt]);
+  }, [page, attempt, router]);
   function refresh(nextPage = page, accepted = false) {
     setResult(undefined); setPending(true); setNeedsLogin(false); setMessage("Consultando invitaciones…");
     if (accepted) setNotice("Invitación aceptada. La inscripción está ACTIVE. Puedes volver a Cuenta y comprobar tu sesión.");
@@ -39,8 +43,8 @@ export function InvitationArea() {
     <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">Sólo se muestran las invitaciones asociadas a tu identidad. Abrir esta página no acepta ninguna invitación.</p>
     {notice && <p role="status" className="mt-5 rounded-2xl border border-accent bg-accent/60 px-4 py-3 text-sm">{notice}</p>}
     {message && <p role="status" className="mt-5 rounded-2xl bg-muted/60 px-4 py-3 text-sm">{message}</p>}
-    {needsLogin && <p className="mt-3 text-sm">Inicia sesión con la cuenta invitada. Después del acceso, vuelve desde Cuenta → Invitaciones.{" "}
-      <Link href="/login" className="rti-link">Iniciar sesión</Link>
+    {needsLogin && <p className="mt-3 text-sm">Te estamos llevando al acceso seguro de Cognito. Si la redirección no continúa,{" "}
+      <Link href="/login?returnTo=%2Finvitations" className="rti-link">inicia sesión aquí</Link>.
     </p>}
     {result && <>
       <ul className="mt-6 grid gap-4 sm:grid-cols-2">{result.items.map(invitation => <li key={invitation.id} className="space-y-3 break-words rounded-2xl border border-border/70 bg-background/70 p-5">

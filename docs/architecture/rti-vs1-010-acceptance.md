@@ -57,6 +57,19 @@ El alta de un usuario nuevo puede enviar dos mensajes: credenciales administrada
 por Cognito y la invitación transaccional de SES. Un usuario Cognito ya confirmado
 recibe únicamente la invitación de SES.
 
+La invitación transaccional para colaboradores usa el asunto `Bienvenido(a) a tu
+espacio en Refleja Tu Interior`, personaliza el saludo con su nombre y comunica la
+fecha real de vencimiento. Se entrega en texto plano y HTML con el llamado a la
+acción `CREAR MI USUARIO`, que conduce a `/invitations`; el enlace no contiene
+tokens, códigos ni credenciales. Las invitaciones de Líder y RRHH conservan su
+mensaje de acceso según el rol, pues no requieren completar el perfil de
+colaborador. Si `/invitations` se abre sin sesión, redirige al acceso de Cognito y
+conserva únicamente el retorno seguro a esa ruta; después del primer acceso vuelve
+automáticamente a las invitaciones, incluso cuando `/me` todavía responde 403 por
+no existir una membresía activa. Al ingresar, un perfil pendiente muestra
+`Completa tu perfil para comenzar` hasta que el colaborador guarde todos sus datos
+obligatorios.
+
 La validación real detectó que, en un User Pool configurado con `email` como
 `UsernameAttributes`, Cognito devuelve un username interno generado, pero
 `AdminCreateUser` con `RESEND` debe reutilizar el correo como identificador e incluir

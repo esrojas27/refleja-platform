@@ -24,6 +24,9 @@ export default function LoginPage() {
         <p className="mt-4 max-w-xl leading-7 text-muted-foreground">
           Continuarás en Cognito, el servicio seguro que administra tus credenciales. Refleja Tu Interior no recibe ni almacena tu contraseña.
         </p>
+        <p className="mt-4 rounded-2xl border border-border/70 bg-muted/60 px-4 py-3 text-sm leading-6 text-muted-foreground">
+          Si recibiste una invitación y es tu primer ingreso, utiliza las credenciales enviadas por Cognito. El servicio te pedirá establecer tu contraseña antes de regresar a tus invitaciones.
+        </p>
 
         <LoginButton />
 

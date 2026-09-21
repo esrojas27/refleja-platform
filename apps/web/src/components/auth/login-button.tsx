@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { signInWithRedirect } from "aws-amplify/auth";
 
+import { rememberAuthReturnPathFromLocation } from "@/lib/auth/auth-return-path";
 import { isAuthenticationConfigured } from "@/lib/auth/amplify-configuration";
 
 export function LoginButton() {
@@ -18,6 +19,7 @@ export function LoginButton() {
     setError(undefined);
     setPending(true);
     try {
+      rememberAuthReturnPathFromLocation();
       await signInWithRedirect();
     } catch {
       setError("No fue posible iniciar la autenticación.");

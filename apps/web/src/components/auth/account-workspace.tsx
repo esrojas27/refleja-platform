@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { fetchCurrentIdentity, IdentityRequestError, type CurrentIdentity } from "@/lib/auth/authenticated-api";
+import { consumeAuthReturnPath } from "@/lib/auth/auth-return-path";
 
 type AccountWorkspaceState = {
   identity?: CurrentIdentity;
@@ -46,7 +47,10 @@ export function AccountWorkspace({ children }: { children: ReactNode }) {
       setIdentity(currentIdentity);
       setMessage("Sesión autenticada.");
       const active = currentIdentity.organizations.find(item => item.id === currentIdentity.activeOrganizationId);
-      if (pathname === "/account" && active?.roles.includes("COLLABORATOR") && active.profileStatus === "PENDING") {
+      const returnPath = pathname === "/account" ? consumeAuthReturnPath() : undefined;
+      if (returnPath) {
+        router.replace(returnPath);
+      } else if (pathname === "/account" && active?.roles.includes("COLLABORATOR") && active.profileStatus === "PENDING") {
         router.replace(`/profile?organizationId=${encodeURIComponent(active.id)}`);
       }
     } catch (error) {
@@ -67,13 +71,20 @@ export function AccountWorkspace({ children }: { children: ReactNode }) {
       setIdentity(currentIdentity);
       setMessage("Sesión autenticada.");
       const active = currentIdentity.organizations.find(item => item.id === currentIdentity.activeOrganizationId);
-      if (pathname === "/account" && active?.roles.includes("COLLABORATOR") && active.profileStatus === "PENDING") {
+      const returnPath = pathname === "/account" ? consumeAuthReturnPath() : undefined;
+      if (returnPath) {
+        router.replace(returnPath);
+      } else if (pathname === "/account" && active?.roles.includes("COLLABORATOR") && active.profileStatus === "PENDING") {
         router.replace(`/profile?organizationId=${encodeURIComponent(active.id)}`);
       }
     }).catch(error => {
       if (!controller.signal.aborted) {
         setIdentity(undefined);
         setMessage(identityErrorMessage(error));
+        if (pathname === "/account" && error instanceof IdentityRequestError && error.status === 403) {
+          const returnPath = consumeAuthReturnPath();
+          if (returnPath) router.replace(returnPath);
+        }
       }
     }).finally(() => { if (!controller.signal.aborted) setPending(false); });
     return () => controller.abort();

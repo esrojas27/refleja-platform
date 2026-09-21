@@ -2,6 +2,8 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { AccountWorkspace } from "@/components/auth/account-workspace";
+import { IdentityRequestError } from "@/lib/auth/authenticated-api";
+import { rememberAuthReturnPath } from "@/lib/auth/auth-return-path";
 
 const { fetchCurrentIdentity, navigation, replace, signOut } = vi.hoisted(() => ({
   fetchCurrentIdentity: vi.fn(),
@@ -22,6 +24,9 @@ vi.mock("@/lib/auth/authenticated-api", async original => ({
 
 beforeEach(() => {
   navigation.pathname = "/invitations";
+  replace.mockReset();
+  signOut.mockReset();
+  window.sessionStorage.clear();
   fetchCurrentIdentity.mockReset();
   fetchCurrentIdentity.mockResolvedValue({
     cognitoSubject: "subject",
@@ -32,6 +37,16 @@ beforeEach(() => {
   });
 });
 afterEach(cleanup);
+
+it("returns an authenticated invitee to invitations even before internal access is active", async () => {
+  navigation.pathname = "/account";
+  rememberAuthReturnPath("/invitations");
+  fetchCurrentIdentity.mockRejectedValue(new IdentityRequestError(403));
+
+  render(<AccountWorkspace><h1>Cuenta</h1></AccountWorkspace>);
+
+  await waitFor(() => expect(replace).toHaveBeenCalledWith("/invitations"));
+});
 
 it.each([
   ["/invitations", "Invitaciones"],

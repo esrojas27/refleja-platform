@@ -77,6 +77,10 @@ export function CollaboratorProfileForm({ organizationId }: { organizationId: st
       </span>}
     </div>
     {message && <p role="status" className="mt-5 rounded-2xl border border-border/70 bg-muted/60 px-4 py-3 text-sm">{message}</p>}
+    {profile?.status === "PENDING" && !message && <p role="status"
+      className="mt-5 rounded-2xl border border-secondary bg-secondary/45 px-4 py-3 text-sm font-medium">
+      Completa tu perfil para comenzar.
+    </p>}
     {profile && <>
       <dl className="mt-6 grid gap-4 sm:grid-cols-2">
         <div className="rounded-2xl border border-border/70 bg-background/70 p-4">

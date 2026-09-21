@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import LoginPage from "@/app/login/page";
+import { consumeAuthReturnPath } from "@/lib/auth/auth-return-path";
 
 const { signInWithRedirect } = vi.hoisted(() => ({
   signInWithRedirect: vi.fn(),
@@ -16,6 +17,8 @@ describe("Login page", () => {
   beforeEach(() => {
     signInWithRedirect.mockReset();
     signInWithRedirect.mockResolvedValue(undefined);
+    window.sessionStorage.clear();
+    window.history.replaceState({}, "", "/login?returnTo=%2Finvitations");
   });
 
   it("starts the Cognito redirect without rendering credential or signup controls", async () => {
@@ -26,6 +29,7 @@ describe("Login page", () => {
     );
 
     await waitFor(() => expect(signInWithRedirect).toHaveBeenCalledOnce());
+    expect(consumeAuthReturnPath()).toBe("/invitations");
     expect(screen.queryByRole("textbox")).toBeNull();
     expect(screen.queryByText(/registr/i)).toBeNull();
   });

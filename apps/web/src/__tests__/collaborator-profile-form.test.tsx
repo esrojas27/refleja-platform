@@ -27,6 +27,7 @@ it("shows server-derived email and company without asking the collaborator to ed
   expect(screen.queryByLabelText("Email")).toBeNull();
   expect(screen.queryByLabelText("Empresa")).toBeNull();
   expect(screen.getByText("Perfil pendiente")).toBeTruthy();
+  expect(screen.getByRole("status").textContent).toContain("Completa tu perfil para comenzar.");
 });
 
 it("completes every required editable field and unlocks the programs link", async () => {
