@@ -166,6 +166,23 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 .andExpect(jsonPath("$.items[0].responseText").value("Reflexión con ejemplo."));
     }
 
+    @Test void consultantCreatesProgramContentBeforeAnyParticipantIsActive() throws Exception {
+        jdbcTemplate.update("update rti.enrollments set status='INVITED' where program_id=?", program);
+
+        var created = mvc.perform(post(consultantPath()).header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(allBody()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.title").value("Reflexión general"))
+                .andExpect(jsonPath("$.assignees").isEmpty())
+                .andReturn().getResponse();
+        var activityId = UUID.fromString(json.readTree(created.getContentAsString()).path("id").asText());
+
+        assertThat(jdbcTemplate.queryForObject(
+                "select count(*) from rti.program_activities where id=?", Long.class, activityId)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "select count(*) from rti.activity_assignments where activity_id=?", Long.class, activityId)).isZero();
+    }
+
     @Test void requiresAuthenticationAndDoesNotExposeUnknownSessions() throws Exception {
         mvc.perform(get(consultantPath())).andExpect(status().isUnauthorized());
         mvc.perform(get(collaboratorPath())).andExpect(status().isUnauthorized());

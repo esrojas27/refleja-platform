@@ -43,9 +43,10 @@ class ActivityController {
 
     @PostMapping(path = "/api/v1/organizations/{organizationId}/programs/{programId}/activities",
             consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    @Operation(summary = "Create an activity and atomically assign it to active program enrollments",
-            description = "Assignment makes the activity immediately visible. Drafts and submissions are not part of this operation.")
-    @ApiResponse(responseCode = "201", description = "Activity and all assignments created")
+    @Operation(summary = "Create a program activity and assign it when active enrollments exist",
+            description = "The activity definition can be created before participants are enrolled. When active enrollments exist, "
+                    + "the requested assignments are created atomically and make the activity visible to those collaborators.")
+    @ApiResponse(responseCode = "201", description = "Activity created, with zero or more assignments")
     ResponseEntity<ActivityService.ActivityResponse> create(@AuthenticationPrincipal Jwt jwt,
             @PathVariable UUID organizationId, @PathVariable UUID programId,
             @Valid @RequestBody CreateActivityRequest input, HttpServletRequest request) {

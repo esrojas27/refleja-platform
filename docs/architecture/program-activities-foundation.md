@@ -3,9 +3,10 @@
 ## Propósito
 
 Este incremento convierte la estructura **Programa → Dimensión → Sesión** en un
-recorrido utilizable: un consultor crea una actividad dentro de una sesión, la
-asigna a colaboradores activos y cada colaborador ve exclusivamente sus propias
-actividades desde el programa.
+recorrido utilizable: un consultor puede preparar actividades como contenido del
+programa antes de incorporar participantes y asignarlas cuando existan
+colaboradores activos. Cada colaborador ve exclusivamente sus propias actividades
+asignadas desde el programa.
 
 El incremento continúa fuera de VS1 y no modifica sus criterios de cierre.
 
@@ -13,8 +14,10 @@ El incremento continúa fuera de VS1 y no modifica sus criterios de cierre.
 
 - La actividad exige sesión, título, instrucciones, fecha límite y posición; puede
   guardar un enlace HTTPS opcional a un video de YouTube.
-- Debe asignarse al crearla a una o más inscripciones `ACTIVE` del mismo programa.
-- La creación de actividad y todas sus asignaciones es una única transacción.
+- Puede crearse sin inscripciones activas; en ese caso persiste como definición de
+  contenido con cero asignaciones y no es visible para colaboradores.
+- Cuando se solicitan destinatarios, deben ser inscripciones `ACTIVE` del mismo
+  programa. La creación de actividad y sus asignaciones es una única transacción.
 - La asignación hace la actividad visible inmediatamente; todavía no existe un
   ciclo separado de borrador o publicación.
 - El consultor puede listar actividades y sus destinatarios dentro del programa.
@@ -57,12 +60,13 @@ desde el cliente: deriva la propiedad de la identidad autenticada.
 ## Validación manual
 
 1. Iniciar `dev.cmd` e ingresar como consultor.
-2. Abrir un programa que tenga dimensión, sesión y al menos un colaborador `ACTIVE`.
-3. Entrar en **Actividades**, completar título, instrucciones, enlace opcional de
-   YouTube y fecha límite,
-   seleccionar al colaborador y crear la actividad.
-4. Confirmar que la actividad persiste y muestra el destinatario correcto.
-5. Cerrar sesión e ingresar con ese colaborador.
+2. Abrir **Contenido** en un programa sin participantes y comprobar que inicialmente
+   sólo se muestran sus dimensiones.
+3. Desplegar una dimensión y una sesión, crear una actividad desde el modal y
+   confirmar que persiste con cero asignaciones.
+4. Agregar un colaborador `ACTIVE`, crear otra actividad para todos o para una
+   selección individual y confirmar los destinatarios.
+5. Cerrar sesión e ingresar con el colaborador asignado.
 6. Abrir **Mis programas**, entrar al programa y comprobar la actividad asignada y
    su enlace de video cuando exista.
 7. Verificar con otro colaborador activo del mismo programa que la actividad no

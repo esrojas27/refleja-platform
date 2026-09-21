@@ -59,16 +59,17 @@ public class ActivityService {
         var activeEnrollments = assignToAll
                 ? enrollments.findAllActive(context.organizationId(), programId)
                 : enrollments.findActive(context.organizationId(), programId, uniqueEnrollmentIds);
-        if (activeEnrollments.isEmpty()
-                || (!assignToAll && activeEnrollments.size() != uniqueEnrollmentIds.size())) {
+        if (!assignToAll && activeEnrollments.size() != uniqueEnrollmentIds.size()) {
             throw new EnrollmentNotFound();
         }
 
         var activity = activities.create(context.organizationId(), programId, sessionId,
                 title, instructions, youtubeUrl, dueDate, position);
-        var createdAssignments = assignments.create(context.organizationId(), programId, activity.id(),
-                activeEnrollments.stream().map(Enrollments.Data::id).toList());
-        auditAfterCommit("PROGRAM_ACTIVITY_ASSIGNED", context.userId(), context.organizationId(), activity.id(), requestId);
+        var createdAssignments = activeEnrollments.isEmpty() ? List.<ActivityAssignments.Data>of()
+                : assignments.create(context.organizationId(), programId, activity.id(),
+                        activeEnrollments.stream().map(Enrollments.Data::id).toList());
+        auditAfterCommit(createdAssignments.isEmpty() ? "PROGRAM_ACTIVITY_CREATED" : "PROGRAM_ACTIVITY_ASSIGNED",
+                context.userId(), context.organizationId(), activity.id(), requestId);
         return response(activity, createdAssignments);
     }
 

@@ -75,6 +75,26 @@ it("assigns the next activity to every active enrollment by default", async () =
   }, expect.any(AbortSignal)));
 });
 
+it("highlights every missing required field and focuses the first one", async () => {
+  render(<ProgramActivityArea organizationId="org-a" programId="program-a" />);
+  fireEvent.click(await screen.findByRole("button", { name: "Crear y asignar" }));
+  const form = await screen.findByRole("form", { name: "Crear actividad" });
+  fireEvent.submit(form);
+
+  expect(await within(form).findByText("Escribe el título de la actividad.")).toBeTruthy();
+  expect(within(form).getByText("Escribe las instrucciones que debe seguir el colaborador.")).toBeTruthy();
+  expect(within(form).getByText("Selecciona la fecha límite.")).toBeTruthy();
+  expect(within(form).getByLabelText("Título").getAttribute("aria-invalid")).toBe("true");
+  expect(within(form).getByLabelText("Instrucciones").getAttribute("aria-invalid")).toBe("true");
+  expect(within(form).getByLabelText("Fecha límite").getAttribute("aria-invalid")).toBe("true");
+  await waitFor(() => expect(document.activeElement).toBe(within(form).getByLabelText("Título")));
+  expect(createProgramActivity).not.toHaveBeenCalled();
+
+  fireEvent.change(within(form).getByLabelText("Instrucciones"), { target: { value: "Registra tus hallazgos" } });
+  expect(within(form).queryByText("Escribe las instrucciones que debe seguir el colaborador.")).toBeNull();
+  expect(within(form).getByLabelText("Instrucciones").getAttribute("aria-invalid")).toBeNull();
+});
+
 it("reveals individual collaborators when assigning to everyone is disabled", async () => {
   render(<ProgramActivityArea organizationId="org-a" programId="program-a" />);
   fireEvent.click(await screen.findByRole("button", { name: "Crear y asignar" }));
@@ -87,6 +107,22 @@ it("reveals individual collaborators when assigning to everyone is disabled", as
   fireEvent.submit(form);
   await waitFor(() => expect(createProgramActivity).toHaveBeenCalledWith("org-a", "program-a",
     expect.objectContaining({ assignToAll: false, enrollmentIds: ["enrollment-a"] }), expect.any(AbortSignal)));
+});
+
+it("creates program content even when there are no active enrollments", async () => {
+  vi.mocked(listEnrollments).mockResolvedValue({ items: [], page: 0, size: 100, totalElements: 0, totalPages: 0 });
+  vi.mocked(createProgramActivity).mockResolvedValue({ ...activity, id: "activity-template", assignees: [] });
+  render(<ProgramActivityArea organizationId="org-a" programId="program-a" />);
+  fireEvent.click(await screen.findByRole("button", { name: "Crear actividad" }));
+  const form = await screen.findByRole("form", { name: "Crear actividad" });
+  expect(within(form).getByText(/Puedes preparar esta actividad sin participantes/)).toBeTruthy();
+  expect(within(form).queryByRole("group", { name: "Destinatarios" })).toBeNull();
+  fireEvent.change(within(form).getByLabelText("Título"), { target: { value: "Actividad de plantilla" } });
+  fireEvent.change(within(form).getByLabelText("Instrucciones"), { target: { value: "Contenido predefinido" } });
+  fireEvent.change(within(form).getByLabelText("Fecha límite"), { target: { value: "2026-10-15" } });
+  fireEvent.submit(form);
+  await waitFor(() => expect(createProgramActivity).toHaveBeenCalledWith("org-a", "program-a",
+    expect.objectContaining({ assignToAll: true, enrollmentIds: [] }), expect.any(AbortSignal)));
 });
 
 it("lets the consultant approve a submitted response", async () => {

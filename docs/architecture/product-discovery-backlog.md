@@ -59,6 +59,12 @@ nuevos programas. Se debe definir qué se copia —dimensiones, sesiones, activi
 fechas relativas y evaluaciones—, qué información se excluye y cómo se versiona una
 plantilla después de haber sido utilizada.
 
+Base habilitada el 2026-09-20: el contenido del programa se gestiona como acordeón
+**Dimensión → Sesión → Actividad**, los formularios se abren en modales y una
+actividad puede existir sin participantes ni asignaciones. Esto permite preparar
+la estructura reutilizable; la creación, clonación y versionado de la plantilla
+siguen pendientes.
+
 ### Terminología del programa
 
 - En el producto se hablará de **dimensiones**, no de módulos.
