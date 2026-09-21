@@ -10,8 +10,10 @@ import com.reflejatuinterior.participation.application.EnrollmentNotFound;
 import com.reflejatuinterior.participation.application.MyProgramNotFound;
 import com.reflejatuinterior.participation.application.ActivityAssignmentNotFound;
 import com.reflejatuinterior.participation.application.ActivityWorkflowConflict;
+import com.reflejatuinterior.participation.application.DiscProfileConflict;
 import com.reflejatuinterior.participation.domain.InvalidEnrollmentInput;
 import com.reflejatuinterior.participation.domain.InvalidActivityAssignment;
+import com.reflejatuinterior.participation.domain.InvalidDiscProfile;
 import com.reflejatuinterior.program.ProgramActivities;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -25,7 +27,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice(assignableTypes = {EnrollmentController.class, InvitationController.class, MyProgramController.class,
-        ActivityController.class})
+        ActivityController.class, DiscProfileController.class})
 class EnrollmentErrorHandler {
     @ExceptionHandler({OrganizationAccess.Denied.class, CollaboratorInvitations.Denied.class, CollaboratorAccess.Denied.class})
     ResponseEntity<ErrorResponse> denied(HttpServletRequest request) { return error(request, 403, "FORBIDDEN", List.of()); }
@@ -51,7 +53,7 @@ class EnrollmentErrorHandler {
     ResponseEntity<ErrorResponse> unavailable(HttpServletRequest request) { return error(request, 503, "INVITATION_SERVICE_UNAVAILABLE", List.of()); }
 
     @ExceptionHandler({EnrollmentConflict.class, CollaboratorInvitations.Conflict.class, DataIntegrityViolationException.class,
-            OptimisticLockingFailureException.class, ActivityWorkflowConflict.class})
+            OptimisticLockingFailureException.class, ActivityWorkflowConflict.class, DiscProfileConflict.class})
     ResponseEntity<ErrorResponse> conflict(HttpServletRequest request) { return error(request, 409, "ENROLLMENT_CONFLICT", List.of()); }
 
     @ExceptionHandler(InvalidEnrollmentInput.class)
@@ -61,6 +63,11 @@ class EnrollmentErrorHandler {
 
     @ExceptionHandler(InvalidActivityAssignment.class)
     ResponseEntity<ErrorResponse> invalidAssignment(InvalidActivityAssignment exception, HttpServletRequest request) {
+        return error(request, 400, "VALIDATION_ERROR", List.of(field(exception.field())));
+    }
+
+    @ExceptionHandler(InvalidDiscProfile.class)
+    ResponseEntity<ErrorResponse> invalidDisc(InvalidDiscProfile exception, HttpServletRequest request) {
         return error(request, 400, "VALIDATION_ERROR", List.of(field(exception.field())));
     }
 

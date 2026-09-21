@@ -24,8 +24,11 @@ export function AccountWorkspace({ children }: { children: ReactNode }) {
   const router = useRouter();
   const request = useRef<AbortController | null>(null);
   const [identity, setIdentity] = useState<CurrentIdentity>();
+  const organizationProgramsMatch = /^\/organizations\/([^/]+)\/programs(?:\/new)?$/.exec(pathname);
+  const organizationProgramsOrganizationId = organizationProgramsMatch?.[1];
+  const organizationProgramsPath = organizationProgramsOrganizationId !== undefined;
   const visible = pathname === "/account" || pathname === "/profile"
-    || pathname === "/invitations" || pathname === "/my-programs";
+    || pathname === "/invitations" || pathname === "/my-programs" || organizationProgramsPath;
   const [pending, setPending] = useState(visible);
   const [message, setMessage] = useState(visible
     ? "Comprobando la sesión…" : "Comprueba la sesión después de volver de Cognito.");
@@ -59,7 +62,7 @@ export function AccountWorkspace({ children }: { children: ReactNode }) {
     if (!visible) return;
     const controller = new AbortController();
     request.current = controller;
-    fetchCurrentIdentity(undefined, controller.signal).then(currentIdentity => {
+    fetchCurrentIdentity(organizationProgramsOrganizationId, controller.signal).then(currentIdentity => {
       if (controller.signal.aborted) return;
       setIdentity(currentIdentity);
       setMessage("Sesión autenticada.");
@@ -74,7 +77,7 @@ export function AccountWorkspace({ children }: { children: ReactNode }) {
       }
     }).finally(() => { if (!controller.signal.aborted) setPending(false); });
     return () => controller.abort();
-  }, [visible, pathname, router]);
+  }, [visible, pathname, router, organizationProgramsOrganizationId]);
 
   async function endSession() {
     request.current?.abort();
@@ -113,9 +116,10 @@ export function AccountWorkspace({ children }: { children: ReactNode }) {
           <Link href="/invitations" aria-current={pathname === "/invitations" ? "page" : undefined} className={itemClass(pathname === "/invitations")}>
             <Mail aria-hidden="true" className="size-4" />Invitaciones
           </Link>
-          <Link href="/my-programs" aria-current={pathname === "/my-programs" ? "page" : undefined} className={itemClass(pathname === "/my-programs")}>
+          {identity?.organizations.some(organization => organization.roles.includes("COLLABORATOR")) && <Link
+            href="/my-programs" aria-current={pathname === "/my-programs" ? "page" : undefined} className={itemClass(pathname === "/my-programs")}>
             <BookOpenText aria-hidden="true" className="size-4" />Mis programas
-          </Link>
+          </Link>}
           {active?.roles.includes("COLLABORATOR") && <Link
             href={`/profile?organizationId=${encodeURIComponent(active.id)}`}
             aria-current={pathname === "/profile" ? "page" : undefined}
@@ -123,7 +127,9 @@ export function AccountWorkspace({ children }: { children: ReactNode }) {
             <IdCard aria-hidden="true" className="size-4" />Mi perfil
           </Link>}
           {identity?.activeOrganizationId && identity.roles.some(role => ["CONSULTANT", "COMPANY_ADMIN", "LEADER"].includes(role)) && <Link
-            href={`/organizations/${encodeURIComponent(identity.activeOrganizationId)}/programs`} className={`${menuItemClass} ${inactiveMenuItemClass}`}>
+            href={`/organizations/${encodeURIComponent(identity.activeOrganizationId)}/programs`}
+            aria-current={organizationProgramsPath ? "page" : undefined}
+            className={itemClass(organizationProgramsPath)}>
             <Building2 aria-hidden="true" className="size-4" />Ver programas
           </Link>}
           {identity?.canCreateOrganizations === true && <Link href="/organizations/new" className={`${menuItemClass} ${inactiveMenuItemClass}`}>

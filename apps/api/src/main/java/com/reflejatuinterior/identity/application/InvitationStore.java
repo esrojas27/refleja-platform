@@ -1,6 +1,7 @@
 package com.reflejatuinterior.identity.application;
 
 import java.util.UUID;
+import java.util.Set;
 import com.reflejatuinterior.identity.CollaboratorInvitations.Account;
 import com.reflejatuinterior.identity.CollaboratorInvitations.Invitation;
 import com.reflejatuinterior.identity.CollaboratorInvitations.InvitedRole;
@@ -16,6 +17,7 @@ public interface InvitationStore {
     Page listOwned(String subject, int page, int size);
     Invitation findInOrganization(UUID organizationId, UUID invitationId);
     Participant participant(UUID organizationId, UUID membershipId);
+    Set<String> participantRoles(UUID organizationId, UUID membershipId);
     Invitation accept(String subject, UUID invitationId);
     Attempt claim(UUID organizationId, UUID invitationId);
     boolean credentialsSent(UUID organizationId, UUID invitationId, UUID attemptId);

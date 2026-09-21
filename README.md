@@ -143,6 +143,15 @@ son exclusivamente sobre el usuario autenticado, usan `Cache-Control: no-store` 
 vuelven a comprobar la membresía colaboradora de la organización. Modelo, seguridad,
 límites y recorrido manual: [perfil inicial del colaborador](docs/architecture/collaborator-profile.md).
 
+### Ficha DISC del programa
+
+Consultores y líderes inscritos en un programa pueden registrar los campos
+Dominante, Influyente, Sereno y Concienzudo de cada integrante `COLLABORATOR`
+desde la sección **DISC** del espacio de trabajo. La API limita lectura y edición
+al programa autorizado, aplica RLS por organización y conserva una revisión
+inmutable por cada guardado. Contrato, privacidad, auditoría y recorrido manual:
+[ficha DISC por participante](docs/architecture/program-participant-disc.md).
+
 ### Mis programas — RTI-VS1-011
 
 Una cuenta con usuario, membresía y rol `COLLABORATOR` activos ve **Mis programas**

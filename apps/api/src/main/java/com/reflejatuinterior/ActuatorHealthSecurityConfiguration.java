@@ -49,6 +49,7 @@ class ActuatorHealthSecurityConfiguration {
                         .requestMatchers(HttpMethod.GET, "/api/v1/organizations/{organizationId}/programs",
                                 "/api/v1/organizations/{organizationId}/programs/{programId}",
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/modules",
+                                "/api/v1/organizations/{organizationId}/programs/{programId}/disc-profiles",
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/activities").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/organizations/{organizationId}/programs/{programId}/enrollments",
                                 "/api/v1/invitations").authenticated()
@@ -61,7 +62,9 @@ class ActuatorHealthSecurityConfiguration {
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/enrollments/{enrollmentId}/invitation-delivery",
                                 "/api/v1/invitations/{invitationId}/accept",
                                 "/api/v1/me/programs/{programId}/activities/{activityId}/submission").authenticated()
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/me/profile").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/me/profile",
+                                "/api/v1/organizations/{organizationId}/programs/{programId}/disc-profiles/{enrollmentId}")
+                                .authenticated()
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(resourceServer ->
                         resourceServer.jwt(Customizer.withDefaults())

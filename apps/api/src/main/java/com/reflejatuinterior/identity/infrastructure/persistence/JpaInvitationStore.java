@@ -89,6 +89,13 @@ class JpaInvitationStore implements InvitationStore {
         if (user == null) throw new Unavailable();
         return new Participant(user.id(), member.id(), user.email(), user.firstName(), user.lastName());
     }
+    @Override public Set<String> participantRoles(UUID organizationId, UUID membershipId) {
+        participant(organizationId, membershipId);
+        return em.createQuery("select r from MembershipRoleJpaEntity r where r.membershipId = :membershipId",
+                        MembershipRoleJpaEntity.class)
+                .setParameter("membershipId", membershipId)
+                .getResultList().stream().map(role -> role.role().name()).collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
 
     @Override @Transactional(propagation = Propagation.MANDATORY)
     public Invitation accept(String subject, UUID invitationId) {

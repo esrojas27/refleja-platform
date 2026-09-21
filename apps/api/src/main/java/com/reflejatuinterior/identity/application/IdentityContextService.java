@@ -32,7 +32,8 @@ public class IdentityContextService {
                 .collect(Collectors.toMap(IdentityContextReader.MembershipData::organizationId, Function.identity()));
         var available = organizations.findSummaries(activeMemberships.keySet()).stream()
                 .filter(organization -> "ACTIVE".equals(organization.status()))
-                .map(organization -> new OrganizationAccess(organization.id(), organization.name(),
+                .map(organization -> new OrganizationAccess(organization.id(),
+                        activeMemberships.get(organization.id()).id(), organization.name(),
                         activeMemberships.get(organization.id()).roles(),
                         activeMemberships.get(organization.id()).profileStatus()))
                 .toList();

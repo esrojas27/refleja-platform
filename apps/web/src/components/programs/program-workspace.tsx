@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { BarChart3, BookOpenText, CheckSquare2, ChevronLeft, ListTree, UsersRound } from "lucide-react";
+import { BarChart3, BookOpenText, BrainCircuit, CheckSquare2, ChevronLeft, ListTree, UsersRound } from "lucide-react";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { fetchCurrentIdentity } from "@/lib/auth/authenticated-api";
 import { programsPath } from "@/lib/programs/program-api";
 
 type WorkspaceItem = {
@@ -23,7 +24,17 @@ export function ProgramWorkspace({
   children: ReactNode;
 }) {
   const pathname = usePathname();
+  const [canManageDisc, setCanManageDisc] = useState(false);
   const programPath = `${programsPath(organizationId)}/${encodeURIComponent(programId)}`;
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchCurrentIdentity(organizationId, controller.signal)
+      .then(identity => setCanManageDisc(identity.roles.some(role => role === "CONSULTANT" || role === "LEADER")))
+      .catch(() => setCanManageDisc(false));
+    return () => controller.abort();
+  }, [organizationId]);
+
   const items: WorkspaceItem[] = [
     {
       href: programPath,
@@ -55,6 +66,12 @@ export function ProgramWorkspace({
       icon: BarChart3,
       active: current => current === `${programPath}/progress`,
     },
+    ...(canManageDisc ? [{
+      href: `${programPath}/disc`,
+      label: "DISC",
+      icon: BrainCircuit,
+      active: (current: string) => current === `${programPath}/disc`,
+    }] : []),
   ];
 
   return (

@@ -1,10 +1,19 @@
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { ProgramWorkspace } from "@/components/programs/program-workspace";
+import { fetchCurrentIdentity } from "@/lib/auth/authenticated-api";
 
 const { usePathname } = vi.hoisted(() => ({ usePathname: vi.fn() }));
 
 vi.mock("next/navigation", () => ({ usePathname }));
+vi.mock("@/lib/auth/authenticated-api", () => ({ fetchCurrentIdentity: vi.fn() }));
+
+beforeEach(() => {
+  vi.mocked(fetchCurrentIdentity).mockResolvedValue({
+    cognitoSubject: "subject", user: { id: "user", email: "consultant@example.com", firstName: null, lastName: null },
+    organizations: [], activeOrganizationId: "org-a", roles: ["CONSULTANT"],
+  });
+});
 
 afterEach(() => {
   cleanup();
@@ -41,6 +50,21 @@ it("marks program content as active", () => {
   usePathname.mockReturnValue("/organizations/org-a/programs/program-a/content");
   render(<ProgramWorkspace organizationId="org-a" programId="program-a"><p>Contenido real</p></ProgramWorkspace>);
   expect(screen.getByRole("link", { name: "Contenido" }).getAttribute("aria-current")).toBe("page");
+});
+
+it("shows DISC only to authorized consultants and leaders", async () => {
+  usePathname.mockReturnValue("/organizations/org-a/programs/program-a/disc");
+  render(<ProgramWorkspace organizationId="org-a" programId="program-a"><p>Ficha</p></ProgramWorkspace>);
+  expect((await screen.findByRole("link", { name: "DISC" })).getAttribute("aria-current")).toBe("page");
+
+  cleanup();
+  vi.mocked(fetchCurrentIdentity).mockResolvedValue({
+    cognitoSubject: "subject", user: { id: "user", email: "hr@example.com", firstName: null, lastName: null },
+    organizations: [], activeOrganizationId: "org-a", roles: ["COMPANY_ADMIN"],
+  });
+  render(<ProgramWorkspace organizationId="org-a" programId="program-a"><p>Ficha</p></ProgramWorkspace>);
+  await Promise.resolve();
+  expect(screen.queryByRole("link", { name: "DISC" })).toBeNull();
 });
 
 it("marks collaborators as active and preserves encoded route segments", () => {

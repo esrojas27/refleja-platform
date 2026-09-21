@@ -2,6 +2,7 @@ package com.reflejatuinterior.identity;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /** Identity-owned invitation workflow. Call provision/create/dispatch only after scoped authorization. */
@@ -23,6 +24,7 @@ public interface CollaboratorInvitations {
     Page listOwned(String subject, int page, int size);
     Invitation findInOrganization(UUID organizationId, UUID invitationId);
     Participant participant(UUID organizationId, UUID membershipId);
+    Set<String> participantRoles(UUID organizationId, UUID membershipId);
     Invitation accept(String subject, UUID invitationId);
     Invitation dispatch(UUID organizationId, UUID invitationId);
 

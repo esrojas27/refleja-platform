@@ -16,6 +16,7 @@ public interface Enrollments {
     Optional<Data> findOwned(UUID organizationId, UUID membershipId, UUID programId);
     List<Data> findActive(UUID organizationId, UUID programId, Collection<UUID> enrollmentIds);
     List<Data> findAllActive(UUID organizationId, UUID programId);
+    List<Data> findParticipants(UUID organizationId, UUID programId);
 
     record Data(UUID id, UUID organizationId, UUID programId, UUID membershipId, UUID invitationId, String status) {}
     record Page(List<Data> items, int page, int size, long totalElements, int totalPages) {

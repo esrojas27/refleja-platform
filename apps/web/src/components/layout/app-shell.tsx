@@ -1,16 +1,35 @@
+"use client";
+
 import { BookOpenText, CircleUserRound, Mail } from "lucide-react";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { Brand } from "@/components/layout/brand";
+import { fetchCurrentIdentity } from "@/lib/auth/authenticated-api";
 
-const navigation = [
-  { href: "/account", label: "Cuenta", icon: CircleUserRound },
-  { href: "/my-programs", label: "Mis programas", icon: BookOpenText },
-  { href: "/invitations", label: "Invitaciones", icon: Mail },
-];
+const accountNavigationItem = { href: "/account", label: "Cuenta", icon: CircleUserRound };
+const collaboratorNavigationItem = { href: "/my-programs", label: "Mis programas", icon: BookOpenText };
+const invitationsNavigationItem = { href: "/invitations", label: "Invitaciones", icon: Mail };
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const [showMyPrograms, setShowMyPrograms] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchCurrentIdentity(undefined, controller.signal).then(identity => {
+      if (!controller.signal.aborted) {
+        setShowMyPrograms(identity.organizations.some(organization => organization.roles.includes("COLLABORATOR")));
+      }
+    }).catch(() => {
+      if (!controller.signal.aborted) setShowMyPrograms(false);
+    });
+    return () => controller.abort();
+  }, []);
+
+  const visibleNavigation = showMyPrograms
+    ? [accountNavigationItem, collaboratorNavigationItem, invitationsNavigationItem]
+    : [accountNavigationItem, invitationsNavigationItem];
+
   return (
     <div className="flex min-h-dvh flex-col">
       <a
@@ -24,7 +43,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
           <Brand compact />
           <nav aria-label="Navegación principal" className="flex items-center gap-1 sm:gap-2">
-            {navigation.map(({ href, label, icon: Icon }) => (
+            {visibleNavigation.map(({ href, label, icon: Icon }) => (
               <Link
                 key={href}
                 href={href}

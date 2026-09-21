@@ -32,6 +32,12 @@ public record AuthenticatedPrincipal(
                 .findFirst().map(OrganizationAccess::roles).orElse(Set.of());
     }
 
+    public UUID membershipId() {
+        return organizations.stream()
+                .filter(organization -> organization.id().equals(activeOrganizationId))
+                .findFirst().map(OrganizationAccess::membershipId).orElse(null);
+    }
+
     /** Role checks never combine memberships or grant a role outside the selected tenant. */
     public boolean hasRole(UUID organizationId, String role) {
         return organizationId != null && organizationId.equals(activeOrganizationId)
@@ -42,13 +48,17 @@ public record AuthenticatedPrincipal(
             UUID id, String cognitoSubject, String email, String firstName, String lastName) {
     }
 
-    public record OrganizationAccess(UUID id, String name, Set<String> roles, String profileStatus) {
+    public record OrganizationAccess(UUID id, UUID membershipId, String name, Set<String> roles, String profileStatus) {
         public OrganizationAccess {
             roles = Set.copyOf(roles);
         }
 
         public OrganizationAccess(UUID id, String name, Set<String> roles) {
-            this(id, name, roles, "COMPLETE");
+            this(id, null, name, roles, "COMPLETE");
+        }
+
+        public OrganizationAccess(UUID id, String name, Set<String> roles, String profileStatus) {
+            this(id, null, name, roles, profileStatus);
         }
     }
 }

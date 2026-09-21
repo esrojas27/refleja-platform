@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { AccountWorkspace } from "@/components/auth/account-workspace";
@@ -44,7 +44,7 @@ it.each([
   expect(screen.getByRole("navigation", { name: "Secciones de la cuenta" })).toBeDefined();
   expect(screen.getByRole("link", { name: "Cuenta" }).getAttribute("href")).toBe("/account");
   expect(screen.getByRole("link", { name: "Invitaciones" }).getAttribute("href")).toBe("/invitations");
-  expect(screen.getByRole("link", { name: "Mis programas" }).getAttribute("href")).toBe("/my-programs");
+  expect((await screen.findByRole("link", { name: "Mis programas" })).getAttribute("href")).toBe("/my-programs");
   expect((await screen.findByRole("link", { name: selected })).getAttribute("aria-current")).toBe("page");
   expect(await screen.findByRole("link", { name: "Mi perfil" })).toBeDefined();
 });
@@ -55,4 +55,25 @@ it("leaves program detail navigation to the program workspace", () => {
   expect(screen.getByRole("heading", { name: "Detalle contextual" })).toBeDefined();
   expect(screen.queryByRole("navigation", { name: "Secciones de la cuenta" })).toBeNull();
   expect(fetchCurrentIdentity).not.toHaveBeenCalled();
+});
+
+it.each([
+  "/organizations/org-a/programs",
+  "/organizations/org-a/programs/new",
+])("keeps the account menu visible at %s and selects Ver programas", async pathname => {
+  navigation.pathname = pathname;
+  fetchCurrentIdentity.mockResolvedValue({
+    cognitoSubject: "subject",
+    user: { id: "user", email: "consultant@example.test", firstName: "Ana", lastName: "Prueba" },
+    organizations: [{ id: "org-a", name: "Empresa A", roles: ["CONSULTANT"], profileStatus: "COMPLETE" }],
+    activeOrganizationId: "org-a",
+    roles: ["CONSULTANT"],
+  });
+
+  render(<AccountWorkspace><h1>Programas</h1></AccountWorkspace>);
+
+  expect(screen.getByRole("navigation", { name: "Secciones de la cuenta" })).toBeDefined();
+  expect((await screen.findByRole("link", { name: "Ver programas" })).getAttribute("aria-current")).toBe("page");
+  await waitFor(() => expect(fetchCurrentIdentity).toHaveBeenCalledWith("org-a", expect.any(AbortSignal)));
+  expect(screen.queryByRole("link", { name: "Mis programas" })).toBeNull();
 });

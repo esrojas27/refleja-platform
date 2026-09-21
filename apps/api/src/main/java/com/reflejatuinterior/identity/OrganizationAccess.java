@@ -7,8 +7,11 @@ import java.util.UUID;
 public interface OrganizationAccess {
     Context resolve(String cognitoSubject, UUID organizationId);
 
-    record Context(UUID userId, UUID organizationId, Set<String> roles) {
+    record Context(UUID userId, UUID membershipId, UUID organizationId, Set<String> roles) {
         public Context { roles = Set.copyOf(roles); }
+        public Context(UUID userId, UUID organizationId, Set<String> roles) {
+            this(userId, null, organizationId, roles);
+        }
     }
 
     class Denied extends RuntimeException {}

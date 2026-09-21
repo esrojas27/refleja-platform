@@ -15,7 +15,8 @@ class ResolveOrganizationAccess implements OrganizationAccess {
         Objects.requireNonNull(organizationId);
         try {
             var principal = contexts.resolve(subject, organizationId);
-            return new Context(principal.userId(), principal.activeOrganizationId(), principal.roles());
+            return new Context(principal.userId(), principal.membershipId(),
+                    principal.activeOrganizationId(), principal.roles());
         } catch (IdentityAccessDeniedException exception) {
             throw new Denied();
         } catch (OrganizationUnavailableException exception) {

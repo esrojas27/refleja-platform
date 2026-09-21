@@ -41,11 +41,16 @@ detalle futuro de visibilidad continúa pendiente y no se amplía en este increm
 
 ### Información DISC
 
-El líder de la empresa debe poder registrar información DISC para cada colaborador.
-Se requieren cuatro campos de texto independientes: D, I, S y C. Esta información
-sólo debe ser visible para líderes autorizados de la empresa y consultores de
-Refleja Tu Interior. Deben definirse edición, auditoría y alcance por organización
-o programa antes de implementar la persistencia.
+Decisión implementada localmente el 2026-09-20: un consultor o un líder con
+inscripción activa/completada en el programa registra cuatro campos de texto
+independientes —Dominante, Influyente, Sereno y Concienzudo— para cada integrante
+con rol `COLLABORATOR`. RRHH y colaboradores no reciben visibilidad.
+
+La ficha pertenece a organización, programa e inscripción; usa RLS, control de
+versión y un historial inmutable por cada creación o actualización. La interfaz
+ofrece un recorrido individual de pendientes y permite editar fichas completas.
+No se implementan cuestionarios, puntajes, exportación ni visibilidad del
+colaborador.
 
 ### Plantillas de programa
 
@@ -126,8 +131,9 @@ La numeración oficial debe asignarse al convertir cada bloque en ticket.
    las políticas de visibilidad existentes.
 3. **Perfil inicial — implementado localmente:** formulario obligatorio, estado
    pendiente/completo y bloqueo de programas hasta completar los datos aprobados.
-4. **Ficha DISC:** cuatro campos por colaborador con autorización y aislamiento
-   tenant, una vez definido el alcance y la auditoría.
+4. **Ficha DISC — implementado localmente:** cuatro campos por colaborador,
+   acceso limitado a consultores y líderes inscritos, aislamiento tenant e
+   historial inmutable de cambios.
 5. **Progreso inicial — implementado localmente:** resumen del colaborador, vista
    operativa del consultor y desglose por programa, dimensión y sesión a partir de
    estados de actividades.
@@ -149,7 +155,7 @@ La numeración oficial debe asignarse al convertir cada bloque en ticket.
 | Preguntas de evaluaciones | Paula Rojas | Evaluaciones |
 | Alcance de Líder y RRHH | Parcialmente resuelto: roles de organización; visibilidad funcional pendiente | DISC y evaluaciones |
 | Dimensiones fijas o configurables | Resuelto: configurables; los tres nombres pertenecen a la futura plantilla | Plantillas |
-| Alcance y auditoría de DISC | Decisión de producto y privacidad | Ficha DISC |
+| Retención y anonimización de DISC | Decisión de privacidad | Operación con datos reales a escala |
 | Contenido y versionado de plantillas | Decisión de producto | Plantillas |
 | Logo y paleta aprobados | Diseño/negocio | Actualización visual |
 | Estrategia de idioma | Decisión de producto | Traducción/i18n |

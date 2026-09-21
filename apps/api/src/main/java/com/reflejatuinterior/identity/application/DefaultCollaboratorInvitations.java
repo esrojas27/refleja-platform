@@ -1,6 +1,7 @@
 package com.reflejatuinterior.identity.application;
 
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import com.reflejatuinterior.identity.CollaboratorInvitations;
@@ -36,6 +37,9 @@ class DefaultCollaboratorInvitations implements CollaboratorInvitations {
     }
     @Override public Invitation findInOrganization(UUID organizationId, UUID invitationId) { return store.findInOrganization(organizationId, invitationId); }
     @Override public Participant participant(UUID organizationId, UUID membershipId) { return store.participant(organizationId, membershipId); }
+    @Override public Set<String> participantRoles(UUID organizationId, UUID membershipId) {
+        return store.participantRoles(organizationId, membershipId);
+    }
     @Override @Transactional(propagation = Propagation.MANDATORY)
     public Invitation accept(String subject, UUID invitationId) { return store.accept(subject, invitationId); }
 

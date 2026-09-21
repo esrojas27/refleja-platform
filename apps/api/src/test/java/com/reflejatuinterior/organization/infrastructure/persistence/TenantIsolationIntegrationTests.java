@@ -34,6 +34,10 @@ class TenantIsolationIntegrationTests extends PostgreSqlIntegrationTestSupport {
     private final UUID activityB = uuid7(0xc10);
     private final UUID assignmentA = uuid7(0xc11);
     private final UUID assignmentB = uuid7(0xc12);
+    private final UUID discProfileA = uuid7(0xc13);
+    private final UUID discProfileB = uuid7(0xc14);
+    private final UUID discRevisionA = uuid7(0xc15);
+    private final UUID discRevisionB = uuid7(0xc16);
 
     @Autowired
     OrganizationTenantContext tenantContext;
@@ -47,6 +51,8 @@ class TenantIsolationIntegrationTests extends PostgreSqlIntegrationTestSupport {
     void fixture() {
         transactions = new TransactionTemplate(transactionManager);
         var admin = migratorJdbcTemplate();
+        admin.update("delete from rti.program_participant_disc_profile_revisions where organization_id in (?, ?)", organizationA, organizationB);
+        admin.update("delete from rti.program_participant_disc_profiles where organization_id in (?, ?)", organizationA, organizationB);
         admin.update("delete from rti.activity_assignments where organization_id in (?, ?)", organizationA, organizationB);
         admin.update("delete from rti.program_activities where organization_id in (?, ?)", organizationA, organizationB);
         admin.update("delete from rti.program_sessions where organization_id in (?, ?)", organizationA, organizationB);
@@ -105,6 +111,23 @@ class TenantIsolationIntegrationTests extends PostgreSqlIntegrationTestSupport {
                        (?, ?, ?, ?, ?, now(), 'ASSIGNED', now(), now(), 0)
                 """, assignmentA, organizationA, programA, activityA, enrollmentA,
                 assignmentB, organizationB, programB, activityB, enrollmentB);
+        admin.update("""
+                insert into rti.program_participant_disc_profiles
+                    (id, organization_id, program_id, enrollment_id, dominant_text, influential_text,
+                     serene_text, conscientious_text, created_by, updated_by, created_at, updated_at, version)
+                values (?, ?, ?, ?, 'D-A', 'I-A', 'S-A', 'C-A', ?, ?, now(), now(), 0),
+                       (?, ?, ?, ?, 'D-B', 'I-B', 'S-B', 'C-B', ?, ?, now(), now(), 0)
+                """, discProfileA, organizationA, programA, enrollmentA, userA, userA,
+                discProfileB, organizationB, programB, enrollmentB, userB, userB);
+        admin.update("""
+                insert into rti.program_participant_disc_profile_revisions
+                    (id, profile_id, organization_id, program_id, enrollment_id, dominant_text,
+                     influential_text, serene_text, conscientious_text, action, actor_id,
+                     profile_version, recorded_at)
+                values (?, ?, ?, ?, ?, 'D-A', 'I-A', 'S-A', 'C-A', 'CREATED', ?, 0, now()),
+                       (?, ?, ?, ?, ?, 'D-B', 'I-B', 'S-B', 'C-B', 'CREATED', ?, 0, now())
+                """, discRevisionA, discProfileA, organizationA, programA, enrollmentA, userA,
+                discRevisionB, discProfileB, organizationB, programB, enrollmentB, userB);
     }
 
     @Test
@@ -120,21 +143,28 @@ class TenantIsolationIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 join pg_namespace n on n.oid = c.relnamespace
                 where n.nspname = 'rti'
                   and c.relname in ('programs', 'enrollments', 'program_modules', 'program_sessions',
-                                    'program_activities', 'activity_assignments')
+                                    'program_activities', 'activity_assignments',
+                                    'program_participant_disc_profiles',
+                                    'program_participant_disc_profile_revisions')
                   and c.relrowsecurity
                 order by c.relname
-                """, String.class)).containsExactly("activity_assignments", "enrollments", "program_activities",
-                        "program_modules", "program_sessions", "programs");
+        """, String.class)).containsExactly("activity_assignments", "enrollments", "program_activities",
+                        "program_modules", "program_participant_disc_profile_revisions",
+                        "program_participant_disc_profiles", "program_sessions", "programs");
         assertThat(admin.queryForList("""
                 select policyname
                 from pg_policies
                 where schemaname = 'rti'
                   and tablename in ('programs', 'enrollments', 'program_modules', 'program_sessions',
-                                    'program_activities', 'activity_assignments')
+                                    'program_activities', 'activity_assignments',
+                                    'program_participant_disc_profiles',
+                                    'program_participant_disc_profile_revisions')
                 order by policyname
                 """, String.class)).containsExactly("activity_assignments_tenant_isolation",
                         "enrollments_tenant_isolation", "program_activities_tenant_isolation",
-                        "program_modules_tenant_isolation", "program_sessions_tenant_isolation",
+                        "program_modules_tenant_isolation",
+                        "program_participant_disc_profile_revisions_tenant_isolation",
+                        "program_participant_disc_profiles_tenant_isolation", "program_sessions_tenant_isolation",
                         "programs_tenant_isolation");
     }
 
@@ -146,6 +176,8 @@ class TenantIsolationIntegrationTests extends PostgreSqlIntegrationTestSupport {
         assertThat(count("program_sessions")).isZero();
         assertThat(count("program_activities")).isZero();
         assertThat(count("activity_assignments")).isZero();
+        assertThat(count("program_participant_disc_profiles")).isZero();
+        assertThat(count("program_participant_disc_profile_revisions")).isZero();
     }
 
     @Test
@@ -165,6 +197,10 @@ class TenantIsolationIntegrationTests extends PostgreSqlIntegrationTestSupport {
             assertThat(countById("program_activities", activityB)).isZero();
             assertThat(countById("activity_assignments", assignmentA)).isEqualTo(1);
             assertThat(countById("activity_assignments", assignmentB)).isZero();
+            assertThat(countById("program_participant_disc_profiles", discProfileA)).isEqualTo(1);
+            assertThat(countById("program_participant_disc_profiles", discProfileB)).isZero();
+            assertThat(countById("program_participant_disc_profile_revisions", discRevisionA)).isEqualTo(1);
+            assertThat(countById("program_participant_disc_profile_revisions", discRevisionB)).isZero();
         });
 
         assertThat(count("programs")).isZero();
@@ -173,6 +209,8 @@ class TenantIsolationIntegrationTests extends PostgreSqlIntegrationTestSupport {
         assertThat(count("program_sessions")).isZero();
         assertThat(count("program_activities")).isZero();
         assertThat(count("activity_assignments")).isZero();
+        assertThat(count("program_participant_disc_profiles")).isZero();
+        assertThat(count("program_participant_disc_profile_revisions")).isZero();
     }
 
     @Test
@@ -192,6 +230,9 @@ class TenantIsolationIntegrationTests extends PostgreSqlIntegrationTestSupport {
             assertThat(jdbcTemplate.update(
                     "update rti.activity_assignments set status = 'SUBMITTED', response_text = 'tampered', "
                             + "submitted_at = now() where id = ?", assignmentB)).isZero();
+            assertThat(jdbcTemplate.update(
+                    "update rti.program_participant_disc_profiles set dominant_text = 'tampered' where id = ?",
+                    discProfileB)).isZero();
         });
 
         var admin = migratorJdbcTemplate();
@@ -209,6 +250,31 @@ class TenantIsolationIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 .isEqualTo(1);
         assertThat(admin.queryForObject("select status from rti.activity_assignments where id = ?", String.class, assignmentB))
                 .isEqualTo("ASSIGNED");
+        assertThat(admin.queryForObject("select dominant_text from rti.program_participant_disc_profiles where id = ?",
+                String.class, discProfileB)).isEqualTo("D-B");
+    }
+
+    @Test
+    void discAuditRevisionsAreAppendOnlyForTheRuntimeRole() {
+        assertThatThrownBy(() -> transactions.executeWithoutResult(status -> {
+            tenantContext.activate(organizationA);
+            jdbcTemplate.update("update rti.program_participant_disc_profile_revisions "
+                    + "set dominant_text = 'tampered' where id = ?", discRevisionA);
+        })).isInstanceOf(DataAccessException.class);
+    }
+
+    @Test
+    void tenantContextRejectsDiscAuditReferencesFromAnotherOrganization() {
+        assertThatThrownBy(() -> transactions.executeWithoutResult(status -> {
+            tenantContext.activate(organizationA);
+            jdbcTemplate.update("""
+                    insert into rti.program_participant_disc_profile_revisions
+                        (id, profile_id, organization_id, program_id, enrollment_id, dominant_text,
+                         influential_text, serene_text, conscientious_text, action, actor_id,
+                         profile_version, recorded_at)
+                    values (?, ?, ?, ?, ?, 'D', 'I', 'S', 'C', 'UPDATED', ?, 1, now())
+                    """, uuid7(0xc17), discProfileB, organizationA, programA, enrollmentA, userA);
+        })).isInstanceOf(DataAccessException.class);
     }
 
     @Test
