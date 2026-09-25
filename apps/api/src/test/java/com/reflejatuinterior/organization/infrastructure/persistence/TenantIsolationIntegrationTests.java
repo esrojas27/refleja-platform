@@ -8,6 +8,7 @@ import java.util.UUID;
 
 import com.reflejatuinterior.PostgreSqlIntegrationTestSupport;
 import com.reflejatuinterior.organization.OrganizationTenantContext;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,19 +51,8 @@ class TenantIsolationIntegrationTests extends PostgreSqlIntegrationTestSupport {
     @BeforeEach
     void fixture() {
         transactions = new TransactionTemplate(transactionManager);
+        cleanFixtures();
         var admin = migratorJdbcTemplate();
-        admin.update("delete from rti.program_participant_disc_profile_revisions where organization_id in (?, ?)", organizationA, organizationB);
-        admin.update("delete from rti.program_participant_disc_profiles where organization_id in (?, ?)", organizationA, organizationB);
-        admin.update("delete from rti.activity_assignments where organization_id in (?, ?)", organizationA, organizationB);
-        admin.update("delete from rti.program_activities where organization_id in (?, ?)", organizationA, organizationB);
-        admin.update("delete from rti.program_sessions where organization_id in (?, ?)", organizationA, organizationB);
-        admin.update("delete from rti.program_modules where organization_id in (?, ?)", organizationA, organizationB);
-        admin.update("delete from rti.enrollments where organization_id in (?, ?)", organizationA, organizationB);
-        admin.update("delete from rti.programs where organization_id in (?, ?)", organizationA, organizationB);
-        admin.update("delete from rti.membership_roles where membership_id in (?, ?)", membershipA, membershipB);
-        admin.update("delete from rti.organization_memberships where id in (?, ?)", membershipA, membershipB);
-        admin.update("delete from rti.users where id in (?, ?)", userA, userB);
-        admin.update("delete from rti.organizations where id in (?, ?)", organizationA, organizationB);
 
         insertOrganization(organizationA);
         insertOrganization(organizationB);
@@ -128,6 +118,23 @@ class TenantIsolationIntegrationTests extends PostgreSqlIntegrationTestSupport {
                        (?, ?, ?, ?, ?, 'D-B', 'I-B', 'S-B', 'C-B', 'CREATED', ?, 0, now())
                 """, discRevisionA, discProfileA, organizationA, programA, enrollmentA, userA,
                 discRevisionB, discProfileB, organizationB, programB, enrollmentB, userB);
+    }
+
+    @AfterEach
+    void cleanFixtures() {
+        var admin = migratorJdbcTemplate();
+        admin.update("delete from rti.program_participant_disc_profile_revisions where organization_id in (?, ?)", organizationA, organizationB);
+        admin.update("delete from rti.program_participant_disc_profiles where organization_id in (?, ?)", organizationA, organizationB);
+        admin.update("delete from rti.activity_assignments where organization_id in (?, ?)", organizationA, organizationB);
+        admin.update("delete from rti.program_activities where organization_id in (?, ?)", organizationA, organizationB);
+        admin.update("delete from rti.program_sessions where organization_id in (?, ?)", organizationA, organizationB);
+        admin.update("delete from rti.program_modules where organization_id in (?, ?)", organizationA, organizationB);
+        admin.update("delete from rti.enrollments where organization_id in (?, ?)", organizationA, organizationB);
+        admin.update("delete from rti.programs where organization_id in (?, ?)", organizationA, organizationB);
+        admin.update("delete from rti.membership_roles where membership_id in (?, ?)", membershipA, membershipB);
+        admin.update("delete from rti.organization_memberships where id in (?, ?)", membershipA, membershipB);
+        admin.update("delete from rti.users where id in (?, ?)", userA, userB);
+        admin.update("delete from rti.organizations where id in (?, ?)", organizationA, organizationB);
     }
 
     @Test
