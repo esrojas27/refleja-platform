@@ -4,7 +4,8 @@ import type { AssignedActivity, ProgramActivity } from "@/lib/participation/acti
 
 const base = {
   id: "activity-a", organizationId: "org-a", programId: "program-a", moduleId: "dimension-a",
-  sessionId: "session-a", dimensionName: "Interior", sessionName: "Autoconocimiento",
+  sessionId: "session-a", dimensionName: "Interior", dimensionPosition: 1,
+  sessionName: "Autoconocimiento", sessionPosition: 1,
   title: "Reflexión", instructions: "Describe", youtubeUrl: null, dueDate: "2026-09-19",
   position: 1, version: 0,
 };

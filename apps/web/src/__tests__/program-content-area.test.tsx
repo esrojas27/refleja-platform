@@ -33,7 +33,8 @@ const dimensionData: ProgramDimension = { id: "module-a", organizationId: "org-a
     programId: "program-a", dimensionId: "module-a", name: "Sesión inicial", objective: "Definir el punto de partida",
     scheduledDate: "2026-10-01", position: 3, version: 0 }] };
 const activity: ProgramActivity = { id: "activity-a", organizationId: "org-a", programId: "program-a",
-  moduleId: "module-a", sessionId: "session-a", dimensionName: "Fundamentos", sessionName: "Sesión inicial",
+  moduleId: "module-a", sessionId: "session-a", dimensionName: "Fundamentos", dimensionPosition: 1,
+  sessionName: "Sesión inicial", sessionPosition: 1,
   title: "Reflexión inicial", instructions: "Describe tu punto de partida.", youtubeUrl: null,
   dueDate: "2026-10-08", position: 1, version: 0, assignees: [] };
 

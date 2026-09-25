@@ -7,9 +7,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: "Segoe UI", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-sans: var(--font-montserrat), Montserrat, Avenir, Helvetica, Arial, sans-serif;
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  --font-heading: var(--font-sans);
+  --font-heading: var(--font-cormorant), "Cormorant Garamond", "Playfair Display", Georgia, serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -49,70 +49,75 @@
 }
 
 :root {
-  --background: oklch(0.985 0.009 73);
-  --foreground: oklch(0.24 0.025 28);
-  --card: oklch(0.998 0.004 73);
-  --card-foreground: oklch(0.24 0.025 28);
-  --popover: oklch(0.998 0.004 73);
-  --popover-foreground: oklch(0.24 0.025 28);
-  --primary: oklch(0.43 0.12 18);
-  --primary-foreground: oklch(0.985 0.006 70);
-  --secondary: oklch(0.94 0.025 75);
-  --secondary-foreground: oklch(0.31 0.04 28);
-  --muted: oklch(0.955 0.014 73);
-  --muted-foreground: oklch(0.5 0.035 38);
-  --accent: oklch(0.925 0.04 153);
-  --accent-foreground: oklch(0.31 0.055 153);
+  --brand-black: #111111;
+  --brand-pink: #e8b8ca;
+  --brand-white: #ffffff;
+  --brand-mist: #f5e7ed;
+  --brand-graphite: #444144;
+  --background: var(--brand-white);
+  --foreground: var(--brand-black);
+  --card: var(--brand-white);
+  --card-foreground: var(--brand-black);
+  --popover: var(--brand-white);
+  --popover-foreground: var(--brand-black);
+  --primary: var(--brand-black);
+  --primary-foreground: var(--brand-white);
+  --secondary: var(--brand-mist);
+  --secondary-foreground: var(--brand-black);
+  --muted: color-mix(in srgb, var(--brand-mist) 72%, var(--brand-white));
+  --muted-foreground: var(--brand-graphite);
+  --accent: var(--brand-mist);
+  --accent-foreground: var(--brand-black);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.88 0.025 65);
-  --input: oklch(0.86 0.025 65);
-  --ring: oklch(0.55 0.11 18);
-  --chart-1: oklch(0.58 0.13 18);
-  --chart-2: oklch(0.62 0.095 153);
-  --chart-3: oklch(0.7 0.12 76);
-  --chart-4: oklch(0.52 0.07 280);
-  --chart-5: oklch(0.64 0.11 34);
-  --radius: 0.85rem;
-  --sidebar: oklch(0.97 0.012 73);
-  --sidebar-foreground: oklch(0.24 0.025 28);
-  --sidebar-primary: oklch(0.43 0.12 18);
-  --sidebar-primary-foreground: oklch(0.985 0.006 70);
-  --sidebar-accent: oklch(0.925 0.04 153);
-  --sidebar-accent-foreground: oklch(0.31 0.055 153);
-  --sidebar-border: oklch(0.88 0.025 65);
-  --sidebar-ring: oklch(0.55 0.11 18);
+  --border: color-mix(in srgb, var(--brand-pink) 48%, var(--brand-white));
+  --input: color-mix(in srgb, var(--brand-pink) 68%, var(--brand-white));
+  --ring: var(--brand-graphite);
+  --chart-1: var(--brand-black);
+  --chart-2: var(--brand-pink);
+  --chart-3: var(--brand-graphite);
+  --chart-4: #958f93;
+  --chart-5: var(--brand-mist);
+  --radius: 0.65rem;
+  --sidebar: color-mix(in srgb, var(--brand-mist) 58%, var(--brand-white));
+  --sidebar-foreground: var(--brand-black);
+  --sidebar-primary: var(--brand-black);
+  --sidebar-primary-foreground: var(--brand-white);
+  --sidebar-accent: var(--brand-mist);
+  --sidebar-accent-foreground: var(--brand-black);
+  --sidebar-border: color-mix(in srgb, var(--brand-pink) 48%, var(--brand-white));
+  --sidebar-ring: var(--brand-pink);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --background: var(--brand-black);
+  --foreground: var(--brand-white);
+  --card: var(--brand-graphite);
+  --card-foreground: var(--brand-white);
+  --popover: var(--brand-graphite);
+  --popover-foreground: var(--brand-white);
+  --primary: var(--brand-pink);
+  --primary-foreground: var(--brand-black);
+  --secondary: color-mix(in srgb, var(--brand-graphite) 76%, var(--brand-black));
+  --secondary-foreground: var(--brand-white);
+  --muted: var(--brand-graphite);
+  --muted-foreground: var(--brand-mist);
+  --accent: var(--brand-graphite);
+  --accent-foreground: var(--brand-white);
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --ring: var(--brand-pink);
+  --chart-1: var(--brand-pink);
+  --chart-2: var(--brand-white);
+  --chart-3: var(--brand-mist);
+  --chart-4: #958f93;
+  --chart-5: var(--brand-graphite);
+  --sidebar: var(--brand-graphite);
+  --sidebar-foreground: var(--brand-white);
+  --sidebar-primary: var(--brand-pink);
+  --sidebar-primary-foreground: var(--brand-black);
+  --sidebar-accent: color-mix(in srgb, var(--brand-graphite) 76%, var(--brand-black));
+  --sidebar-accent-foreground: var(--brand-white);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
 }
@@ -124,22 +129,28 @@
   body {
     @apply bg-background text-foreground;
     background-image:
-      radial-gradient(circle at 8% 4%, oklch(0.88 0.07 20 / 0.26), transparent 28rem),
-      radial-gradient(circle at 92% 14%, oklch(0.9 0.055 153 / 0.3), transparent 30rem);
+      radial-gradient(ellipse at 8% 0%, rgb(232 184 202 / 0.14), transparent 36rem);
     background-attachment: fixed;
   }
   html {
     @apply font-sans;
   }
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-heading;
+  }
 }
 
 @layer components {
   .rti-surface {
-    @apply rounded-3xl border border-border/80 bg-card/95 shadow-xl shadow-primary/5;
+    @apply rounded-3xl border border-border/80 bg-card;
+    box-shadow: 0 2px 8px rgb(17 17 17 / 0.025), 0 12px 32px rgb(17 17 17 / 0.025);
   }
 
   .rti-kicker {
-    @apply text-xs font-semibold uppercase tracking-[0.16em] text-primary;
+    @apply text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground;
   }
 
   .rti-button,
@@ -161,7 +172,7 @@
   }
 
   .rti-field {
-    @apply mt-1 min-h-11 w-full min-w-0 rounded-xl border border-input bg-background/80 px-3 py-2.5 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus:border-primary/60 focus:outline-none focus:ring-3 focus:ring-ring/15 disabled:cursor-not-allowed disabled:opacity-60;
+    @apply mt-1 min-h-11 w-full min-w-0 rounded-xl border border-input bg-background px-3 py-2.5 text-base sm:text-sm transition-colors placeholder:text-muted-foreground focus:border-primary/60 focus:outline-none focus:ring-3 focus:ring-ring/15 disabled:cursor-not-allowed disabled:opacity-60;
   }
 
   .rti-modal-scroll {
@@ -189,4 +200,121 @@
     background: color-mix(in oklab, var(--primary) 75%, transparent);
     background-clip: padding-box;
   }
+}
+
+/* Shared workspaces: readable navigation and consistent content density. */
+@layer components {
+  .rti-app {
+    background: color-mix(in srgb, var(--background) 97%, var(--brand-graphite));
+  }
+  .rti-workspace {
+    display: grid;
+    width: 100%;
+    min-width: 0;
+    align-items: start;
+    gap: 1rem;
+  }
+  .rti-workspace-sidebar {
+    min-width: 0;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 1.25rem;
+    background: var(--card);
+  }
+  .rti-workspace-nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.375rem;
+  }
+  .rti-workspace-nav > a,
+  .rti-workspace-actions > button {
+    min-width: 0;
+    white-space: normal;
+    text-align: left;
+    overflow-wrap: anywhere;
+  }
+  .rti-workspace-nav svg,
+  .rti-workspace-actions svg { flex-shrink: 0; }
+  .rti-workspace-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.375rem;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+  }
+  .rti-workspace-content {
+    min-width: 0;
+  }
+  .rti-workspace-content h1 {
+    font-size: clamp(2rem, 4vw, 2.75rem);
+    line-height: 1.1;
+    text-wrap: balance;
+  }
+  .rti-workspace-content summary {
+    min-height: 3.25rem;
+    transition: background-color 160ms ease;
+    overflow-wrap: anywhere;
+  }
+  .rti-workspace-content summary:hover {
+    background-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  .rti-workspace-content summary:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: -3px;
+    border-radius: 0.5rem;
+  }
+  .rti-progress-summary {
+    container-type: inline-size;
+    padding: clamp(1rem, 3vw, 1.75rem);
+    border: 1px solid var(--border);
+    border-radius: 1.25rem;
+    background: var(--card);
+  }
+  .rti-progress-layout {
+    display: grid;
+    gap: 1.5rem;
+    align-items: center;
+  }
+  .rti-progress-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.625rem;
+    margin-top: 1.25rem;
+  }
+  @container (min-width: 38rem) {
+    .rti-progress-layout { grid-template-columns: 9rem minmax(0, 1fr); }
+  }
+  @container (min-width: 48rem) {
+    .rti-progress-metrics { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  }
+  @media (min-width: 48rem) {
+    .rti-workspace-nav { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+  @media (min-width: 64rem) {
+    .rti-workspace { grid-template-columns: 14rem minmax(0, 1fr); gap: 1.5rem; }
+    .rti-workspace-sidebar {
+      position: sticky;
+      top: 6rem;
+      max-height: calc(100dvh - 7rem);
+      overflow-y: auto;
+      scrollbar-width: thin;
+    }
+    .rti-workspace-nav,
+    .rti-workspace-actions { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .rti-app *, .rti-app *::before, .rti-app *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* Workspace panels own their spacing instead of standalone page utilities. */
+.rti-workspace-content > .rti-surface {
+  max-width: none;
+  padding: clamp(1.125rem, 3vw, 2rem);
 }

@@ -13,6 +13,7 @@ class ApplicationModulesTest {
             "identity",
             "organization",
             "program",
+            "programtemplate",
             "participation");
 
     @Test

@@ -79,9 +79,9 @@ export function ActivityStatusBadges({ status, dueDate, surveyStatus }: {
 function ProgressSummaryCard({ progress, subject, detail }: {
   progress: ProgressSummary; subject: string; detail: string;
 }) {
-  return <div className="overflow-hidden rounded-3xl border border-primary/15 bg-gradient-to-br from-primary/10 via-card to-accent/35 p-5 sm:p-7">
-    <div className="grid gap-6 lg:grid-cols-[12rem_minmax(0,1fr)] lg:items-center">
-      <div className="mx-auto flex size-40 items-center justify-center rounded-full p-3"
+  return <div className="rti-progress-summary">
+    <div className="rti-progress-layout">
+      <div className="mx-auto flex size-32 items-center justify-center rounded-full p-3"
         style={{ background: `conic-gradient(var(--primary) ${progress.percentage}%, var(--muted) 0)` }}>
         <div className="flex size-full flex-col items-center justify-center rounded-full bg-card text-center shadow-inner">
           <strong className="text-4xl font-semibold">{progress.percentage}%</strong>
@@ -92,7 +92,7 @@ function ProgressSummaryCard({ progress, subject, detail }: {
         <h3 className="text-xl font-semibold">{subject}</h3>
         <p className="mt-2 text-sm text-muted-foreground">{detail}</p>
         <ProgressMeter progress={progress} />
-        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <div className="rti-progress-metrics">
           <Metric label="Pendientes" value={progress.pending} tone="amber" />
           <Metric label="En revisión" value={progress.inReview} tone="sky" />
           <Metric label="Con cambios" value={progress.changesRequested} tone="orange" />
@@ -112,8 +112,9 @@ function Metric({ label, value, tone }: { label: string; value: number; tone: "a
     emerald: "border-emerald-200 bg-emerald-50 text-emerald-950",
     red: "border-red-200 bg-red-50 text-red-950",
   };
-  return <div className={`rounded-2xl border px-3 py-3 ${tones[tone]}`}>
-    <strong className="block text-2xl font-semibold">{value}</strong>
+  return <div className="min-w-0 rounded-xl border border-border/70 bg-background px-3 py-3">
+    <span aria-hidden="true" className={`mb-2 block size-2 rounded-full border ${tones[tone]}`} />
+    <strong className="block text-2xl font-semibold tabular-nums">{value}</strong>
     <span className="text-xs font-medium">{label}</span>
   </div>;
 }

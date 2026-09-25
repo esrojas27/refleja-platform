@@ -132,6 +132,13 @@ export async function selectPort(preferred, alternatives = []) {
   throw new Error(`Puertos ocupados: ${[preferred, ...alternatives].join(', ')}. Cierra el servicio correspondiente o configura otro puerto.`);
 }
 
+export function nextDevelopmentArguments(nextBinary, port) {
+  // Turbopack's Windows PostCSS worker can terminate natively with 0xc0000409.
+  // Webpack keeps local development in one stable Node toolchain and is an
+  // officially supported Next.js 16 fallback. CI/build behavior is unchanged.
+  return [nextBinary, 'dev', '--webpack', '--hostname', '127.0.0.1', '--port', String(port)];
+}
+
 function launch(command, args, { cwd = root, env = process.env, log } = {}) {
   if (stopping) throw new Error('Arranque cancelado.');
   const child = spawn(command, args, { cwd, env, windowsHide: true, detached: !windows, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -335,7 +342,9 @@ async function main() {
     if (!await httpReady(`${apiOrigin}/api/v1/me`, 401)) throw new Error('/api/v1/me no devuelve el 401 esperado sin autenticacion.');
     const frontendEnv = { ...process.env, ...auth.publicEnv, NODE_ENV: 'development', NEXT_PUBLIC_API_BASE_URL: apiOrigin };
     // DB credentials loaded from .env are supplied exclusively to the API process.
-    const frontend = launch(process.execPath, [path.join(web, 'node_modules', 'next', 'dist', 'bin', 'next'), 'dev', '--hostname', '127.0.0.1', '--port', String(auth.port)], { cwd: web, env: frontendEnv, log: path.join(logDir, 'web.log') });
+    const frontend = launch(process.execPath,
+      nextDevelopmentArguments(path.join(web, 'node_modules', 'next', 'dist', 'bin', 'next'), auth.port),
+      { cwd: web, env: frontendEnv, log: path.join(logDir, 'web.log') });
     for (const route of ['/', '/login', '/account']) {
       await waitFor(`web ${route}`, () => httpReady(`${auth.origin}${route}`), startupSeconds * 1000, frontend);
     }

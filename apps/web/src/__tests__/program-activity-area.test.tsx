@@ -26,7 +26,8 @@ const identity = { cognitoSubject: "subject", user: { id: "user", email: "consul
 const enrollment = { id: "enrollment-a", organizationId: "org-a", programId: "program-a", status: "ACTIVE" as const,
   participant: { userId: "user-a", membershipId: "membership-a", email: "ana@example.test", firstName: "Ana", lastName: "Prueba" }, invitation: null };
 const activity: ProgramActivity = { id: "activity-a", organizationId: "org-a", programId: "program-a", moduleId: "module-a",
-  sessionId: "session-a", dimensionName: "Fundamentos", sessionName: "Sesión inicial",
+  sessionId: "session-a", dimensionName: "Fundamentos", dimensionPosition: 1,
+  sessionName: "Sesión inicial", sessionPosition: 1,
   title: "Reflexión inicial", instructions: "Describe tu punto de partida.",
   youtubeUrl: "https://youtu.be/dQw4w9WgXcQ", dueDate: "2026-10-08",
   position: 1, version: 0, assignees: [{ assignmentId: "assignment-a", enrollmentId: "enrollment-a",

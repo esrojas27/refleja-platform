@@ -1,4 +1,5 @@
 import { ArrowRight, Building2, ClipboardCheck, UsersRound } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 
 import { Brand } from "@/components/layout/brand";
@@ -55,6 +56,16 @@ export default function Home() {
           <div className="rti-surface relative overflow-hidden p-6 sm:p-8">
             <div aria-hidden="true" className="absolute -right-16 -top-16 size-48 rounded-full bg-accent/70 blur-3xl" />
             <div className="relative">
+              <div className="mb-7 overflow-hidden rounded-2xl border border-border/70 bg-white p-3 shadow-sm">
+                <Image
+                  src="/brand/RP_LOGO_PNG.png"
+                  alt=""
+                  width={2550}
+                  height={811}
+                  sizes="(min-width: 1024px) 36rem, 90vw"
+                  className="h-auto w-full"
+                />
+              </div>
               <p className="rti-kicker">Una experiencia compartida</p>
               <h2 className="mt-4 text-2xl font-semibold tracking-tight sm:text-3xl">
                 Del programa a la experiencia de cada persona.

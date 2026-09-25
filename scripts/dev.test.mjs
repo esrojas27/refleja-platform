@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import net from 'node:net';
 import { test } from 'node:test';
-import { authenticationEnvironment, invitationEnvironment, parseEnvironment, portAvailable, redact, selectPort } from './dev.mjs';
+import { authenticationEnvironment, invitationEnvironment, nextDevelopmentArguments,
+  parseEnvironment, portAvailable, redact, selectPort } from './dev.mjs';
 
 const backend = {
   COGNITO_APP_CLIENT_ID: 'test-client',
@@ -64,4 +65,9 @@ test('an IPv4-only listener is detected even when IPv6 can bind the same port', 
   await new Promise((resolve) => occupied.listen(0, '127.0.0.1', resolve));
   try { assert.equal(await portAvailable(occupied.address().port), false); }
   finally { await new Promise((resolve) => occupied.close(resolve)); }
+});
+
+test('local Next.js uses the supported webpack fallback on Windows-safe arguments', () => {
+  assert.deepEqual(nextDevelopmentArguments('next-bin', 3000),
+    ['next-bin', 'dev', '--webpack', '--hostname', '127.0.0.1', '--port', '3000']);
 });

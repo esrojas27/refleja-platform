@@ -12,5 +12,6 @@ describe("Home page", () => {
     ).toBeDefined();
     expect(screen.getByText("Una experiencia compartida")).toBeDefined();
     expect(screen.getByRole("link", { name: "Entrar a la plataforma" }).getAttribute("href")).toBe("/login");
+    expect(document.querySelector('img[src*="RP_LOGO_PNG.png"]')).not.toBeNull();
   });
 });

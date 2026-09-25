@@ -54,16 +54,17 @@ colaborador.
 
 ### Plantillas de programa
 
-Un programa existente podrá convertirse en una plantilla reutilizable para crear
-nuevos programas. Se debe definir qué se copia —dimensiones, sesiones, actividades,
-fechas relativas y evaluaciones—, qué información se excluye y cómo se versiona una
-plantilla después de haber sido utilizada.
+Implementado el 2026-09-24: un programa completo puede convertirse en una plantilla
+reutilizable y crear nuevos programas `DRAFT`. El snapshot copia dimensiones,
+sesiones, actividades, fechas relativas y encuestas. Excluye personas, invitaciones,
+asignaciones, entregas, respuestas, revisiones, progreso y DISC.
 
 Base habilitada el 2026-09-20: el contenido del programa se gestiona como acordeón
 **Dimensión → Sesión → Actividad**, los formularios se abren en modales y una
 actividad puede existir sin participantes ni asignaciones. Esto permite preparar
-la estructura reutilizable; la creación, clonación y versionado de la plantilla
-siguen pendientes.
+la estructura reutilizable. La primera versión usa snapshots inmutables en un
+catálogo global reutilizable entre organizaciones; la edición y el versionado explícito de plantillas quedan para una
+iteración posterior. Véase [Plantillas reutilizables de programa](program-templates.md).
 
 ### Terminología del programa
 
@@ -75,7 +76,8 @@ siguen pendientes.
 Decisión cerrada el 2026-09-14: las dimensiones son configurables. La interfaz y
 el cliente usan el nuevo lenguaje; la API v1 mantiene las rutas `/modules` y el
 campo `moduleId` por compatibilidad. Se agregó `objective` de forma aditiva y el
-contenido previo se conserva. La creación de plantillas continúa pendiente.
+contenido previo se conserva. Las plantillas no crean automáticamente estas tres
+dimensiones: copian exactamente el contenido validado del programa fuente.
 
 ### Video de YouTube en actividades
 
@@ -174,9 +176,9 @@ La numeración oficial debe asignarse al convertir cada bloque en ticket.
 | Campos del perfil básico | Resuelto: nombre completo, fecha de nacimiento, teléfono, ciudad, país y cargo; correo y empresa derivados | Implementado |
 | Preguntas de evaluaciones | Paula Rojas | Evaluaciones |
 | Alcance de Líder y RRHH | Parcialmente resuelto: roles de organización; visibilidad funcional pendiente | DISC y evaluaciones |
-| Dimensiones fijas o configurables | Resuelto: configurables; los tres nombres pertenecen a la futura plantilla | Plantillas |
+| Dimensiones fijas o configurables | Resuelto: configurables; una plantilla copia las dimensiones del programa fuente | Implementado |
 | Retención y anonimización de DISC | Decisión de privacidad | Operación con datos reales a escala |
-| Contenido y versionado de plantillas | Decisión de producto | Plantillas |
+| Contenido y versionado de plantillas | Resuelto para V1: snapshot inmutable; edición/versionado explícito posterior | Implementado |
 | Logo y paleta aprobados | Diseño/negocio | Actualización visual |
 | Estrategia de idioma | Decisión de producto | Traducción/i18n |
 | Reglas de avisos | Decisión operativa | Notificaciones |

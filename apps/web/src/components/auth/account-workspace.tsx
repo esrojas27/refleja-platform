@@ -114,13 +114,13 @@ export function AccountWorkspace({ children }: { children: ReactNode }) {
     ? "bg-primary text-primary-foreground shadow-sm" : inactiveMenuItemClass}`;
 
   return <AccountWorkspaceContext.Provider value={value}>
-    <div className="mx-auto grid w-full max-w-[90rem] gap-5 lg:grid-cols-[15rem_minmax(0,1fr)] lg:items-start">
-      <aside className="rti-surface overflow-hidden p-3 lg:sticky lg:top-24" aria-label="Navegación de la cuenta">
+    <div className="rti-workspace">
+      <aside className="rti-workspace-sidebar" aria-label="Navegación de la cuenta">
         <div className="px-3 pb-3 pt-2">
           <p className="rti-kicker">Tu espacio</p>
           <p className="mt-2 text-lg font-semibold">Cuenta</p>
         </div>
-        <nav aria-label="Secciones de la cuenta" className="flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible">
+        <nav aria-label="Secciones de la cuenta" className="rti-workspace-nav">
           <Link href="/account" aria-current={pathname === "/account" ? "page" : undefined} className={itemClass(pathname === "/account")}>
             <UserRound aria-hidden="true" className="size-4" />Cuenta
           </Link>
@@ -147,7 +147,7 @@ export function AccountWorkspace({ children }: { children: ReactNode }) {
             <CirclePlus aria-hidden="true" className="size-4" />Crear organización
           </Link>}
         </nav>
-        <div className="mt-3 flex gap-2 overflow-x-auto border-t border-border/70 px-1 pt-3 lg:flex-col lg:overflow-visible">
+        <div className="rti-workspace-actions">
           <button type="button" disabled={pending} onClick={() => void refreshIdentity(identity?.activeOrganizationId ?? undefined)}
             className={`${menuItemClass} ${inactiveMenuItemClass} disabled:cursor-not-allowed disabled:opacity-60`}>
             <RefreshCw aria-hidden="true" className={`size-4 ${pending ? "animate-spin" : ""}`} />Comprobar sesión
@@ -157,7 +157,7 @@ export function AccountWorkspace({ children }: { children: ReactNode }) {
           </button>
         </div>
       </aside>
-      <div className="min-w-0">{children}</div>
+      <div className="rti-workspace-content">{children}</div>
     </div>
   </AccountWorkspaceContext.Provider>;
 }

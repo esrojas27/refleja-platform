@@ -23,7 +23,8 @@ const program: MyProgram = {
 const page = { items: [program], page: 0, size: 20, totalElements: 1, totalPages: 1 };
 const assignedActivity: AssignedActivity = { id: "activity-a", organizationId: "org-a",
   programId: "program-a", moduleId: "module-a", sessionId: "session-a",
-  dimensionName: "Interior", sessionName: "Autoconocimiento", title: "Reflexión inicial",
+  dimensionName: "Interior", dimensionPosition: 1, sessionName: "Autoconocimiento", sessionPosition: 1,
+  title: "Reflexión inicial",
   instructions: "Describe tu punto de partida.", youtubeUrl: "https://youtu.be/dQw4w9WgXcQ",
   dueDate: "2026-10-08", position: 1, version: 0,
   assignmentId: "assignment-a", assignmentStatus: "ASSIGNED", responseText: null, submittedAt: null,
@@ -51,7 +52,8 @@ afterEach(() => { cleanup(); vi.resetAllMocks(); });
 async function openAssignedActivity() {
   await screen.findByText("Interior", { exact: true });
   for (const label of ["Interior", "Autoconocimiento", "Reflexión inicial"]) {
-    const summary = screen.getByText(label, { exact: true }).closest("summary");
+    const summary = screen.getAllByText(label, { exact: true })
+      .map(element => element.closest("summary")).find(Boolean);
     expect(summary).not.toBeNull();
     fireEvent.click(summary!);
     expect((summary!.parentElement as HTMLDetailsElement).open).toBe(true);
@@ -80,13 +82,32 @@ it("opens the program summary with progress without requesting participant ident
 
 it("shows assigned work only in the activities section", async () => {
   render(<MyProgramArea mode="activities" programId="program-a" />);
-  expect(await screen.findByText("Reflexión inicial")).toBeTruthy();
+  expect((await screen.findAllByText("Reflexión inicial")).length).toBe(2);
   expect(screen.getByText("Interior", { exact: true }).closest("details")?.open).toBe(false);
   expect(screen.getByText("Autoconocimiento", { exact: true }).closest("details")?.open).toBe(false);
   await openAssignedActivity();
   expect(screen.getByRole("link", { name: "Ver video en YouTube" }).getAttribute("href")).toBe("https://youtu.be/dQw4w9WgXcQ");
   expect(screen.queryByRole("heading", { name: "Progreso del programa" })).toBeNull();
   expect(listMyProgramActivities).toHaveBeenCalledWith("program-a", expect.any(AbortSignal));
+});
+
+it("highlights the first actionable activity in program structure order instead of due-date order", async () => {
+  const firstPending = { ...assignedActivity, id: "activity-first", title: "Primera pendiente",
+    dimensionPosition: 1, sessionPosition: 1, position: 2, dueDate: "2026-12-20" };
+  const laterPending = { ...assignedActivity, id: "activity-later", moduleId: "module-b", sessionId: "session-b",
+    dimensionName: "Exterior", dimensionPosition: 2, sessionName: "Proyección", sessionPosition: 1,
+    title: "Pendiente posterior", position: 1, dueDate: "2026-09-20" };
+  const completedFirst = { ...assignedActivity, id: "activity-completed", title: "Ya completada", position: 1,
+    assignmentStatus: "COMPLETED" as const, completionPercentage: 100,
+    survey: { ...assignedActivity.survey!, status: "COMPLETED" as const, completedAt: "2026-09-10T12:00:00Z" } };
+  vi.mocked(listMyProgramActivities).mockResolvedValue({ items: [laterPending, firstPending, completedFirst] });
+
+  render(<MyProgramArea mode="activities" programId="program-a" />);
+
+  const notice = await screen.findByRole("complementary", { name: "Tu próxima actividad" });
+  expect(within(notice).getByText("Primera pendiente")).toBeTruthy();
+  expect(within(notice).queryByText("Pendiente posterior")).toBeNull();
+  expect(within(notice).getByText(/Después de esta tienes 1 actividad pendiente/)).toBeTruthy();
 });
 
 it("shows overdue as a visual activity label without replacing its workflow state", async () => {

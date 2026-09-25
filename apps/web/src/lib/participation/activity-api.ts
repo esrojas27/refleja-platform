@@ -18,7 +18,7 @@ export type ActivityAssignee = {
 export type ActivityAssignmentStatus = "ASSIGNED" | "SUBMITTED" | "CHANGES_REQUESTED" | "COMPLETED";
 export type ProgramActivity = {
   id: string; organizationId: string; programId: string; moduleId: string; sessionId: string;
-  dimensionName: string; sessionName: string;
+  dimensionName: string; dimensionPosition: number; sessionName: string; sessionPosition: number;
   title: string; instructions: string; youtubeUrl: string | null; dueDate: string; position: number; version: number;
   assignees: ActivityAssignee[];
 };
@@ -34,6 +34,25 @@ export type ActivityInput = {
 export type ActivityReviewInput = { decision: "APPROVE" | "REQUEST_CHANGES"; comment: string | null };
 export type ActivitySurveyAnswerInput = { questionId: string; values: string[] };
 export type ActivitySurveySubmission = { evaluationId: string; status: "COMPLETED"; completedAt: string };
+
+export function compareAssignedActivityOrder(left: AssignedActivity, right: AssignedActivity) {
+  return left.dimensionPosition - right.dimensionPosition
+    || left.moduleId.localeCompare(right.moduleId)
+    || left.sessionPosition - right.sessionPosition
+    || left.sessionId.localeCompare(right.sessionId)
+    || left.position - right.position
+    || left.id.localeCompare(right.id);
+}
+
+export function needsCollaboratorAction(activity: AssignedActivity) {
+  return activity.assignmentStatus === "ASSIGNED"
+    || activity.assignmentStatus === "CHANGES_REQUESTED"
+    || activity.survey?.status === "PENDING";
+}
+
+export function pendingAssignedActivities(activities: AssignedActivity[]) {
+  return activities.filter(needsCollaboratorAction).sort(compareAssignedActivityOrder);
+}
 
 export class ActivityRequestError extends Error {
   constructor(public readonly status: number, public readonly fields: string[] = [], public readonly requestId?: string) {

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Flag } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import {
@@ -14,7 +14,8 @@ import {
   type PageResult,
 } from "@/lib/participation/participation-api";
 import { activityErrorMessage, listMyProgramActivities, submitMyActivity,
-  type AssignedActivity } from "@/lib/participation/activity-api";
+  compareAssignedActivityOrder, pendingAssignedActivities, type AssignedActivity } from "@/lib/participation/activity-api";
+import { useCollaboratorActivities } from "@/components/participation/collaborator-activities-state";
 import { ActivityStatusBadges, CollaboratorProgressOverview } from "@/components/participation/progress-overview";
 import { ActivitySurveyForm } from "@/components/participation/activity-survey-form";
 
@@ -123,7 +124,7 @@ type ActivityDimensionGroup = { id: string; name: string; sessions: ActivitySess
 
 function groupAssignedActivities(activities: AssignedActivity[]): ActivityDimensionGroup[] {
   const dimensions = new Map<string, ActivityDimensionGroup & { sessionMap: Map<string, ActivitySessionGroup> }>();
-  for (const activity of activities) {
+  for (const activity of [...activities].sort(compareAssignedActivityOrder)) {
     let dimension = dimensions.get(activity.moduleId);
     if (!dimension) {
       dimension = { id: activity.moduleId, name: activity.dimensionName, sessions: [], sessionMap: new Map() };
@@ -147,24 +148,34 @@ function groupAssignedActivities(activities: AssignedActivity[]): ActivityDimens
 }
 
 function AssignedActivityList({ programId, section }: { programId: string; section: "summary" | "activities" }) {
-  const [activities, setActivities] = useState<AssignedActivity[]>();
-  const [message, setMessage] = useState("Cargando actividades asignadas…");
+  const shared = useCollaboratorActivities();
+  const [localActivities, setLocalActivities] = useState<AssignedActivity[]>();
+  const [localMessage, setLocalMessage] = useState("Cargando actividades asignadas…");
+  const activities = shared?.activities ?? localActivities;
+  const message = shared?.message ?? localMessage;
 
   useEffect(() => {
+    if (shared) return;
     const controller = new AbortController();
     listMyProgramActivities(programId, controller.signal).then(result => {
       if (controller.signal.aborted) return;
-      setActivities(result.items);
-      setMessage(result.items.length ? "" : "Todavía no tienes actividades asignadas en este programa.");
+      setLocalActivities(result.items);
+      setLocalMessage(result.items.length ? "" : "Todavía no tienes actividades asignadas en este programa.");
     }).catch(error => {
-      if (!controller.signal.aborted) setMessage(activityErrorMessage(error));
+      if (!controller.signal.aborted) setLocalMessage(activityErrorMessage(error));
     });
     return () => controller.abort();
-  }, [programId]);
+  }, [programId, shared]);
+
+  function updateActivity(updated: AssignedActivity) {
+    if (shared) shared.updateActivity(updated);
+    else setLocalActivities(current => current?.map(activity => activity.id === updated.id ? updated : activity));
+  }
 
   return <div className="space-y-8">
     {section === "summary" && activities && <CollaboratorProgressOverview activities={activities} />}
     {section === "activities" && <section aria-labelledby="assigned-activities-title">
+    {activities && activities.length > 0 && <NextActivityNotice activities={activities} />}
     <h2 id="assigned-activities-title" className="text-xl font-semibold">Actividades asignadas</h2>
     {message && <p role="status" className="mt-3 rounded-2xl bg-muted/60 px-4 py-3 text-sm">{message}</p>}
     {activities && activities.length > 0 && <div className="mt-4 space-y-4">
@@ -192,8 +203,7 @@ function AssignedActivityList({ programId, section }: { programId: string; secti
               </summary>
               <ol className="space-y-3 border-t border-border/70 p-3 sm:p-4">
                 {session.activities.map(activity => <AssignedActivityAccordion key={activity.id} programId={programId}
-                  activity={activity} onSubmitted={updated => setActivities(current => current?.map(item =>
-                    item.id === updated.id ? updated : item))} />)}
+                  activity={activity} onSubmitted={updateActivity} />)}
               </ol>
             </details>)}
           </div>
@@ -204,10 +214,44 @@ function AssignedActivityList({ programId, section }: { programId: string; secti
   </div>;
 }
 
+function NextActivityNotice({ activities }: { activities: AssignedActivity[] }) {
+  const pending = pendingAssignedActivities(activities);
+  const next = pending[0];
+  if (!next) return <aside aria-label="Estado de tus actividades"
+    className="mb-6 rounded-2xl border border-border bg-[var(--brand-mist)] px-5 py-4">
+    <p className="rti-kicker">Estás al día</p>
+    <p className="mt-2 font-semibold">No tienes actividades pendientes por completar.</p>
+  </aside>;
+
+  const nextStep = next.survey?.status === "PENDING" ? "Completa la encuesta pendiente"
+    : next.assignmentStatus === "CHANGES_REQUESTED" ? "Realiza los cambios solicitados"
+      : "Completa esta actividad";
+  return <aside aria-label="Tu próxima actividad"
+    className="mb-6 overflow-hidden rounded-2xl border border-[var(--brand-pink)] bg-[var(--brand-mist)]">
+    <div className="flex gap-4 p-5 sm:p-6">
+      <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[var(--brand-black)] text-white">
+        <Flag aria-hidden="true" className="size-5" />
+      </span>
+      <div className="min-w-0">
+        <p className="rti-kicker">Tu próxima actividad</p>
+        <h2 className="mt-2 break-words text-xl font-semibold">{next.title}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {next.dimensionName} · {next.sessionName} · Actividad {next.position}
+        </p>
+        <p className="mt-3 text-sm font-semibold">{nextStep}</p>
+        <p className="mt-1 text-sm text-muted-foreground">Fecha límite: {next.dueDate}</p>
+        {pending.length > 1 && <p className="mt-3 text-xs font-medium text-muted-foreground">
+          Después de esta tienes {pending.length - 1} {pending.length === 2 ? "actividad pendiente" : "actividades pendientes"}.
+        </p>}
+      </div>
+    </div>
+  </aside>;
+}
+
 function AssignedActivityAccordion({ programId, activity, onSubmitted }: {
   programId: string; activity: AssignedActivity; onSubmitted: (activity: AssignedActivity) => void;
 }) {
-  return <li><details className="group/activity overflow-hidden rounded-xl border border-border/70 bg-background">
+  return <li id={`activity-${activity.id}`}><details className="group/activity overflow-hidden rounded-xl border border-border/70 bg-background">
     <summary className="flex cursor-pointer list-none flex-col gap-3 px-4 py-3 marker:hidden sm:flex-row sm:items-center sm:justify-between [&::-webkit-details-marker]:hidden">
       <span><span className="rti-kicker block">Actividad {activity.position}</span>
         <span className="mt-1 block font-semibold">{activity.title}</span></span>

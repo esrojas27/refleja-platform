@@ -358,6 +358,14 @@ Los incrementos posteriores agregan `program_modules`, `program_sessions`,
 `program_activities` y `activity_assignments`. Las definiciones de actividad son
 propiedad de `program`; las asignaciones pertenecen a `participation`.
 
+Las plantillas de programa se guardan como snapshots inmutables en un catálogo
+global reutilizable entre organizaciones. Conservan la organización fuente solo
+como procedencia y copian la definición completa de dimensiones,
+sesiones, actividades y encuestas, pero nunca participantes, asignaciones,
+respuestas, progreso ni fichas DISC. Al materializar una plantilla, las fechas de
+sesiones y actividades se recalculan respecto a la fecha de inicio de la nueva
+cohorte.
+
 El perfil inicial agrega datos personales a `users` y conserva `job_title` y
 `profile_status` en `organization_memberships`. El estado se persiste por nombre
 simbólico (`PENDING` o `COMPLETE`) y no sustituye el estado operativo de la

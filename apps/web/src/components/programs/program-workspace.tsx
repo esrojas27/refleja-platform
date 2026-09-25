@@ -75,13 +75,13 @@ export function ProgramWorkspace({
   ];
 
   return (
-    <div className="mx-auto grid w-full max-w-[90rem] gap-5 lg:grid-cols-[15rem_minmax(0,1fr)] lg:items-start">
-      <aside className="rti-surface overflow-hidden p-3 lg:sticky lg:top-24" aria-label="Espacio de trabajo del programa">
+    <div className="rti-workspace">
+      <aside className="rti-workspace-sidebar" aria-label="Espacio de trabajo del programa">
         <div className="px-3 pb-3 pt-2">
           <p className="rti-kicker">Espacio de trabajo</p>
           <p className="mt-2 text-lg font-semibold">Programa</p>
         </div>
-        <nav aria-label="Secciones del programa" className="flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible">
+        <nav aria-label="Secciones del programa" className="rti-workspace-nav">
           {items.map(item => {
             const Icon = item.icon;
             const selected = item.active(pathname);
@@ -109,7 +109,7 @@ export function ProgramWorkspace({
           </Link>
         </div>
       </aside>
-      <div className="min-w-0">{children}</div>
+      <div className="rti-workspace-content">{children}</div>
     </div>
   );
 }

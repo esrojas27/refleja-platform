@@ -221,7 +221,8 @@ public class ActivityService {
                     evaluation, completedAt.get(assignment.id())));
         }
         return new ActivityResponse(activity.id(), activity.organizationId(), activity.programId(),
-                activity.moduleId(), activity.sessionId(), activity.dimensionName(), activity.sessionName(),
+                activity.moduleId(), activity.sessionId(), activity.dimensionName(), activity.dimensionPosition(),
+                activity.sessionName(), activity.sessionPosition(),
                 activity.title(), activity.instructions(), activity.youtubeUrl(), activity.dueDate(),
                 activity.position(), activity.version(), assignees);
     }
@@ -242,7 +243,8 @@ public class ActivityService {
             ActivityAssignments.Data assignment, Optional<ActivityEvaluations.Evaluation> evaluation,
             Instant surveyCompletedAt) {
         return new AssignedActivityResponse(activity.id(), activity.organizationId(), activity.programId(),
-                activity.moduleId(), activity.sessionId(), activity.dimensionName(), activity.sessionName(),
+                activity.moduleId(), activity.sessionId(), activity.dimensionName(), activity.dimensionPosition(),
+                activity.sessionName(), activity.sessionPosition(),
                 activity.title(), activity.instructions(), activity.youtubeUrl(), activity.dueDate(),
                 activity.position(), activity.version(), assignment.id(), assignment.status(),
                 assignment.responseText(), assignment.submittedAt(), assignment.reviewComment(),
@@ -294,13 +296,15 @@ public class ActivityService {
             String reviewComment, Instant reviewedAt, String surveyStatus,
             int completionPercentage, long version) {}
     public record ActivityResponse(UUID id, UUID organizationId, UUID programId, UUID moduleId, UUID sessionId,
-            String dimensionName, String sessionName, String title, String instructions, String youtubeUrl,
+            String dimensionName, int dimensionPosition, String sessionName, int sessionPosition,
+            String title, String instructions, String youtubeUrl,
             LocalDate dueDate, int position, long version,
             List<AssigneeResponse> assignees) {
         public ActivityResponse { assignees = List.copyOf(assignees); }
     }
     public record AssignedActivityResponse(UUID id, UUID organizationId, UUID programId, UUID moduleId,
-            UUID sessionId, String dimensionName, String sessionName, String title, String instructions,
+            UUID sessionId, String dimensionName, int dimensionPosition, String sessionName, int sessionPosition,
+            String title, String instructions,
             String youtubeUrl, LocalDate dueDate, int position, long version,
             UUID assignmentId, String assignmentStatus, String responseText, Instant submittedAt,
             String reviewComment, Instant reviewedAt, long assignmentVersion,

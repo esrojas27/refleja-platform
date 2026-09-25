@@ -13,7 +13,7 @@ public interface ProgramActivities {
     List<Activity> findAll(UUID organizationId, UUID programId, Collection<UUID> activityIds);
 
     record Activity(UUID id, UUID organizationId, UUID programId, UUID moduleId, UUID sessionId,
-                    String dimensionName, String sessionName,
+                    String dimensionName, int dimensionPosition, String sessionName, int sessionPosition,
                     String title, String instructions, String youtubeUrl, LocalDate dueDate,
                     int position, long version) {}
 

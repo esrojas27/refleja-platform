@@ -44,7 +44,8 @@ class JpaProgramActivities implements ProgramActivities {
                 .orElseThrow(Missing::new);
         return data(activities.saveAndFlush(new ProgramActivityJpaEntity(organizationId, programId,
                 session.moduleId(), session.id(), input.title(), input.instructions(), input.youtubeUrl(),
-                input.dueDate(), input.position())), module.name(), session.name());
+                input.dueDate(), input.position())), module.name(), module.position(),
+                session.name(), session.position());
     }
 
     @Override
@@ -58,10 +59,7 @@ class JpaProgramActivities implements ProgramActivities {
     public List<Activity> findAll(UUID organizationId, UUID programId, Collection<UUID> activityIds) {
         if (activityIds.isEmpty()) return List.of();
         return contextualize(organizationId, programId,
-                activities.findByOrganizationIdAndProgramIdAndIdIn(organizationId, programId, activityIds))
-                .stream()
-                .sorted(Comparator.comparing(Activity::dueDate).thenComparing(Activity::position).thenComparing(Activity::id))
-                .toList();
+                activities.findByOrganizationIdAndProgramIdAndIdIn(organizationId, programId, activityIds));
     }
 
     private List<Activity> contextualize(UUID organizationId, UUID programId,
@@ -77,13 +75,20 @@ class JpaProgramActivities implements ProgramActivities {
             var dimension = dimensions.get(entity.moduleId());
             var session = programSessions.get(entity.sessionId());
             if (dimension == null || session == null) throw new Missing();
-            return data(entity, dimension.name(), session.name());
-        }).toList();
+            return data(entity, dimension.name(), dimension.position(), session.name(), session.position());
+        }).sorted(Comparator.comparingInt(Activity::dimensionPosition)
+                .thenComparing(Activity::moduleId)
+                .thenComparingInt(Activity::sessionPosition)
+                .thenComparing(Activity::sessionId)
+                .thenComparingInt(Activity::position)
+                .thenComparing(Activity::id)).toList();
     }
 
-    private static Activity data(ProgramActivityJpaEntity entity, String dimensionName, String sessionName) {
+    private static Activity data(ProgramActivityJpaEntity entity, String dimensionName, int dimensionPosition,
+            String sessionName, int sessionPosition) {
         return new Activity(entity.id(), entity.organizationId(), entity.programId(), entity.moduleId(),
-                entity.sessionId(), dimensionName, sessionName, entity.title(), entity.instructions(),
-                entity.youtubeUrl(), entity.dueDate(), entity.position(), entity.version());
+                entity.sessionId(), dimensionName, dimensionPosition, sessionName, sessionPosition,
+                entity.title(), entity.instructions(), entity.youtubeUrl(), entity.dueDate(),
+                entity.position(), entity.version());
     }
 }
