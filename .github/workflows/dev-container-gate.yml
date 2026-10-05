@@ -1,0 +1,84 @@
+name: DEV container gate
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/dev-container-gate.yml"
+      - "apps/api/Dockerfile"
+      - "apps/api/pom.xml"
+      - "apps/api/src/**"
+      - "apps/web/Dockerfile"
+      - "apps/web/package.json"
+      - "apps/web/package-lock.json"
+      - "apps/web/next.config.ts"
+      - "apps/web/public/**"
+      - "apps/web/src/**"
+      - "compose.dev.yml"
+      - "config/dev.env.example"
+      - "infra/dev/**"
+      - "scripts/check-dev-container-budget.mjs"
+  push:
+    branches: [master]
+    paths:
+      - ".github/workflows/dev-container-gate.yml"
+      - "apps/api/Dockerfile"
+      - "apps/api/pom.xml"
+      - "apps/api/src/**"
+      - "apps/web/Dockerfile"
+      - "apps/web/package.json"
+      - "apps/web/package-lock.json"
+      - "apps/web/next.config.ts"
+      - "apps/web/public/**"
+      - "apps/web/src/**"
+      - "compose.dev.yml"
+      - "config/dev.env.example"
+      - "infra/dev/**"
+      - "scripts/check-dev-container-budget.mjs"
+  workflow_dispatch:
+
+concurrency:
+  group: dev-container-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  arm64-images:
+    name: Validate ARM64 images and 2 GiB layout
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+      - uses: docker/setup-buildx-action@v3
+      - name: Validate isolated ports and memory budget
+        run: node scripts/check-dev-container-budget.mjs
+      - name: Build API for Graviton
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/api
+          file: apps/api/Dockerfile
+          platforms: linux/arm64
+          push: false
+          cache-from: type=gha,scope=dev-api-arm64
+          cache-to: type=gha,mode=max,scope=dev-api-arm64
+      - name: Build web for Graviton
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/web
+          file: apps/web/Dockerfile
+          platforms: linux/arm64
+          push: false
+          build-args: |
+            NEXT_PUBLIC_AWS_REGION=us-east-1
+            NEXT_PUBLIC_COGNITO_USER_POOL_ID=us-east-1_EXAMPLE
+            NEXT_PUBLIC_COGNITO_APP_CLIENT_ID=example
+            NEXT_PUBLIC_COGNITO_DOMAIN=example.auth.us-east-1.amazoncognito.com
+            NEXT_PUBLIC_COGNITO_REDIRECT_SIGN_IN=http://localhost:8088/account
+            NEXT_PUBLIC_COGNITO_REDIRECT_SIGN_OUT=http://localhost:8088/login
+            NEXT_PUBLIC_API_BASE_URL=http://localhost:8088
+          cache-from: type=gha,scope=dev-web-arm64
+          cache-to: type=gha,mode=max,scope=dev-web-arm64

@@ -11,6 +11,8 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+config/*.env
+!config/*.env.example
 
 # Logs and test output
 *.log

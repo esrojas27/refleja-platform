@@ -9,5 +9,10 @@ Los ADR aceptados son restricciones arquitectónicas para la Plataforma Refleja 
 | ADR-003 — Multi-Tenancy, Identity and Authorization Model | Accepted | 2026-08-18 | [Abrir ADR-003](https://docs.google.com/document/d/1vzpG5ZiD6uTD6jT9USe_R1rdhU7bN54Q38Ty3Udu-Ik/edit?tab=t.dn8lzy7mbl8c) |
 | ADR-004 — Data Model, Database Ownership and Persistence Strategy | Accepted | 2026-08-18 | [Abrir ADR-004](https://docs.google.com/document/d/1vzpG5ZiD6uTD6jT9USe_R1rdhU7bN54Q38Ty3Udu-Ik/edit?tab=t.xp6hlc982bad) |
 | ADR-005 — API Design and REST Conventions | Accepted | 2026-08-23 | [Abrir ADR-005](https://docs.google.com/document/d/1vzpG5ZiD6uTD6jT9USe_R1rdhU7bN54Q38Ty3Udu-Ik/edit?tab=t.eonywumg69hn) |
+| ADR-006 — Despliegue DEV con presupuesto máximo de USD 20 | Accepted | 2026-10-04 | [Ver decisión local](./006-dev-deployment-under-20-usd.md) |
 
 Los ADR se referencian en lugar de duplicarse para evitar que una copia local quede desactualizada respecto de la fuente canónica.
+
+ADR-006 se conserva localmente porque documenta una restricción operativa y de
+costos específica del entorno DEV. Debe incorporarse a la fuente canónica antes
+de promover esta arquitectura a un ambiente compartido de larga duración.

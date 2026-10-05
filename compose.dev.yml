@@ -1,0 +1,143 @@
+name: refleja-tu-interior-dev
+
+services:
+  proxy:
+    image: caddy:2.10.2-alpine
+    environment:
+      DEV_SITE_ADDRESS: ${DEV_SITE_ADDRESS:-http://localhost}
+    ports:
+      - "${DEV_HTTP_PORT:-8088}:80"
+      - "${DEV_HTTPS_PORT:-8443}:443"
+    volumes:
+      - ./infra/dev/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:2019/config/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    mem_limit: 64m
+    cpus: 0.10
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+  web:
+    image: ${WEB_IMAGE:-refleja-tu-interior-web:dev}
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_AWS_REGION: ${NEXT_PUBLIC_AWS_REGION:?Set NEXT_PUBLIC_AWS_REGION}
+        NEXT_PUBLIC_COGNITO_USER_POOL_ID: ${NEXT_PUBLIC_COGNITO_USER_POOL_ID:?Set NEXT_PUBLIC_COGNITO_USER_POOL_ID}
+        NEXT_PUBLIC_COGNITO_APP_CLIENT_ID: ${NEXT_PUBLIC_COGNITO_APP_CLIENT_ID:?Set NEXT_PUBLIC_COGNITO_APP_CLIENT_ID}
+        NEXT_PUBLIC_COGNITO_DOMAIN: ${NEXT_PUBLIC_COGNITO_DOMAIN:?Set NEXT_PUBLIC_COGNITO_DOMAIN}
+        NEXT_PUBLIC_COGNITO_REDIRECT_SIGN_IN: ${NEXT_PUBLIC_COGNITO_REDIRECT_SIGN_IN:?Set NEXT_PUBLIC_COGNITO_REDIRECT_SIGN_IN}
+        NEXT_PUBLIC_COGNITO_REDIRECT_SIGN_OUT: ${NEXT_PUBLIC_COGNITO_REDIRECT_SIGN_OUT:?Set NEXT_PUBLIC_COGNITO_REDIRECT_SIGN_OUT}
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:?Set NEXT_PUBLIC_API_BASE_URL}
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:3000/login"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 20s
+    mem_limit: 320m
+    cpus: 0.50
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  api:
+    image: ${API_IMAGE:-refleja-tu-interior-api:dev}
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-refleja_tu_interior}
+      DB_USERNAME: rti_app
+      DB_PASSWORD: ${RTI_APP_PASSWORD:?Set RTI_APP_PASSWORD}
+      DB_MIGRATION_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-refleja_tu_interior}
+      DB_MIGRATION_USERNAME: rti_migrator
+      DB_MIGRATION_PASSWORD: ${RTI_MIGRATOR_PASSWORD:?Set RTI_MIGRATOR_PASSWORD}
+      COGNITO_ISSUER_URI: ${COGNITO_ISSUER_URI:?Set COGNITO_ISSUER_URI}
+      COGNITO_JWK_SET_URI: ${COGNITO_JWK_SET_URI:?Set COGNITO_JWK_SET_URI}
+      COGNITO_APP_CLIENT_ID: ${COGNITO_APP_CLIENT_ID:?Set COGNITO_APP_CLIENT_ID}
+      CORS_ALLOWED_ORIGINS: ${DEV_PUBLIC_URL:-http://localhost:8088}
+      OPERATOR_ORGANIZATION_ID: ${OPERATOR_ORGANIZATION_ID:-}
+      INVITATIONS_ENABLED: ${INVITATIONS_ENABLED:-false}
+      INVITATIONS_AWS_REGION: ${INVITATIONS_AWS_REGION:-us-east-1}
+      INVITATIONS_COGNITO_USER_POOL_ID: ${INVITATIONS_COGNITO_USER_POOL_ID:-}
+      INVITATIONS_SES_FROM: ${INVITATIONS_SES_FROM:-}
+      INVITATIONS_WEB_BASE_URL: ${DEV_PUBLIC_URL:-http://localhost:8088}
+    expose:
+      - "8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 45s
+    mem_limit: 640m
+    cpus: 0.75
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  postgres:
+    image: postgres:18.0-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-refleja_tu_interior}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?Set POSTGRES_SUPERUSER_PASSWORD}
+      RTI_MIGRATOR_PASSWORD: ${RTI_MIGRATOR_PASSWORD:?Set RTI_MIGRATOR_PASSWORD}
+      RTI_APP_PASSWORD: ${RTI_APP_PASSWORD:?Set RTI_APP_PASSWORD}
+    expose:
+      - "5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql
+      - ./infra/postgres/init/01-create-rti-database-roles.sh:/docker-entrypoint-initdb.d/01-create-rti-database-roles.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    mem_limit: 384m
+    cpus: 0.65
+    restart: unless-stopped
+    shm_size: 64m
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  postgres_dev_data:
+  caddy_data:
+  caddy_config:

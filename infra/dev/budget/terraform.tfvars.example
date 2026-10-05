@@ -1,0 +1,2 @@
+aws_region        = "us-east-1"
+budget_alert_email = "replace-with-the-budget-owner@example.com"
