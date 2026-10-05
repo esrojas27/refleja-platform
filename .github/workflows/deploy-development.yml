@@ -1,0 +1,221 @@
+name: Deploy development
+
+on:
+  workflow_run:
+    workflows: ["VS1 CI Gate"]
+    types: [completed]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-development
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    name: Build and deploy DEV
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'master' &&
+      github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: development
+    env:
+      AWS_REGION: ${{ vars.RTI_DEV_AWS_REGION }}
+      AWS_ACCOUNT_ID: ${{ vars.RTI_DEV_AWS_ACCOUNT_ID }}
+      DEPLOY_ROLE_ARN: ${{ vars.RTI_DEV_AWS_ROLE_ARN }}
+      INSTANCE_ID: ${{ vars.RTI_DEV_INSTANCE_ID }}
+      BACKUP_BUCKET: ${{ vars.RTI_DEV_BACKUP_BUCKET }}
+      PUBLIC_URL: ${{ vars.RTI_DEV_PUBLIC_URL }}
+      HOSTNAME: ${{ vars.RTI_DEV_HOSTNAME }}
+      API_REPOSITORY: ${{ vars.RTI_DEV_ECR_API }}
+      WEB_REPOSITORY: ${{ vars.RTI_DEV_ECR_WEB }}
+      COGNITO_USER_POOL_ID: ${{ vars.RTI_DEV_COGNITO_USER_POOL_ID }}
+      COGNITO_APP_CLIENT_ID: ${{ vars.RTI_DEV_COGNITO_APP_CLIENT_ID }}
+      COGNITO_DOMAIN: ${{ vars.RTI_DEV_COGNITO_DOMAIN }}
+      OPERATOR_ORGANIZATION_ID: ${{ vars.RTI_DEV_OPERATOR_ORGANIZATION_ID }}
+      PARAMETER_PATH: /refleja-tu-interior/dev
+    steps:
+      - name: Resolve immutable revision
+        id: revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_run" ]]; then
+            revision='${{ github.event.workflow_run.head_sha }}'
+          else
+            revision="${GITHUB_SHA}"
+          fi
+          [[ "${revision}" =~ ^[0-9a-f]{40}$ ]]
+          image_tag="${revision}-${GITHUB_RUN_ATTEMPT}"
+          echo "sha=${revision}" >> "${GITHUB_OUTPUT}"
+          echo "tag=${image_tag}" >> "${GITHUB_OUTPUT}"
+          echo "DEPLOY_SHA=${revision}" >> "${GITHUB_ENV}"
+          echo "IMAGE_TAG=${image_tag}" >> "${GITHUB_ENV}"
+
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ steps.revision.outputs.sha }}
+
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Obtain short-lived AWS credentials through GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@v6.2.4
+        with:
+          role-to-assume: ${{ env.DEPLOY_ROLE_ARN }}
+          role-session-name: rti-dev-deploy-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+          allowed-account-ids: ${{ env.AWS_ACCOUNT_ID }}
+          mask-aws-account-id: true
+
+      - name: Sign in to the private container registry
+        shell: bash
+        run: |
+          set -euo pipefail
+          aws ecr get-login-password --region "${AWS_REGION}" \
+            | docker login --username AWS --password-stdin "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+
+      - name: Build and publish API image
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/api
+          file: apps/api/Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: ${{ env.API_REPOSITORY }}:${{ steps.revision.outputs.tag }}
+          cache-from: type=gha,scope=dev-api-arm64
+          cache-to: type=gha,mode=max,scope=dev-api-arm64
+
+      - name: Build and publish web image
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/web
+          file: apps/web/Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: ${{ env.WEB_REPOSITORY }}:${{ steps.revision.outputs.tag }}
+          build-args: |
+            NEXT_PUBLIC_AWS_REGION=${{ env.AWS_REGION }}
+            NEXT_PUBLIC_COGNITO_USER_POOL_ID=${{ env.COGNITO_USER_POOL_ID }}
+            NEXT_PUBLIC_COGNITO_APP_CLIENT_ID=${{ env.COGNITO_APP_CLIENT_ID }}
+            NEXT_PUBLIC_COGNITO_DOMAIN=${{ env.COGNITO_DOMAIN }}
+            NEXT_PUBLIC_COGNITO_REDIRECT_SIGN_IN=${{ env.PUBLIC_URL }}/account
+            NEXT_PUBLIC_COGNITO_REDIRECT_SIGN_OUT=${{ env.PUBLIC_URL }}/login
+            NEXT_PUBLIC_API_BASE_URL=${{ env.PUBLIC_URL }}
+          cache-from: type=gha,scope=dev-web-arm64
+          cache-to: type=gha,mode=max,scope=dev-web-arm64
+
+      - name: Assemble deployment bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p bundle/infra/dev bundle/infra/postgres/init bundle/scripts
+          cp compose.dev.yml bundle/
+          cp infra/dev/Caddyfile bundle/infra/dev/
+          cp infra/postgres/init/01-create-rti-database-roles.sh bundle/infra/postgres/init/
+          cp scripts/deploy-dev-on-instance.sh bundle/scripts/
+          chmod 0755 bundle/scripts/deploy-dev-on-instance.sh bundle/infra/postgres/init/01-create-rti-database-roles.sh
+          cat >bundle/dev.env.public <<EOF
+          DEV_SITE_ADDRESS=${HOSTNAME}
+          DEV_PUBLIC_URL=${PUBLIC_URL}
+          DEV_HTTP_PORT=80
+          DEV_HTTPS_PORT=443
+          POSTGRES_DB=refleja_tu_interior
+          COGNITO_ISSUER_URI=https://cognito-idp.${AWS_REGION}.amazonaws.com/${COGNITO_USER_POOL_ID}
+          COGNITO_JWK_SET_URI=https://cognito-idp.${AWS_REGION}.amazonaws.com/${COGNITO_USER_POOL_ID}/.well-known/jwks.json
+          COGNITO_APP_CLIENT_ID=${COGNITO_APP_CLIENT_ID}
+          NEXT_PUBLIC_AWS_REGION=${AWS_REGION}
+          NEXT_PUBLIC_COGNITO_USER_POOL_ID=${COGNITO_USER_POOL_ID}
+          NEXT_PUBLIC_COGNITO_APP_CLIENT_ID=${COGNITO_APP_CLIENT_ID}
+          NEXT_PUBLIC_COGNITO_DOMAIN=${COGNITO_DOMAIN}
+          NEXT_PUBLIC_COGNITO_REDIRECT_SIGN_IN=${PUBLIC_URL}/account
+          NEXT_PUBLIC_COGNITO_REDIRECT_SIGN_OUT=${PUBLIC_URL}/login
+          NEXT_PUBLIC_API_BASE_URL=${PUBLIC_URL}
+          OPERATOR_ORGANIZATION_ID=${OPERATOR_ORGANIZATION_ID}
+          INVITATIONS_ENABLED=true
+          INVITATIONS_AWS_REGION=${AWS_REGION}
+          INVITATIONS_COGNITO_USER_POOL_ID=${COGNITO_USER_POOL_ID}
+          WEB_IMAGE=${WEB_REPOSITORY}:${IMAGE_TAG}
+          API_IMAGE=${API_REPOSITORY}:${IMAGE_TAG}
+          EOF
+          tar -C bundle -czf "rti-dev-${DEPLOY_SHA}.tar.gz" .
+
+      - name: Start DEV and wait for Systems Manager
+        shell: bash
+        run: |
+          set -euo pipefail
+          state="$(aws ec2 describe-instances --region "${AWS_REGION}" --instance-ids "${INSTANCE_ID}" --query 'Reservations[0].Instances[0].State.Name' --output text)"
+          if [[ "${state}" == "stopped" ]]; then
+            aws ec2 start-instances --region "${AWS_REGION}" --instance-ids "${INSTANCE_ID}" >/dev/null
+          elif [[ "${state}" != "running" ]]; then
+            echo "Unexpected EC2 state: ${state}" >&2
+            exit 1
+          fi
+          aws ec2 wait instance-status-ok --region "${AWS_REGION}" --instance-ids "${INSTANCE_ID}"
+          for attempt in $(seq 1 60); do
+            status="$(aws ssm describe-instance-information --region "${AWS_REGION}" \
+              --filters "Key=InstanceIds,Values=${INSTANCE_ID}" --query 'InstanceInformationList[0].PingStatus' --output text)"
+            [[ "${status}" == "Online" ]] && exit 0
+            sleep 5
+          done
+          echo "The DEV instance did not become available in Systems Manager." >&2
+          exit 1
+
+      - name: Upload bundle and deploy through Systems Manager
+        shell: bash
+        run: |
+          set -euo pipefail
+          object_key="deployments/${DEPLOY_SHA}/${IMAGE_TAG}.tar.gz"
+          aws s3 cp "rti-dev-${DEPLOY_SHA}.tar.gz" "s3://${BACKUP_BUCKET}/${object_key}" --sse AES256
+          release_dir="/srv/refleja/application/releases/${DEPLOY_SHA}"
+          jq -n \
+            --arg bucket "${BACKUP_BUCKET}" \
+            --arg key "${object_key}" \
+            --arg release "${release_dir}" \
+            --arg region "${AWS_REGION}" \
+            --arg parameters "${PARAMETER_PATH}" \
+            '{commands:[
+              "set -euo pipefail",
+              ("rm -rf " + $release),
+              ("mkdir -p " + $release),
+              ("aws s3 cp s3://" + $bucket + "/" + $key + " /tmp/rti-dev-release.tar.gz"),
+              ("tar -xzf /tmp/rti-dev-release.tar.gz -C " + $release),
+              ("chmod 0755 " + $release + "/scripts/deploy-dev-on-instance.sh"),
+              ($release + "/scripts/deploy-dev-on-instance.sh " + $release + " " + $parameters + " " + $region),
+              "rm -f /tmp/rti-dev-release.tar.gz"
+            ]}' >command.json
+          command_id="$(aws ssm send-command --region "${AWS_REGION}" --instance-ids "${INSTANCE_ID}" \
+            --document-name AWS-RunShellScript --comment "Deploy Refleja DEV ${IMAGE_TAG}" \
+            --timeout-seconds 900 --parameters file://command.json --query 'Command.CommandId' --output text)"
+          for attempt in $(seq 1 180); do
+            status="$(aws ssm get-command-invocation --region "${AWS_REGION}" --command-id "${command_id}" \
+              --instance-id "${INSTANCE_ID}" --query Status --output text)"
+            case "${status}" in
+              Success) break ;;
+              Failed|Cancelled|TimedOut)
+                aws ssm get-command-invocation --region "${AWS_REGION}" --command-id "${command_id}" \
+                  --instance-id "${INSTANCE_ID}" --query '{Status:Status,Output:StandardOutputContent,Error:StandardErrorContent}'
+                exit 1 ;;
+              Pending|InProgress|Delayed) sleep 5 ;;
+              *) echo "Unexpected SSM status: ${status}" >&2; exit 1 ;;
+            esac
+          done
+          [[ "${status}" == "Success" ]]
+          aws s3 rm "s3://${BACKUP_BUCKET}/${object_key}"
+
+      - name: Verify public HTTPS endpoints
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --show-error --silent --retry 18 --retry-all-errors --retry-delay 10 "${PUBLIC_URL}/health" \
+            | grep -q '"status":"UP"'
+          curl --fail --show-error --silent --retry 6 --retry-all-errors --retry-delay 5 "${PUBLIC_URL}/login" >/dev/null

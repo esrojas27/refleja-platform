@@ -1,0 +1,49 @@
+name: DEV infrastructure gate
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/dev-infrastructure-gate.yml"
+      - "infra/dev/bootstrap-state/**"
+      - "infra/dev/platform/**"
+  push:
+    branches: [master]
+    paths:
+      - ".github/workflows/dev-infrastructure-gate.yml"
+      - "infra/dev/bootstrap-state/**"
+      - "infra/dev/platform/**"
+  workflow_dispatch:
+
+concurrency:
+  group: dev-infrastructure-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  terraform:
+    name: Validate ${{ matrix.root }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        root:
+          - infra/dev/bootstrap-state
+          - infra/dev/platform
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: hashicorp/setup-terraform@v4.0.1
+        with:
+          terraform_version: "1.15.8"
+          terraform_wrapper: false
+      - name: Verify formatting
+        working-directory: ${{ matrix.root }}
+        run: terraform fmt -check
+      - name: Initialize providers without accessing remote state
+        working-directory: ${{ matrix.root }}
+        run: terraform init -backend=false -input=false
+      - name: Validate configuration
+        working-directory: ${{ matrix.root }}
+        run: terraform validate -no-color

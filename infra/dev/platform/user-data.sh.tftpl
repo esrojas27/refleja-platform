@@ -1,0 +1,76 @@
+#!/bin/bash
+set -euo pipefail
+
+DATA_VOLUME_ID="${data_volume_id}"
+DATA_VOLUME_SERIAL="$${DATA_VOLUME_ID//-/}"
+DATA_DEVICE="/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_$${DATA_VOLUME_SERIAL}"
+MOUNT_POINT="/srv/refleja"
+
+# Amazon Linux 2023 includes curl-minimal, which provides the curl command.
+# Installing the full curl package conflicts with curl-minimal on fresh AMIs.
+# The selected Amazon Linux 2023 AMI already includes AWS CLI v2.
+dnf install -y docker nvme-cli
+systemctl enable --now amazon-ssm-agent
+
+for attempt in $$(seq 1 60); do
+  if [[ -e "$${DATA_DEVICE}" ]]; then
+    break
+  fi
+  sleep 2
+done
+
+if [[ ! -e "$${DATA_DEVICE}" ]]; then
+  echo "The persistent data volume was not attached after 120 seconds." >&2
+  exit 1
+fi
+
+if ! blkid -s TYPE -o value "$${DATA_DEVICE}" | grep -q .; then
+  mkfs.xfs "$${DATA_DEVICE}"
+fi
+
+mkdir -p "$${MOUNT_POINT}"
+DATA_UUID="$$(blkid -s UUID -o value "$${DATA_DEVICE}")"
+
+if ! grep -q "UUID=$${DATA_UUID}" /etc/fstab; then
+  echo "UUID=$${DATA_UUID} $${MOUNT_POINT} xfs defaults,nofail 0 2" >> /etc/fstab
+fi
+
+mount -a
+mkdir -p "$${MOUNT_POINT}/docker" "$${MOUNT_POINT}/application" "$${MOUNT_POINT}/backups"
+
+cat >/etc/docker/daemon.json <<'JSON'
+{
+  "data-root": "/srv/refleja/docker",
+  "log-driver": "local",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  }
+}
+JSON
+
+systemctl enable --now docker
+usermod -aG docker ec2-user
+
+if ! docker compose version >/dev/null 2>&1; then
+  if ! dnf install -y docker-compose-plugin; then
+    COMPOSE_VERSION="v5.5.1"
+    COMPOSE_SHA256="732e3a84c1a0f67256ce80bc2598a24546b10ca05f9faa97efceb1171ece2ef7"
+    COMPOSE_TARGET="/usr/local/lib/docker/cli-plugins/docker-compose"
+
+    mkdir -p "$$(dirname "$${COMPOSE_TARGET}")"
+    curl --fail --location --silent --show-error \
+      "https://github.com/docker/compose/releases/download/$${COMPOSE_VERSION}/docker-compose-linux-aarch64" \
+      --output "$${COMPOSE_TARGET}"
+    echo "$${COMPOSE_SHA256}  $${COMPOSE_TARGET}" | sha256sum --check --strict
+    chmod 0755 "$${COMPOSE_TARGET}"
+  fi
+fi
+
+docker compose version
+
+cat >/etc/motd <<'EOF'
+Refleja Tu Interior DEV
+Managed with Terraform. Use AWS Systems Manager Session Manager; SSH is not exposed.
+Application deployment is intentionally handled by the protected deployment workflow.
+EOF

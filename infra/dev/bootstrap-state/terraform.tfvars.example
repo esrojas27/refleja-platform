@@ -1,0 +1,5 @@
+aws_region      = "us-east-1"
+resource_prefix = "refleja-tu-interior-dev"
+
+# Keep enough history to recover from an accidental state overwrite.
+noncurrent_version_retention_days = 90

@@ -35,6 +35,7 @@ target/
 *.tfstate
 *.tfstate.*
 *.tfplan
+backend.hcl
 crash.log
 override.tf
 override.tf.json

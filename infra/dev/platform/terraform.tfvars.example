@@ -1,0 +1,34 @@
+aws_region      = "us-east-1"
+resource_prefix = "rti-dev"
+
+# Public access is intentional only for DEV product validation.
+allowed_ingress_cidrs = ["0.0.0.0/0"]
+
+instance_type       = "t4g.small"
+root_volume_size_gib = 16
+data_volume_size_gib = 25
+
+# Existing integration resources for invitation delivery.
+cognito_user_pool_arn = "arn:aws:cognito-idp:us-east-1:836528258662:userpool/us-east-1_AKiEfWZMK"
+
+# Keep the previous identity alongside the new one during a sender migration.
+ses_identity_arns = [
+  "arn:aws:ses:us-east-1:836528258662:identity/esrojas27@gmail.com",
+]
+invitation_sender_email = "esrojas27@gmail.com"
+
+# Temporary external DNS. A future corporate Route 53 zone can replace it.
+route53_zone_id = null
+dev_hostname    = "rti-dev.18-210-172-252.nip.io"
+
+# DEV is available from 08:00 to 20:00, Monday through Friday, Bogota time.
+schedule_enabled   = true
+schedule_timezone  = "America/Bogota"
+weekday_start_cron = "cron(0 8 ? * MON-FRI *)"
+weekday_stop_cron  = "cron(0 20 ? * MON-FRI *)"
+
+# Existing repository identity. The deployment role trusts only the protected
+# GitHub environment, not every workflow in the repository.
+github_oidc_provider_arn          = "arn:aws:iam::836528258662:oidc-provider/token.actions.githubusercontent.com"
+github_repository_subject_prefix = "repo:esrojas27@62344298/refleja-platform@1344197039"
+github_deployment_environment     = "development"

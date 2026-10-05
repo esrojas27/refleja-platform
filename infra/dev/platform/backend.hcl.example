@@ -1,0 +1,5 @@
+bucket       = "refleja-tu-interior-dev-tfstate-REPLACE_AWS_ACCOUNT_ID"
+key          = "development/platform.tfstate"
+region       = "us-east-1"
+encrypt      = true
+use_lockfile = true
