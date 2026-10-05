@@ -1,0 +1,131 @@
+name: Bootstrap development operator
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: bootstrap-development-operator
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  bootstrap:
+    name: Verify and enable the first DEV consultant
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: development
+    env:
+      AWS_REGION: ${{ vars.RTI_DEV_AWS_REGION }}
+      AWS_ACCOUNT_ID: ${{ vars.RTI_DEV_AWS_ACCOUNT_ID }}
+      DEPLOY_ROLE_ARN: ${{ vars.RTI_DEV_AWS_ROLE_ARN }}
+      INSTANCE_ID: ${{ vars.RTI_DEV_INSTANCE_ID }}
+      BACKUP_BUCKET: ${{ vars.RTI_DEV_BACKUP_BUCKET }}
+      COGNITO_USER_POOL_ID: ${{ vars.RTI_DEV_COGNITO_USER_POOL_ID }}
+      OPERATOR_ORGANIZATION_ID: ${{ vars.RTI_DEV_OPERATOR_ORGANIZATION_ID }}
+      OPERATOR_EMAIL: ${{ vars.RTI_DEV_OPERATOR_EMAIL }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Validate public bootstrap configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "${OPERATOR_EMAIL}" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]]
+          [[ "${COGNITO_USER_POOL_ID}" =~ ^${AWS_REGION}_[A-Za-z0-9]+$ ]]
+          [[ "${OPERATOR_ORGANIZATION_ID}" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]
+          [[ "${INSTANCE_ID}" =~ ^i-[0-9a-f]+$ ]]
+
+      - name: Obtain short-lived AWS credentials through GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@v6.2.4
+        with:
+          role-to-assume: ${{ env.DEPLOY_ROLE_ARN }}
+          role-session-name: rti-dev-bootstrap-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+          allowed-account-ids: ${{ env.AWS_ACCOUNT_ID }}
+          mask-aws-account-id: true
+
+      - name: Start DEV and wait for Systems Manager
+        shell: bash
+        run: |
+          set -euo pipefail
+          state="$(aws ec2 describe-instances --region "${AWS_REGION}" --instance-ids "${INSTANCE_ID}" \
+            --query 'Reservations[0].Instances[0].State.Name' --output text)"
+          if [[ "${state}" == "stopped" ]]; then
+            aws ec2 start-instances --region "${AWS_REGION}" --instance-ids "${INSTANCE_ID}" >/dev/null
+          elif [[ "${state}" != "running" ]]; then
+            echo "Unexpected EC2 state: ${state}" >&2
+            exit 1
+          fi
+          aws ec2 wait instance-status-ok --region "${AWS_REGION}" --instance-ids "${INSTANCE_ID}"
+          for attempt in $(seq 1 60); do
+            status="$(aws ssm describe-instance-information --region "${AWS_REGION}" \
+              --filters "Key=InstanceIds,Values=${INSTANCE_ID}" \
+              --query 'InstanceInformationList[0].PingStatus' --output text)"
+            [[ "${status}" == "Online" ]] && exit 0
+            sleep 5
+          done
+          echo "The DEV instance did not become available in Systems Manager." >&2
+          exit 1
+
+      - name: Verify Cognito identity and bootstrap the internal operator
+        shell: bash
+        run: |
+          set -euo pipefail
+          operation="bootstrap-operator-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          archive="${operation}.tar.gz"
+          object_key="deployments/operations/${archive}"
+          tar -czf "${archive}" scripts/bootstrap-dev-operator-on-instance.sh scripts/sql/bootstrap-dev-operator.sql
+          aws s3 cp "${archive}" "s3://${BACKUP_BUCKET}/${object_key}" --sse AES256
+
+          jq -n \
+            --arg bucket "${BACKUP_BUCKET}" \
+            --arg key "${object_key}" \
+            --arg operation "${operation}" \
+            --arg email "${OPERATOR_EMAIL}" \
+            --arg pool "${COGNITO_USER_POOL_ID}" \
+            --arg organization "${OPERATOR_ORGANIZATION_ID}" \
+            --arg region "${AWS_REGION}" \
+            '{commands:[
+              "set -euo pipefail",
+              ("work=/tmp/" + $operation),
+              "rm -rf \"${work}\"",
+              "mkdir -p \"${work}\"",
+              ("aws s3 cp s3://" + $bucket + "/" + $key + " \"${work}/bootstrap.tar.gz\""),
+              "tar -xzf \"${work}/bootstrap.tar.gz\" -C \"${work}\"",
+              "chmod 0755 \"${work}/scripts/bootstrap-dev-operator-on-instance.sh\"",
+              ("\"${work}/scripts/bootstrap-dev-operator-on-instance.sh\" " + ($email | @sh) + " " + ($pool | @sh) + " " + ($organization | @sh) + " " + ($region | @sh)),
+              "rm -rf \"${work}\""
+            ]}' >command.json
+
+          command_id="$(aws ssm send-command --region "${AWS_REGION}" --instance-ids "${INSTANCE_ID}" \
+            --document-name AWS-RunShellScript --comment "Bootstrap Refleja DEV operator" \
+            --timeout-seconds 300 --parameters file://command.json \
+            --query 'Command.CommandId' --output text)"
+          for attempt in $(seq 1 60); do
+            status="$(aws ssm get-command-invocation --region "${AWS_REGION}" --command-id "${command_id}" \
+              --instance-id "${INSTANCE_ID}" --query Status --output text)"
+            case "${status}" in
+              Success) break ;;
+              Failed|Cancelled|TimedOut)
+                aws ssm get-command-invocation --region "${AWS_REGION}" --command-id "${command_id}" \
+                  --instance-id "${INSTANCE_ID}" \
+                  --query '{Status:Status,Output:StandardOutputContent,Error:StandardErrorContent}'
+                exit 1 ;;
+              Pending|InProgress|Delayed) sleep 5 ;;
+              *) echo "Unexpected SSM status: ${status}" >&2; exit 1 ;;
+            esac
+          done
+          [[ "${status}" == "Success" ]]
+          aws ssm get-command-invocation --region "${AWS_REGION}" --command-id "${command_id}" \
+            --instance-id "${INSTANCE_ID}" --query 'StandardOutputContent' --output text
+
+      - name: Remove the temporary operation bundle
+        if: always()
+        shell: bash
+        run: |
+          operation="bootstrap-operator-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          aws s3 rm "s3://${BACKUP_BUCKET}/deployments/operations/${operation}.tar.gz" || true
