@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BarChart3, BookOpenText, BrainCircuit, CheckSquare2, ChevronLeft, ListTree, UsersRound } from "lucide-react";
+import { BarChart3, BookOpenText, BrainCircuit, CheckSquare2, ChevronLeft, ListTree, UsersRound, ChartNoAxesCombined } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { fetchCurrentIdentity } from "@/lib/auth/authenticated-api";
@@ -25,14 +25,16 @@ export function ProgramWorkspace({
   children: ReactNode;
 }) {
   const pathname = usePathname();
-  const [canManageDisc, setCanManageDisc] = useState(false);
+  const [permissions, setPermissions] = useState({ organizationId: "", disc: false, results: false });
   const programPath = `${programsPath(organizationId)}/${encodeURIComponent(programId)}`;
 
   useEffect(() => {
     const controller = new AbortController();
     fetchCurrentIdentity(organizationId, controller.signal)
-      .then(identity => setCanManageDisc(identity.roles.some(role => role === "CONSULTANT" || role === "LEADER")))
-      .catch(() => setCanManageDisc(false));
+      .then(identity => { if (!controller.signal.aborted) setPermissions({ organizationId,
+        disc: identity.roles.some(role => role === "CONSULTANT" || role === "LEADER"),
+        results: identity.activeOrganizationId === organizationId && identity.roles.includes("CONSULTANT") }); })
+      .catch(() => { if (!controller.signal.aborted) setPermissions({ organizationId, disc: false, results: false }); });
     return () => controller.abort();
   }, [organizationId]);
 
@@ -67,7 +69,13 @@ export function ProgramWorkspace({
       icon: BarChart3,
       active: current => current === `${programPath}/progress`,
     },
-    ...(canManageDisc ? [{
+    ...(permissions.organizationId === organizationId && permissions.results ? [{
+      href: `${programPath}/survey-results`,
+      label: "Resultados de encuestas",
+      icon: ChartNoAxesCombined,
+      active: (current: string) => current === `${programPath}/survey-results`,
+    }] : []),
+    ...(permissions.organizationId === organizationId && permissions.disc ? [{
       href: `${programPath}/disc`,
       label: "DISC",
       icon: BrainCircuit,

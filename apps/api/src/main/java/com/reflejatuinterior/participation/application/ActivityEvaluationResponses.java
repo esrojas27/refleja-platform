@@ -11,6 +11,7 @@ public interface ActivityEvaluationResponses {
     Response create(UUID organizationId, UUID programId, UUID activityId, UUID evaluationId,
             UUID assignmentId, UUID enrollmentId, List<AnswerInput> answers);
     Optional<Response> findByAssignment(UUID organizationId, UUID programId, UUID assignmentId);
+    List<Response> listByAssignments(UUID organizationId, UUID programId, Collection<UUID> assignmentIds);
     Map<UUID, Instant> completedAtByAssignments(UUID organizationId, UUID programId,
             Collection<UUID> assignmentIds);
 

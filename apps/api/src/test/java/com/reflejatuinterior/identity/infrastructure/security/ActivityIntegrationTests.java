@@ -572,6 +572,131 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 .andExpect(jsonPath("$.items[1].assignees[0].submittedAt").doesNotExist());
     }
 
+    @Test void surveyResultsAggregateScalesSeparatelyAndCompareTheFullHierarchy() throws Exception {
+        var first = createAdminActivity(true, 1);
+        var firstSurvey = createResultsSurvey(first);
+        sendResults(collaborator, first, firstSurvey, "4", "5", "=1+1", java.util.List.of("Inspirado(a)", "Motivado(a)"));
+        sendResults(otherCollaborator, first, firstSurvey, "2", "3", "Aprendí a escuchar", java.util.List.of("Inspirado(a)"));
+        var otherDimension = uuid7(0xe21); var otherSession = uuid7(0xe22);
+        jdbcTemplate.update("""
+                insert into rti.program_modules (id,organization_id,program_id,name,position,created_at,updated_at,version)
+                values (?,?,?,'Exterior',2,now(),now(),0)
+                """, otherDimension, organization, program);
+        jdbcTemplate.update("""
+                insert into rti.program_sessions (id,organization_id,program_id,module_id,name,scheduled_date,position,created_at,updated_at,version)
+                values (?,?,?,?,'Segunda sesión','2026-10-02',1,now(),now(),0)
+                """, otherSession, organization, program, otherDimension);
+        var response = mvc.perform(post(consultantPath()).header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(allBody().replace(session.toString(), otherSession.toString())))
+                .andExpect(status().isCreated()).andReturn().getResponse();
+        var second = UUID.fromString(json.readTree(response.getContentAsString()).path("id").asText());
+        var secondSurvey = createResultsSurvey(second);
+        sendResults(collaborator, second, secondSurvey, "1", "1", "Otro aprendizaje", java.util.List.of("Reflexivo(a)"));
+
+        mvc.perform(get(resultsPath()).header("Authorization", token(consultant)))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.summary.surveyCount").value(2)).andExpect(jsonPath("$.summary.assignedCount").value(4))
+                .andExpect(jsonPath("$.summary.responseCount").value(3)).andExpect(jsonPath("$.summary.pendingCount").value(1))
+                .andExpect(jsonPath("$.summary.participantCount").value(2)).andExpect(jsonPath("$.summary.respondentCount").value(2))
+                .andExpect(jsonPath("$.summary.responseRate").value(75.0))
+                .andExpect(jsonPath("$.summary.agreementAverage").value(2.33)).andExpect(jsonPath("$.summary.agreementAnswers").value(3))
+                .andExpect(jsonPath("$.summary.likelihoodAverage").value(3.0))
+                .andExpect(jsonPath("$.dimensions.length()").value(2)).andExpect(jsonPath("$.sessions.length()").value(2))
+                .andExpect(jsonPath("$.activities.length()").value(2))
+                .andExpect(jsonPath("$.dimensions[0].summary.agreementAverage").value(3.0))
+                .andExpect(jsonPath("$.dimensions[1].summary.agreementAverage").value(1.0))
+                .andExpect(jsonPath("$.surveys[0].questions[0].average").value(3.0))
+                .andExpect(jsonPath("$.surveys[0].questions[0].distribution[0].count").value(0))
+                .andExpect(jsonPath("$.surveys[0].questions[0].distribution[1].count").value(1))
+                .andExpect(jsonPath("$.surveys[0].questions[0].distribution[3].percentage").value(50.0))
+                .andExpect(jsonPath("$.surveys[0].questions[3].distribution[0].value").value("Inspirado(a)"))
+                .andExpect(jsonPath("$.surveys[0].questions[3].distribution[0].count").value(2))
+                .andExpect(jsonPath("$.surveys[0].questions[3].distribution[0].percentage").value(100.0))
+                .andExpect(jsonPath("$.surveys[0].questions[3].distribution[1].percentage").value(50.0))
+                .andExpect(jsonPath("$.surveys[0].responses.length()").value(2))
+                .andExpect(jsonPath("$.surveys[0].responses[0].email").isNotEmpty())
+                .andExpect(jsonPath("$.surveys[0].responses[0].responseText").doesNotExist());
+        mvc.perform(get(resultsPath()).param("dimensionId", otherDimension.toString()).param("sessionId", otherSession.toString())
+                .param("activityId", second.toString()).header("Authorization", token(consultant)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.summary.responseCount").value(1))
+                .andExpect(jsonPath("$.summary.assignedCount").value(2)).andExpect(jsonPath("$.summary.agreementAverage").value(1.0))
+                .andExpect(jsonPath("$.options.length()").value(2)).andExpect(jsonPath("$.surveys.length()").value(1));
+        mvc.perform(get(resultsPath()).param("dimensionId", module.toString()).param("activityId", second.toString())
+                .header("Authorization", token(consultant))).andExpect(status().isNotFound());
+    }
+
+    @Test void surveyResultsUseNullNotZeroForMissingAveragesAndIgnoreArchivedPendingWork() throws Exception {
+        var first = createAdminActivity(true, 1); createResultsSurvey(first);
+        mvc.perform(get(resultsPath()).header("Authorization", token(consultant)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.summary.assignedCount").value(2))
+                .andExpect(jsonPath("$.summary.responseCount").value(0)).andExpect(jsonPath("$.summary.pendingCount").value(2))
+                .andExpect(jsonPath("$.summary.responseRate").value(0.0))
+                .andExpect(jsonPath("$.summary.agreementAverage").isEmpty())
+                .andExpect(jsonPath("$.surveys[0].questions[0].distribution.length()").value(5))
+                .andExpect(jsonPath("$.surveys[0].questions[0].distribution[0].percentage").value(0.0));
+        mvc.perform(post(adminPath("activities", first) + "/archive").header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0,\"archived\":true}")).andExpect(status().isNoContent());
+        mvc.perform(get(resultsPath()).header("Authorization", token(consultant)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.summary.surveyCount").value(0))
+                .andExpect(jsonPath("$.summary.responseRate").isEmpty()).andExpect(jsonPath("$.surveys").isEmpty());
+    }
+
+    @Test void surveyResultsAndExportRequireConsultantAndRejectForeignScopes() throws Exception {
+        var activity = createAdminActivity(true, 1); createResultsSurvey(activity);
+        jdbcTemplate.update("insert into rti.membership_roles values (?, 'LEADER'), (?, 'COMPANY_ADMIN')", collaboratorMembership, collaboratorMembership);
+        for (String suffix : java.util.List.of("", "/export")) {
+            mvc.perform(get(resultsPath() + suffix)).andExpect(status().isUnauthorized());
+            mvc.perform(get(resultsPath() + suffix).header("Authorization", token(collaborator))).andExpect(status().isForbidden());
+            mvc.perform(get(resultsPath() + suffix).param("activityId", uuid7(0xefe).toString()).header("Authorization", token(consultant)))
+                    .andExpect(status().isNotFound());
+            mvc.perform(get(resultsPath() + suffix).param("activityId", "not-a-uuid").header("Authorization", token(consultant)))
+                    .andExpect(status().isBadRequest());
+        }
+        var otherOrg = uuid7(0xe31); var membership = uuid7(0xe32);
+        insertOrganization(otherOrg); insertMembership(membership, otherOrg, consultant);
+        jdbcTemplate.update("insert into rti.membership_roles values (?, 'CONSULTANT')", membership);
+        mvc.perform(get(resultsPath().replace(organization.toString(), otherOrg.toString())).header("Authorization", token(consultant)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test void exportsFilteredSurveyAnswersAndAggregatesWithSpreadsheetProtectionAfterProgramClosure() throws Exception {
+        var activity = createAdminActivity(true, 1); var survey = createResultsSurvey(activity);
+        sendResults(collaborator, activity, survey, "5", "4", "=1+1", java.util.List.of("Inspirado(a)", "Motivado(a)"));
+        mvc.perform(post(consultantPath().replace("/activities", "/status")).header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"COMPLETED\",\"version\":0}")).andExpect(status().isOk());
+        var csv = mvc.perform(get(resultsPath() + "/export").param("activityId", activity.toString()).header("Authorization", token(consultant)))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.containsString("attachment")))
+                .andExpect(content().contentTypeCompatibleWith("text/csv")).andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(csv).startsWith("\uFEFF").contains("Comparación dimensión", "Distribución pregunta", "Promedio pregunta", "Inspirado(a)", "'=1+1");
+        assertThat(csv).doesNotContain("Entrega privada para revisión");
+        mvc.perform(get(resultsPath()).header("Authorization", token(consultant)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.summary.responseCount").value(1));
+        assertThat(jdbcTemplate.queryForObject("select answer_value from rti.activity_evaluation_answers where question_id=?", String.class,
+                UUID.fromString(survey.path("questions").get(2).path("id").asText()))).isEqualTo("=1+1");
+    }
+
+    private String resultsPath() { return consultantPath().replace("/activities", "/survey-results"); }
+    private tools.jackson.databind.JsonNode createResultsSurvey(UUID activity) throws Exception {
+        var response = mvc.perform(post(evaluationPath(activity)).header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("""
+                {"title":"Encuesta de experiencia","instructions":"Responde","questions":[
+                  {"prompt":"¿Estás de acuerdo?","type":"AGREEMENT_SCALE","position":1},
+                  {"prompt":"¿Lo aplicarás?","type":"LIKELIHOOD_SCALE","position":2},
+                  {"prompt":"¿Qué aprendiste?","type":"OPEN_TEXT","position":3},
+                  {"prompt":"¿Cómo te sientes?","type":"EMOTION_MULTI_SELECT","position":4}]}
+                """)).andExpect(status().isCreated()).andReturn().getResponse();
+        return json.readTree(response.getContentAsString());
+    }
+    private void sendResults(UUID actor, UUID activity, tools.jackson.databind.JsonNode survey, String agreement, String likelihood, String open, java.util.List<String> emotions) throws Exception {
+        mvc.perform(post(collaboratorPath() + "/" + activity + "/submission").header("Authorization", token(actor))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"Entrega privada para revisión\"}")).andExpect(status().isOk());
+        var values = java.util.List.of(java.util.List.of(agreement), java.util.List.of(likelihood), java.util.List.of(open), emotions);
+        var answers = java.util.stream.IntStream.range(0, 4).mapToObj(i -> java.util.Map.of("questionId", survey.path("questions").get(i).path("id").asText(), "values", values.get(i))).toList();
+        mvc.perform(post(surveyResponsePath(activity)).header("Authorization", token(actor))
+                .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(java.util.Map.of("answers", answers)))).andExpect(status().isOk());
+    }
+
     private UUID createAdminActivity(boolean assigned, int position) throws Exception {
         if (!assigned) jdbcTemplate.update("update rti.enrollments set status='INVITED' where program_id=?", program);
         var response = mvc.perform(post(consultantPath()).header("Authorization", token(consultant))

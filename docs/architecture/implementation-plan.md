@@ -7,6 +7,11 @@ Este archivo registra el punto de continuación; no reemplaza los tickets ni los
 
 ## Incremento local del 2026-10-19
 
+Continuación local: [resultados agregados de encuestas](activity-survey-results.md),
+con filtros, comparación por jerarquía, detalle identificado y exportación CSV.
+Commit y push autorizados por el usuario, junto con el incremento anterior de
+edición y administración del contenido (`c5ba5dc`). Gates remotos por verificar.
+
 El [ciclo de vida del programa](program-lifecycle.md) incorpora activación manual,
 finalización y cancelación por consultor, confirmación de cierre con pendientes,
 consulta posterior y bloqueo de escrituras en programas cerrados. Borrador queda

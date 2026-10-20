@@ -14,6 +14,16 @@ El siguiente backlog extiende esa base sin alterar el comportamiento aceptado.
 
 ## Necesidades registradas
 
+### Resultados de las encuestas de actividad
+
+Implementado localmente el 2026-10-19, con commit y push autorizados: consulta
+exclusiva del consultor de respuestas identificadas, distribución por pregunta,
+medias por tipo de escala, emociones y respuestas abiertas; filtros y comparación
+por dimensión, sesión y actividad; exportación CSV del alcance seleccionado.
+La interpretación de denominadores, límites y pruebas manuales están en
+[resultados de encuestas](activity-survey-results.md). No reemplaza las futuras
+evaluaciones inicial/final ni amplía permisos de Líder/RRHH.
+
 ### Edición y administración del contenido
 
 Incremento implementado el 2026-10-19 y aprobado por el usuario para commit:

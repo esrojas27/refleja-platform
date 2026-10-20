@@ -51,6 +51,19 @@ it("marks progress as active", () => {
   expect(screen.getByRole("link", { name: "Progreso" }).getAttribute("aria-current")).toBe("page");
 });
 
+it("shows the results destination only to a consultant in the active organization", async () => {
+  usePathname.mockReturnValue("/organizations/org-a/programs/program-a/survey-results");
+  render(<ProgramWorkspace organizationId="org-a" programId="program-a"><p>Resultados</p></ProgramWorkspace>);
+  expect((await screen.findByRole("link", { name: "Resultados de encuestas" })).getAttribute("aria-current")).toBe("page");
+  cleanup();
+  vi.mocked(fetchCurrentIdentity).mockResolvedValue({ cognitoSubject: "subject",
+    user: { id: "u", email: "leader@example.test", firstName: null, lastName: null }, organizations: [],
+    activeOrganizationId: "org-a", roles: ["LEADER", "COMPANY_ADMIN"] });
+  render(<ProgramWorkspace organizationId="org-a" programId="program-a"><p>Resultados</p></ProgramWorkspace>);
+  await screen.findByRole("link", { name: "DISC" });
+  expect(screen.queryByRole("link", { name: "Resultados de encuestas" })).toBeNull();
+});
+
 it("marks program content as active", () => {
   usePathname.mockReturnValue("/organizations/org-a/programs/program-a/content");
   render(<ProgramWorkspace organizationId="org-a" programId="program-a"><p>Contenido real</p></ProgramWorkspace>);

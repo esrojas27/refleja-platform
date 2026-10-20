@@ -29,7 +29,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice(assignableTypes = {EnrollmentController.class, InvitationController.class, MyProgramController.class,
-        ActivityController.class, ActivityEvaluationController.class, DiscProfileController.class, ContentAdministrationController.class})
+        ActivityController.class, ActivityEvaluationController.class, DiscProfileController.class, ContentAdministrationController.class, SurveyResultsController.class})
 class EnrollmentErrorHandler {
     @ExceptionHandler(com.reflejatuinterior.program.ProgramContent.Conflict.class)
     ResponseEntity<ErrorResponse> contentConflict(com.reflejatuinterior.program.ProgramContent.Conflict exception, HttpServletRequest request) {

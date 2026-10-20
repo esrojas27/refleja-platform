@@ -58,6 +58,8 @@ class ActuatorHealthSecurityConfiguration {
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/modules",
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/disc-profiles",
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/evaluations",
+                                "/api/v1/organizations/{organizationId}/programs/{programId}/survey-results",
+                                "/api/v1/organizations/{organizationId}/programs/{programId}/survey-results/export",
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/activities").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/organizations/{organizationId}/programs/{programId}/enrollments",
                                 "/api/v1/invitations").authenticated()

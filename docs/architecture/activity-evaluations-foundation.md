@@ -28,6 +28,14 @@ Fecha: 2026-09-20
 
 Crear por segunda vez una encuesta para la misma actividad devuelve conflicto y nunca reemplaza silenciosamente la definición existente.
 
-## Siguiente incremento
+## Resultados y edición posteriores
 
-La consulta agregada de resultados y el eventual versionado editable de encuestas se implementarán sobre estas definiciones. Las respuestas conservan la pregunta contestada y no reemplazan silenciosamente una respuesta previamente enviada.
+La [consulta agregada y exportación de resultados](activity-survey-results.md)
+está implementada localmente el 2026-10-19, con commit y push autorizados por el
+usuario. Incluye filtros por dimensión/sesión/actividad, distribuciones,
+medias separadas por escala, emociones, textos abiertos y CSV.
+
+La [administración de contenido](program-content-administration.md) permite
+corregir encuestas solo antes de la primera entrega. El versionado histórico de
+encuestas ya respondidas sigue pendiente: las respuestas conservan la pregunta
+contestada y nunca se reemplazan silenciosamente.

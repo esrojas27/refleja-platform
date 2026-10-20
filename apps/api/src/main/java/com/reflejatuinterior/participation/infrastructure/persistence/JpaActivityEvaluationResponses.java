@@ -44,6 +44,18 @@ class JpaActivityEvaluationResponses implements ActivityEvaluationResponses {
     }
 
     @Override
+    public List<Response> listByAssignments(UUID organizationId, UUID programId, Collection<UUID> assignmentIds) {
+        if (assignmentIds.isEmpty()) return List.of();
+        var stored = responses.findByOrganizationIdAndProgramIdAndAssignmentIdIn(organizationId, programId, assignmentIds);
+        if (stored.isEmpty()) return List.of();
+        var grouped = answers.findByResponseIdInOrderByResponseIdAscQuestionIdAscPositionAsc(
+                stored.stream().map(ActivityEvaluationResponseJpaEntity::id).toList()).stream()
+                .collect(java.util.stream.Collectors.groupingBy(ActivityEvaluationAnswerJpaEntity::responseId));
+        return stored.stream().map(response -> data(response, grouped.getOrDefault(response.id(), List.of())))
+                .sorted(java.util.Comparator.comparing(Response::completedAt).thenComparing(Response::id)).toList();
+    }
+
+    @Override
     public Map<UUID, Instant> completedAtByAssignments(UUID organizationId, UUID programId,
             Collection<UUID> assignmentIds) {
         if (assignmentIds.isEmpty()) return Map.of();
