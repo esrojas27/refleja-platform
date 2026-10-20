@@ -43,6 +43,7 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
         jdbcTemplate.update("insert into rti.membership_roles values (?, 'COLLABORATOR')", otherMembership);
         insertProgram(program, organization);
         tenantContext.activate(organization);
+        jdbcTemplate.update("update rti.programs set status='ACTIVE' where id=? and organization_id=?", program, organization);
         jdbcTemplate.update("""
                 insert into rti.program_modules
                     (id, organization_id, program_id, name, position, created_at, updated_at, version)
@@ -251,6 +252,80 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
         mvc.perform(post(evaluationPath(activityId)).header("Authorization", token(consultant))
                 .contentType(MediaType.APPLICATION_JSON).content(evaluationBody))
                 .andExpect(status().isConflict());
+    }
+
+    @Test void draftHidesAssignedContentAndRefusesCollaboratorWrites() throws Exception {
+        jdbcTemplate.update("update rti.programs set status='DRAFT' where id=? and organization_id=?", program, organization);
+        var created = mvc.perform(post(consultantPath()).header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(body(enrollment))).andExpect(status().isCreated())
+                .andReturn().getResponse();
+        var id = UUID.fromString(json.readTree(created.getContentAsString()).path("id").asText());
+        mvc.perform(get(collaboratorPath()).header("Authorization", token(collaborator)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items").isEmpty());
+        mvc.perform(post(collaboratorPath() + "/" + id + "/submission").header("Authorization", token(collaborator))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"No debe guardarse\"}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PROGRAM_NOT_ACTIVE"));
+        mvc.perform(post(surveyResponsePath(id)).header("Authorization", token(collaborator))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"answers\":[{\"questionId\":\"" + uuid7(0xdff) + "\",\"values\":[\"Respuesta\"]}]}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PROGRAM_NOT_ACTIVE"));
+        mvc.perform(post("/api/v1/organizations/" + organization + "/programs/" + program + "/status")
+                .header("Authorization", token(consultant)).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"CANCELLED\",\"version\":0}"))
+                .andExpect(status().isOk());
+        mvc.perform(get(collaboratorPath()).header("Authorization", token(collaborator)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items").isEmpty());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"COMPLETED", "CANCELLED"})
+    void closedProgramsPreservePendingWorkAndRefuseAllProgramMutations(String terminal) throws Exception {
+        var created = mvc.perform(post(consultantPath()).header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(body(enrollment))).andExpect(status().isCreated())
+                .andReturn().getResponse();
+        var tree = json.readTree(created.getContentAsString());
+        var id = UUID.fromString(tree.path("id").asText());
+        var assignmentId = UUID.fromString(tree.path("assignees").get(0).path("assignmentId").asText());
+        String survey = "{\"title\":\"Encuesta\",\"instructions\":\"Responde\",\"questions\":["
+                + "{\"prompt\":\"¿Qué aprendiste?\",\"type\":\"OPEN_TEXT\",\"position\":1}]}";
+        mvc.perform(post(evaluationPath(id)).header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(survey)).andExpect(status().isCreated());
+        mvc.perform(post(collaboratorPath() + "/" + id + "/submission").header("Authorization", token(collaborator))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"Entrega conservada\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.completionPercentage").value(50));
+
+        var base = "/api/v1/organizations/" + organization + "/programs/" + program;
+        mvc.perform(post(base + "/status").header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"" + terminal + "\",\"version\":0}"))
+                .andExpect(status().isOk());
+
+        mvc.perform(get(collaboratorPath()).header("Authorization", token(collaborator)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].responseText").value("Entrega conservada"))
+                .andExpect(jsonPath("$.items[0].survey.status").value("PENDING"))
+                .andExpect(jsonPath("$.items[0].completionPercentage").value(50));
+        mvc.perform(post(collaboratorPath() + "/" + id + "/submission").header("Authorization", token(collaborator))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"No guardar\"}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PROGRAM_NOT_ACTIVE"));
+        mvc.perform(post(surveyResponsePath(id)).header("Authorization", token(collaborator))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"answers\":[{\"questionId\":\"" + uuid7(0xdff) + "\",\"values\":[\"Respuesta\"]}]}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PROGRAM_NOT_ACTIVE"));
+        mvc.perform(post(reviewPath(id, assignmentId)).header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"decision\":\"APPROVE\"}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PROGRAM_NOT_ACTIVE"));
+        mvc.perform(post(consultantPath()).header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(allBody()))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PROGRAM_READ_ONLY"));
+        mvc.perform(post(evaluationPath(id)).header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(survey))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PROGRAM_READ_ONLY"));
+        mvc.perform(post(base + "/modules").header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Otra dimensión\",\"position\":2}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PROGRAM_READ_ONLY"));
+        mvc.perform(post(base + "/modules/" + module + "/sessions").header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Otra sesión\",\"scheduledDate\":\"2026-10-01\",\"position\":2}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PROGRAM_READ_ONLY"));
+        mvc.perform(put(base + "/disc-profiles/" + enrollment).header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"dominant\":\"D\",\"influential\":\"I\",\"serene\":\"S\",\"conscientious\":\"C\"}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PROGRAM_READ_ONLY"));
     }
 
     @Test void requiresAuthenticationAndDoesNotExposeUnknownSessions() throws Exception {

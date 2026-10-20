@@ -144,6 +144,55 @@ class ProgramIntegrationTests extends PostgreSqlIntegrationTestSupport {
         mvc.perform(patch(path(organization) + "/" + program).header("Authorization", bearer)).andExpect(status().isForbidden());
     }
 
+    @Test void lifecyclePersistsForwardTransitionsAndRejectsStaleVersions() throws Exception {
+        transition(organization, program, "ACTIVE", 0).andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE")).andExpect(jsonPath("$.version").value(1))
+                .andExpect(header().string("Cache-Control", "no-store")).andExpect(header().exists("X-Request-ID"));
+        transition(organization, program, "COMPLETED", 0).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PROGRAM_VERSION_CONFLICT"));
+        transition(organization, program, "COMPLETED", 1).andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED")).andExpect(jsonPath("$.version").value(2));
+        transition(organization, program, "ACTIVE", 2).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PROGRAM_TRANSITION_NOT_ALLOWED"));
+        detail(organization, program).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("COMPLETED"));
+    }
+
+    @Test void draftCanBeCancelledWithoutDeletingTheProgram() throws Exception {
+        transition(organization, program, "CANCELLED", 0).andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED")).andExpect(jsonPath("$.version").value(1));
+        list(organization).andExpect(jsonPath("$.totalElements").value(1));
+        transition(organization, program, "ACTIVE", 1).andExpect(status().isConflict());
+    }
+
+    @ParameterizedTest @ValueSource(strings = {"COMPANY_ADMIN", "LEADER", "COLLABORATOR", "SUPER_ADMIN"})
+    void lifecycleIsConsultantOnly(String value) throws Exception {
+        role(value);
+        transition(organization, program, "ACTIVE", 0).andExpect(status().isForbidden());
+    }
+
+    @Test void lifecycleDoesNotRevealForeignOrMissingResources() throws Exception {
+        transition(other, foreignProgram, "ACTIVE", 0).andExpect(status().isNotFound());
+        transition(organization, foreignProgram, "ACTIVE", 0).andExpect(status().isNotFound());
+        transition(organization, uuid7(0x9ff), "ACTIVE", 0).andExpect(status().isNotFound());
+        mvc.perform(post(path(organization) + "/" + program + "/status")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"ACTIVE\",\"version\":0}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @ParameterizedTest @ValueSource(strings = {"{}", "{\"status\":\"ACTIVE\"}",
+            "{\"status\":\"ACTIVE\",\"version\":-1}", "{\"status\":\"DRAFT\",\"version\":0}",
+            "{\"status\":\"SCHEDULED\",\"version\":0}"})
+    void invalidLifecycleRequestCannotWrite(String input) throws Exception {
+        mvc.perform(post(path(organization) + "/" + program + "/status").header("Authorization", bearer)
+                .contentType(MediaType.APPLICATION_JSON).content(input)).andExpect(status().isBadRequest());
+        detail(organization, program).andExpect(jsonPath("$.status").value("DRAFT")).andExpect(jsonPath("$.version").value(0));
+    }
+
+    private ResultActions transition(UUID org, UUID id, String target, long version) throws Exception {
+        return mvc.perform(post(path(org) + "/" + id + "/status").header("Authorization", bearer)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"" + target + "\",\"version\":" + version + "}"));
+    }
+
     private void role(String value) {
         jdbcTemplate.update("delete from rti.membership_roles where membership_id=?", membership);
         if (!value.isEmpty()) jdbcTemplate.update("insert into rti.membership_roles values (?, ?)", membership, value);

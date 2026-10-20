@@ -84,6 +84,9 @@ test.describe("@mvp RTI-VS1-013 authenticated vertical slice", () => {
     await expect(page.getByRole("status")).toHaveText("Programa creado.");
     await page.getByRole("link", { name: "Consultar programa creado" }).click();
     await expect(page.getByText(programName, { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Activar programa", exact: true }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Confirmar: activar programa" }).click();
+    await expect(page.getByRole("status").filter({ hasText: "Programa activo." })).toBeVisible();
     await page.getByRole("link", { name: "Colaboradores del programa" }).click();
 
     await page.getByLabel("Correo electrónico").fill(collaboratorEmail);

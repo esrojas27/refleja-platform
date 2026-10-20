@@ -141,6 +141,15 @@ su actividad. La entrega representa 50% del avance y la encuesta el 50% restante
 encuesta pendiente persiste entre sesiones y bloquea la entrada de la entrega a la
 bandeja de revisión. Queda pendiente la consulta agregada de resultados.
 
+## Ciclo de vida del programa
+
+Incremento del 2026-10-19, con publicación autorizada por el usuario:
+activación manual desde Borrador, finalización con advertencia de pendientes y
+cancelación. Los programas cerrados quedan en consulta y conservan progreso,
+entregas, encuestas e inscripciones. Las fechas no disparan cambios automáticos.
+El colaborador realiza actividades únicamente en programas Activos. Reglas,
+contrato, concurrencia y recorrido manual en [ciclo de vida](program-lifecycle.md).
+
 ## Secuencia propuesta de incrementos
 
 La numeración oficial debe asignarse al convertir cada bloque en ticket.

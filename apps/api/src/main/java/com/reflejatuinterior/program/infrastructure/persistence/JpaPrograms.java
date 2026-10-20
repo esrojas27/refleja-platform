@@ -2,7 +2,10 @@ package com.reflejatuinterior.program.infrastructure.persistence;
 
 import java.util.Optional;
 import java.util.UUID;
+import jakarta.persistence.EntityManager;
+import com.reflejatuinterior.program.ProgramDirectory;
 import com.reflejatuinterior.program.application.ProgramData;
+import com.reflejatuinterior.program.application.ProgramNotFound;
 import com.reflejatuinterior.program.application.ProgramPage;
 import com.reflejatuinterior.program.application.Programs;
 import com.reflejatuinterior.program.domain.NewProgram;
@@ -16,7 +19,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(propagation = Propagation.MANDATORY)
 class JpaPrograms implements Programs {
     private final ProgramJpaRepository repository;
-    JpaPrograms(ProgramJpaRepository repository) { this.repository = repository; }
+    private final EntityManager entityManager;
+    JpaPrograms(ProgramJpaRepository repository, EntityManager entityManager) {
+        this.repository = repository; this.entityManager = entityManager;
+    }
 
     @Override public ProgramData create(UUID organizationId, NewProgram input) {
         return data(repository.saveAndFlush(new ProgramJpaEntity(organizationId, input.name(), input.description(),
@@ -34,8 +40,27 @@ class JpaPrograms implements Programs {
         return repository.findByOrganizationIdAndId(organizationId, programId).map(JpaPrograms::data);
     }
 
+    @Override public ChangedStatus transition(UUID organizationId, UUID programId, String target, long expectedVersion) {
+        var entity = repository.lockByOrganizationIdAndId(organizationId, programId)
+                .orElseThrow(ProgramNotFound::new);
+        // A previous read in this transaction must not hide a concurrent closure.
+        entityManager.refresh(entity);
+        var previous = entity.status().name();
+        entity.transitionTo(ProgramStatus.valueOf(target), expectedVersion);
+        return new ChangedStatus(previous, data(repository.saveAndFlush(entity)));
+    }
+
     private static ProgramData data(ProgramJpaEntity entity) {
         return new ProgramData(entity.id(), entity.organizationId(), entity.name(), entity.description(),
                 entity.status().name(), entity.startDate(), entity.endDate(), entity.version());
+    }
+
+    @Override public void requireEditable(UUID organizationId, UUID programId) {
+        var entity = repository.lockByOrganizationIdAndId(organizationId, programId)
+                .orElseThrow(ProgramNotFound::new);
+        entityManager.refresh(entity);
+        if (entity.status() == ProgramStatus.COMPLETED || entity.status() == ProgramStatus.CANCELLED) {
+            throw new ProgramDirectory.StateConflict("PROGRAM_READ_ONLY");
+        }
     }
 }

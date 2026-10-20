@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { fetchCurrentIdentity } from "@/lib/auth/authenticated-api";
 import { programsPath } from "@/lib/programs/program-api";
+import { ProgramStateProvider } from "./program-state-context";
 
 type WorkspaceItem = {
   href: string;
@@ -109,7 +110,8 @@ export function ProgramWorkspace({
           </Link>
         </div>
       </aside>
-      <div className="rti-workspace-content">{children}</div>
+      <div className="rti-workspace-content"><ProgramStateProvider organizationId={organizationId} programId={programId}
+        pathname={pathname}>{children}</ProgramStateProvider></div>
     </div>
   );
 }

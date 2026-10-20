@@ -31,6 +31,12 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 @RestControllerAdvice(assignableTypes = {EnrollmentController.class, InvitationController.class, MyProgramController.class,
         ActivityController.class, ActivityEvaluationController.class, DiscProfileController.class})
 class EnrollmentErrorHandler {
+    @ExceptionHandler(com.reflejatuinterior.program.ProgramDirectory.StateConflict.class)
+    ResponseEntity<ErrorResponse> lifecycleConflict(com.reflejatuinterior.program.ProgramDirectory.StateConflict exception,
+            HttpServletRequest request) {
+        return error(request, 409, exception.code(), List.of());
+    }
+
     @ExceptionHandler({OrganizationAccess.Denied.class, CollaboratorInvitations.Denied.class, CollaboratorAccess.Denied.class})
     ResponseEntity<ErrorResponse> denied(HttpServletRequest request) { return error(request, 403, "FORBIDDEN", List.of()); }
 

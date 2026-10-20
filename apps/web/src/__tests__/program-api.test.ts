@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchAuthSession } from "aws-amplify/auth";
-import { createProgram, listPrograms, getProgram, ProgramRequestError } from "@/lib/programs/program-api";
+import { createProgram, changeProgramStatus, listPrograms, getProgram, ProgramRequestError } from "@/lib/programs/program-api";
 
 vi.mock("aws-amplify/auth", () => ({ fetchAuthSession: vi.fn() }));
 const input = { name: "Programa", description: "Descripción", startDate: "2026-09-01", endDate: "2026-12-01" };
@@ -25,6 +25,13 @@ describe("program API", () => {
     await listPrograms("tenant-a", 2); await getProgram("tenant-a", "program-b");
     expect(fetcher.mock.calls[0][0]).toBe("http://localhost:8082/api/v1/organizations/tenant-a/programs?page=2&size=20");
     expect(fetcher.mock.calls[1][0]).toBe("http://localhost:8082/api/v1/organizations/tenant-a/programs/program-b");
+  });
+  it("uses a separate authenticated lifecycle contract with an expected version", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ status: "ACTIVE", version: 3 }), { status: 200 }));
+    vi.stubGlobal("fetch", fetcher);
+    await changeProgramStatus("tenant-a", "program-b", "ACTIVE", 2);
+    expect(fetcher).toHaveBeenCalledWith("http://localhost:8082/api/v1/organizations/tenant-a/programs/program-b/status",
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ status: "ACTIVE", version: 2 }), cache: "no-store" }));
   });
   it("never calls backend without an access token", async () => {
     vi.mocked(fetchAuthSession).mockResolvedValue({} as never); const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);

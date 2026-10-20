@@ -16,6 +16,7 @@ import {
 import { ActivityForm } from "@/components/programs/program-activity-area";
 import { ActivityEvaluationForm } from "@/components/programs/activity-evaluation-form";
 import { ProgramModal } from "@/components/programs/program-modal";
+import { useProgramState } from "@/components/programs/program-state-context";
 
 type ContentDialog = { kind: "dimension" }
   | { kind: "session"; dimension: ProgramDimension }
@@ -27,6 +28,7 @@ export function ProgramContentArea({ organizationId, programId }: { organization
 }
 
 function ProgramContent({ organizationId, programId }: { organizationId: string; programId: string }) {
+  const canEdit = useProgramState()?.canEdit ?? true;
   const [dimensions, setDimensions] = useState<ProgramDimension[]>();
   const [activities, setActivities] = useState<ProgramActivity[]>();
   const [evaluations, setEvaluations] = useState<ActivityEvaluation[]>();
@@ -103,7 +105,7 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
           Construye dimensiones, sesiones y actividades antes de incorporar participantes. Despliega cada nivel para consultar y ampliar su contenido.
         </p>
       </div>
-      {ready && <button type="button" className="rti-button-primary shrink-0" onClick={() => setDialog({ kind: "dimension" })}>
+      {ready && canEdit && <button type="button" className="rti-button-primary shrink-0" onClick={() => setDialog({ kind: "dimension" })}>
         <Plus aria-hidden="true" className="size-4" />Crear dimensión
       </button>}
     </div>
@@ -138,7 +140,7 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
           {dimensionOpen && <div id={`dimension-panel-${dimension.id}`} className="border-t border-border/70 px-5 py-5 sm:px-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h3 className="font-semibold">Sesiones</h3>
-              <button type="button" className="rti-button-secondary" onClick={() => setDialog({ kind: "session", dimension })}>
+              <button type="button" disabled={!canEdit} className="rti-button-secondary" onClick={() => setDialog({ kind: "session", dimension })}>
                 <Plus aria-hidden="true" className="size-4" />Agregar sesión
               </button>
             </div>
@@ -161,7 +163,7 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
                     {session.objective && <p className="whitespace-pre-wrap text-sm text-muted-foreground"><span className="font-medium text-foreground">Objetivo: </span>{session.objective}</p>}
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                       <h4 className="font-semibold">Actividades</h4>
-                      <button type="button" className="rti-button-secondary"
+                      <button type="button" disabled={!canEdit} className="rti-button-secondary"
                         onClick={() => setDialog({ kind: "activity", dimensionName: dimension.name, session })}>
                         <Plus aria-hidden="true" className="size-4" />Crear actividad
                       </button>
@@ -183,7 +185,7 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
                           <p className="mt-1 text-xs text-muted-foreground">{evaluation.questions.length} {evaluation.questions.length === 1 ? "pregunta" : "preguntas"}</p>
                           <ol className="mt-2 space-y-1">{evaluation.questions.map(question => <li key={question.id}
                             className="text-xs text-muted-foreground">{question.position}. {question.prompt}</li>)}</ol>
-                        </div> : <button type="button" className="rti-button-secondary mt-4 w-full"
+                        </div> : <button type="button" disabled={!canEdit} className="rti-button-secondary mt-4 w-full"
                           onClick={() => setDialog({ kind: "evaluation", activity })}>
                           <BarChart3 aria-hidden="true" className="size-4" />Crear encuesta
                         </button>}

@@ -3,6 +3,10 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { CollaboratorProgramWorkspace } from "@/components/participation/collaborator-program-workspace";
 import { listMyProgramActivities, type AssignedActivity } from "@/lib/participation/activity-api";
+import { getMyProgram } from "@/lib/participation/participation-api";
+vi.mock("@/lib/participation/participation-api", async original => ({
+  ...await original<typeof import("@/lib/participation/participation-api")>(), getMyProgram: vi.fn(),
+}));
 
 const { usePathname, listActivities } = vi.hoisted(() => ({ usePathname: vi.fn(), listActivities: vi.fn() }));
 vi.mock("next/navigation", () => ({ usePathname }));
@@ -11,7 +15,10 @@ vi.mock("@/lib/participation/activity-api", async original => ({
   listMyProgramActivities: listActivities,
 }));
 
-beforeEach(() => { vi.mocked(listMyProgramActivities).mockResolvedValue({ items: [] }); });
+beforeEach(() => {
+  vi.mocked(listMyProgramActivities).mockResolvedValue({ items: [] });
+  vi.mocked(getMyProgram).mockResolvedValue({ id: "program-a", status: "ACTIVE" } as Awaited<ReturnType<typeof getMyProgram>>);
+});
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 
 it("offers a compact collaborator workspace and marks the summary as active", () => {

@@ -42,6 +42,7 @@ public class ProgramStructureService {
         var context = policy.authorizeConsultant(subject, organizationId, "CREATE_PROGRAM_MODULE", requestId);
         tenantContext.activate(context.organizationId());
         requireProgram(context.organizationId(), programId);
+        requireEditable(context.organizationId(), programId);
         var created = structure.createModule(context.organizationId(), programId,
                 new NewProgramModule(name, description, position));
         auditAfterCommit("PROGRAM_MODULE_CREATED", context.userId(), context.organizationId(), created.id(), requestId);
@@ -55,6 +56,7 @@ public class ProgramStructureService {
         tenantContext.activate(context.organizationId());
         requireProgram(context.organizationId(), programId);
         if (structure.findModule(context.organizationId(), programId, moduleId).isEmpty()) throw new ProgramNotFound();
+        requireEditable(context.organizationId(), programId);
         var created = structure.createSession(context.organizationId(), programId, moduleId,
                 new NewProgramSession(name, description, objective, scheduledDate, position));
         auditAfterCommit("PROGRAM_SESSION_CREATED", context.userId(), context.organizationId(), created.id(), requestId);
@@ -63,6 +65,10 @@ public class ProgramStructureService {
 
     private void requireProgram(UUID organizationId, UUID programId) {
         if (programs.find(organizationId, programId).isEmpty()) throw new ProgramNotFound();
+    }
+
+    private void requireEditable(UUID organizationId, UUID programId) {
+        programs.requireEditable(organizationId, programId);
     }
 
     private void auditAfterCommit(String action, UUID actor, UUID organizationId, UUID resourceId, String requestId) {

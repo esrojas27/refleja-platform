@@ -69,7 +69,7 @@ it("renders detail and a generic unavailable message for cross-tenant failure", 
 });
 it("renders saved detail metadata including version", async () => {
   render(<ProgramArea organizationId="org-a" mode="detail" programId="program-a" />);
-  await screen.findByText("Programa real"); expect(screen.getByText("DRAFT")).toBeTruthy(); expect(screen.getByText("Versión")).toBeTruthy();
+  await screen.findByText("Programa real"); expect(screen.getAllByText("Borrador").length).toBeGreaterThan(0); expect(screen.getByText("Versión")).toBeTruthy();
   await waitFor(() => expect((screen.getByRole("button", { name: "Crear plantilla global" }) as HTMLButtonElement).disabled).toBe(false));
 });
 it("creates within selected organization then shows returned data and detail link", async () => {

@@ -6,6 +6,7 @@ import { fetchCurrentIdentity, IdentityRequestError, type CurrentIdentity } from
 import { createEnrollment, listEnrollments, retryInvitationDelivery, deliveryMessage, participationErrorMessage,
   inviteeRoleLabel, ParticipationRequestError, type Enrollment, type EnrollmentInput, type InviteeRole,
   type PageResult } from "@/lib/participation/participation-api";
+import { useProgramState } from "@/components/programs/program-state-context";
 
 const button = "rti-button-secondary";
 
@@ -15,6 +16,7 @@ export function EnrollmentArea({ organizationId, programId }: { organizationId: 
 }
 
 function EnrollmentContent({ organizationId, programId }: { organizationId: string; programId: string }) {
+  const canEdit = useProgramState()?.canEdit ?? true;
   const [identity, setIdentity] = useState<CurrentIdentity>();
   const [result, setResult] = useState<PageResult<Enrollment>>();
   const [page, setPage] = useState(0);
@@ -54,10 +56,10 @@ function EnrollmentContent({ organizationId, programId }: { organizationId: stri
     <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">Invita a un colaborador, líder o responsable de RRHH. El acceso se activa cuando acepta con su cuenta de Cognito.</p>
     {notice && <p className="mt-5 rounded-2xl border border-accent bg-accent/60 px-4 py-3 text-sm" role="status">{notice}</p>}
     {message && <p className="mt-5 rounded-2xl bg-muted/60 px-4 py-3 text-sm" role="status">{message}</p>}
-    {identity && result && <div className="mt-7 grid gap-8 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
-      <div className="rounded-2xl border border-border/70 bg-background/70 p-5 sm:p-6">
+    {identity && result && <div className={`mt-7 grid gap-8 ${canEdit ? "lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]" : ""}`}>
+      {canEdit && <div className="rounded-2xl border border-border/70 bg-background/70 p-5 sm:p-6">
         <EnrollmentForm organizationId={organizationId} programId={programId} onSaved={saved => refresh(0, saved)} />
-      </div>
+      </div>}
       <section aria-labelledby="enrollment-list-title">
         <h2 id="enrollment-list-title" className="text-xl font-semibold">Personas registradas</h2>
         <ul className="mt-4 space-y-3">{result.items.map(enrollment => <li key={enrollment.id} className="space-y-2 break-words rounded-2xl border border-border/70 bg-background/70 p-5">
@@ -153,6 +155,7 @@ export function EnrollmentForm({ organizationId, programId, onSaved }: {
 }
 
 function DeliveryAction({ enrollment, onSaved }: { enrollment: Enrollment; onSaved: (result: Enrollment) => void }) {
+  const canEdit = useProgramState()?.canEdit ?? true;
   const [pending, setPending] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [message, setMessage] = useState("");
@@ -177,6 +180,6 @@ function DeliveryAction({ enrollment, onSaved }: { enrollment: Enrollment; onSav
   return <div className="space-y-2">
     <p className="text-sm">{enrollment.invitation ? deliveryMessage(enrollment.invitation.deliveryStatus) : "No hay invitación asociada."}</p>
     {message && <p role="status" className="text-sm">{message}</p>}
-    {retryable && <button className={button} disabled={pending || blocked} onClick={() => void retry()}>{pending ? "Solicitando envío…" : "Reintentar envío"}</button>}
+    {canEdit && retryable && <button className={button} disabled={pending || blocked} onClick={() => void retry()}>{pending ? "Solicitando envío…" : "Reintentar envío"}</button>}
   </div>;
 }

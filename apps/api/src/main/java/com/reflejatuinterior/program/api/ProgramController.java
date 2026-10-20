@@ -14,6 +14,8 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Pattern;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -70,12 +72,28 @@ class ProgramController {
                 .body(ProgramResponse.from(programs.detail(jwt.getSubject(), organizationId, programId, id)));
     }
 
+    @PostMapping(path = "/{programId}/status", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "Change program lifecycle manually", description = "Active tenant CONSULTANT only. "
+            + "DRAFT/SCHEDULED -> ACTIVE or CANCELLED; ACTIVE -> COMPLETED or CANCELLED. "
+            + "Terminal states cannot be reopened. Requires the current version; does not alter enrollments, responses or progress.")
+    @ApiResponse(responseCode = "200", description = "New program state and incremented version")
+    @ApiResponse(responseCode = "409", description = "PROGRAM_VERSION_CONFLICT or PROGRAM_TRANSITION_NOT_ALLOWED; reload before retrying")
+    ResponseEntity<ProgramResponse> transition(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID organizationId,
+            @PathVariable UUID programId, @Valid @RequestBody StatusRequest input, HttpServletRequest request) {
+        var id = requestId(request);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("X-Request-ID", id)
+                .body(ProgramResponse.from(programs.transition(jwt.getSubject(), organizationId, programId,
+                        input.status(), input.version(), id)));
+    }
+
     private String requestId(HttpServletRequest request) {
         String id = UUID.randomUUID().toString(); request.setAttribute("rti.requestId", id); return id;
     }
 
     record CreateRequest(@NotBlank @Size(max = 255) String name, @Size(max = 10000) String description,
                          @NotNull LocalDate startDate, @NotNull LocalDate endDate) {}
+    record StatusRequest(@NotNull @Pattern(regexp = "ACTIVE|COMPLETED|CANCELLED") String status,
+                         @NotNull @PositiveOrZero Long version) {}
     record ProgramResponse(UUID id, UUID organizationId, String name, String description, String status,
                            LocalDate startDate, LocalDate endDate, long version) {
         static ProgramResponse from(ProgramData data) {

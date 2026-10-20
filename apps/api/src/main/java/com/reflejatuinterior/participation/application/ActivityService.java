@@ -57,6 +57,7 @@ public class ActivityService {
             String title, String instructions, String youtubeUrl, LocalDate dueDate, int position,
             boolean assignToAll, List<UUID> enrollmentIds, String requestId) {
         var context = authorizeConsultant(subject, organizationId, programId, "CREATE_ACTIVITY", requestId);
+        programs.lock(context.organizationId(), programId).orElseThrow(ProgramActivities.Missing::new).requireEditable();
         var uniqueEnrollmentIds = new LinkedHashSet<>(enrollmentIds);
         if ((assignToAll && !uniqueEnrollmentIds.isEmpty())
                 || (!assignToAll && uniqueEnrollmentIds.isEmpty())
@@ -110,6 +111,8 @@ public class ActivityService {
             tenantContext.activate(membership.organizationId());
             var enrollment = enrollments.findOwned(membership.organizationId(), membership.id(), programId);
             if (enrollment.isEmpty()) continue;
+            var program = programs.find(membership.organizationId(), programId).orElseThrow(MyProgramNotFound::new);
+            if (!program.activated()) return List.of();
             var ownedAssignments = assignments.listOwned(membership.organizationId(), programId, enrollment.get().id());
             var definitions = activities.findAll(membership.organizationId(), programId,
                     ownedAssignments.stream().map(ActivityAssignments.Data::activityId).toList());
@@ -147,6 +150,7 @@ public class ActivityService {
             var enrollment = enrollments.findOwned(membership.organizationId(), membership.id(), programId);
             if (enrollment.isEmpty()) continue;
             if (!"ACTIVE".equals(enrollment.get().status())) throw new ActivityWorkflowConflict();
+            programs.lock(membership.organizationId(), programId).orElseThrow(MyProgramNotFound::new).requireActive();
             var submitted = assignments.submit(membership.organizationId(), programId, activityId,
                     enrollment.get().id(), cleanResponse).orElseThrow(ActivityAssignmentNotFound::new);
             var activity = activities.findAll(membership.organizationId(), programId, List.of(activityId)).stream()
@@ -165,6 +169,7 @@ public class ActivityService {
     public AssigneeResponse review(String subject, UUID organizationId, UUID programId, UUID activityId,
             UUID assignmentId, ActivityReviewDecision decision, String comment, String requestId) {
         var context = authorizeConsultant(subject, organizationId, programId, "REVIEW_ACTIVITY", requestId);
+        programs.lock(context.organizationId(), programId).orElseThrow(ProgramActivities.Missing::new).requireActive();
         var cleanComment = comment == null || comment.isBlank() ? null : comment.trim();
         if ((decision == ActivityReviewDecision.REQUEST_CHANGES && cleanComment == null)
                 || (cleanComment != null && cleanComment.length() > 5000)) {

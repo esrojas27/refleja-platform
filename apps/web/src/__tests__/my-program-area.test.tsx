@@ -17,7 +17,7 @@ vi.mock("@/lib/participation/activity-api", async original => ({
 
 const program: MyProgram = {
   id: "program-a", organizationId: "org-a", organizationName: "Empresa A",
-  name: "Tu historia, tu mayor diferencial", description: "Programa asignado", status: "DRAFT",
+  name: "Tu historia, tu mayor diferencial", description: "Programa asignado", status: "ACTIVE",
   startDate: "2026-09-01", endDate: "2026-12-01", version: 0,
 };
 const page = { items: [program], page: 0, size: 20, totalElements: 1, totalPages: 1 };
@@ -65,9 +65,31 @@ it("renders only the collaborator's returned programs with basic metadata", asyn
   expect((await screen.findByRole("link", { name: program.name })).getAttribute("href")).toBe("/my-programs/program-a");
   expect(screen.getByText("Empresa A")).toBeTruthy();
   expect(screen.getByText("2026-09-01 — 2026-12-01")).toBeTruthy();
-  expect(screen.getByText("DRAFT")).toBeTruthy();
+  expect(screen.getByText("Activo")).toBeTruthy();
   expect(listMyPrograms).toHaveBeenCalledWith(0, expect.any(AbortSignal));
   expect(screen.queryByText(/progreso/i)).toBeNull();
+});
+
+it("shows a preparation notice and never renders a draft's activity forms", async () => {
+  vi.mocked(getMyProgram).mockResolvedValue({ ...program, status: "DRAFT" });
+  render(<MyProgramArea mode="activities" programId="program-a" />);
+  await screen.findByText(/Este programa está en preparación/);
+  expect(screen.queryByText("Reflexión inicial")).toBeNull();
+  expect(screen.queryByLabelText("Tu respuesta")).toBeNull();
+});
+
+it("keeps submitted work visible after closure but removes response and survey forms", async () => {
+  vi.mocked(getMyProgram).mockResolvedValue({ ...program, status: "COMPLETED" });
+  vi.mocked(listMyProgramActivities).mockResolvedValue({ items: [{ ...assignedActivity,
+    assignmentStatus: "SUBMITTED", responseText: "Mi entrega conservada", submittedAt: "2026-10-07T12:00:00Z",
+    completionPercentage: 50, survey: { ...assignedActivity.survey!, status: "PENDING" } }] });
+  render(<MyProgramArea mode="activities" programId="program-a" />);
+  await screen.findByText(/Este programa ha finalizado/);
+  await openAssignedActivity();
+  expect(screen.getByText("Mi entrega conservada")).toBeTruthy();
+  expect(screen.queryByLabelText("Tu respuesta")).toBeNull();
+  expect(screen.queryByRole("form")).toBeNull();
+  expect(screen.queryByLabelText("Tu próxima actividad")).toBeNull();
 });
 
 it("opens the program summary with progress without requesting participant identifiers", async () => {

@@ -2,6 +2,10 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { ProgramWorkspace } from "@/components/programs/program-workspace";
 import { fetchCurrentIdentity } from "@/lib/auth/authenticated-api";
+import { getProgram } from "@/lib/programs/program-api";
+vi.mock("@/lib/programs/program-api", async original => ({
+  ...await original<typeof import("@/lib/programs/program-api")>(), getProgram: vi.fn(),
+}));
 
 const { usePathname } = vi.hoisted(() => ({ usePathname: vi.fn() }));
 
@@ -9,6 +13,7 @@ vi.mock("next/navigation", () => ({ usePathname }));
 vi.mock("@/lib/auth/authenticated-api", () => ({ fetchCurrentIdentity: vi.fn() }));
 
 beforeEach(() => {
+  vi.mocked(getProgram).mockResolvedValue({ id: "program-a", organizationId: "org-a", status: "ACTIVE" } as Awaited<ReturnType<typeof getProgram>>);
   vi.mocked(fetchCurrentIdentity).mockResolvedValue({
     cognitoSubject: "subject", user: { id: "user", email: "consultant@example.com", firstName: null, lastName: null },
     organizations: [], activeOrganizationId: "org-a", roles: ["CONSULTANT"],

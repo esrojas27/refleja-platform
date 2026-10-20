@@ -11,6 +11,7 @@ import { ActivityRequestError, activityErrorMessage, createProgramActivity, list
 import { listProgramDimensions, ProgramContentRequestError, type ProgramDimension } from "@/lib/programs/program-content-api";
 import { ActivityStatusBadges } from "@/components/participation/progress-overview";
 import { ProgramModal } from "@/components/programs/program-modal";
+import { useProgramState } from "@/components/programs/program-state-context";
 
 export type SessionOption = { id: string; label: string };
 
@@ -19,6 +20,9 @@ export function ProgramActivityArea({ organizationId, programId }: { organizatio
 }
 
 function ActivityContent({ organizationId, programId }: { organizationId: string; programId: string }) {
+  const state = useProgramState();
+  const canEdit = state?.canEdit ?? true;
+  const canExecute = state?.canExecute ?? true;
   const [dimensions, setDimensions] = useState<ProgramDimension[]>();
   const [enrollments, setEnrollments] = useState<Enrollment[]>();
   const [activities, setActivities] = useState<ProgramActivity[]>();
@@ -85,14 +89,16 @@ function ActivityContent({ organizationId, programId }: { organizationId: string
           Crea actividades, consulta su alcance y revisa las respuestas pendientes.
         </p>
       </div>
-      {dimensions && enrollments && activities && <button type="button" className="rti-button-primary shrink-0"
+      {canEdit && dimensions && enrollments && activities && <button type="button" className="rti-button-primary shrink-0"
         onClick={() => setCreateOpen(true)}>{enrollments.length ? "Crear y asignar" : "Crear actividad"}</button>}
     </div>
     {notice && <p role="status" className="mt-5 rounded-2xl border border-accent bg-accent/60 px-4 py-3 text-sm">{notice}</p>}
     {message && <p role="status" className="mt-5 rounded-2xl bg-muted/60 px-4 py-3 text-sm">{message}</p>}
     {dimensions && enrollments && activities && <div className="mt-7 space-y-8">
-      <ReviewQueue organizationId={organizationId} programId={programId} activities={activities}
-        onReviewed={reviewed} />
+      {canExecute ? <ReviewQueue organizationId={organizationId} programId={programId} activities={activities}
+        onReviewed={reviewed} /> : <p className="rounded-2xl border border-border bg-muted/50 p-4 text-sm">
+          La revisión de entregas está disponible mientras el programa está activo.
+        </p>}
       <section aria-labelledby="activity-list-title" className="border-t border-border/70 pt-7">
         <h2 id="activity-list-title" className="text-xl font-semibold">Actividades creadas</h2>
         {activities.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">Aún no hay actividades en este programa.</p>
@@ -110,6 +116,19 @@ function ActivityContent({ organizationId, programId }: { organizationId: string
                 {item.label}: {item.count}
               </span>)}
             </div>
+            {!canExecute && activity.assignees.length > 0 && <details className="mt-4 rounded-xl border border-border p-4">
+              <summary className="cursor-pointer text-sm font-semibold">Consultar entregas ({activity.assignees.length})</summary>
+              <ul className="mt-4 space-y-4">{activity.assignees.map(person => <li key={person.assignmentId}
+                className="border-t border-border pt-4 text-sm first:border-t-0 first:pt-0">
+                <p className="break-words font-semibold">{[person.firstName, person.lastName].filter(Boolean).join(" ") || person.email}</p>
+                <p className="mt-1 break-all text-muted-foreground">{person.email}</p>
+                <div className="mt-2"><ActivityStatusBadges status={person.status} dueDate={activity.dueDate}
+                  surveyStatus={person.surveyStatus === "NOT_REQUIRED" ? undefined : person.surveyStatus} /></div>
+                <p className="mt-3 whitespace-pre-wrap break-words">{person.responseText ?? "Sin entrega."}</p>
+                {person.reviewComment && <p className="mt-2 whitespace-pre-wrap break-words text-muted-foreground">Comentario del consultor: {person.reviewComment}</p>}
+                <p className="mt-2 text-muted-foreground">Avance conservado: {person.completionPercentage}%</p>
+              </li>)}</ul>
+            </details>}
           </li>)}</ol>}
       </section>
     </div>}

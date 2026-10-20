@@ -47,6 +47,7 @@ class ActuatorHealthSecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/api/v1/organizations").authenticated()
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/organizations/{organizationId}/programs",
+                                "/api/v1/organizations/{organizationId}/programs/{programId}/status",
                                 "/api/v1/organizations/{organizationId}/program-templates",
                                 "/api/v1/organizations/{organizationId}/program-templates/{templateId}/programs")
                                 .authenticated()

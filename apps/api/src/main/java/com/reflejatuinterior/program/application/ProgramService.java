@@ -49,6 +49,25 @@ public class ProgramService {
         return programs.list(context.organizationId(), page, size);
     }
 
+    @Transactional
+    public ProgramData transition(String subject, UUID organizationId, UUID programId, String target,
+            long expectedVersion, String requestId) {
+        var context = policy.authorizeConsultant(subject, organizationId, "CHANGE_PROGRAM_STATUS", requestId);
+        tenantContext.activate(context.organizationId());
+        if (!java.util.Set.of("ACTIVE", "COMPLETED", "CANCELLED").contains(target)) throw new InvalidProgramInput("status");
+        if (expectedVersion < 0) throw new InvalidProgramInput("version");
+        var changed = programs.transition(context.organizationId(), programId, target, expectedVersion);
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override public void afterCommit() {
+                LoggerFactory.getLogger(ProgramService.class).info(
+                        "action=PROGRAM_STATUS_CHANGED actor={} organization={} resource=Program resourceId={} previousStatus={} status={} version={} requestId={} timestamp={} result=SUCCESS",
+                        context.userId(), context.organizationId(), programId, changed.previousStatus(), target,
+                        changed.program().version(), requestId, Instant.now());
+            }
+        });
+        return changed.program();
+    }
+
     @Transactional(readOnly = true)
     public ProgramData detail(String subject, UUID organizationId, UUID programId, String requestId) {
         var context = policy.authorize(subject, organizationId, false, requestId);

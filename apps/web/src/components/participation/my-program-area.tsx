@@ -18,6 +18,7 @@ import { activityErrorMessage, listMyProgramActivities, submitMyActivity,
 import { useCollaboratorActivities } from "@/components/participation/collaborator-activities-state";
 import { ActivityStatusBadges, CollaboratorProgressOverview } from "@/components/participation/progress-overview";
 import { ActivitySurveyForm } from "@/components/participation/activity-survey-form";
+import { programStateMessage, programStatusLabels } from "@/lib/programs/program-lifecycle";
 
 const button = "rti-button-secondary";
 
@@ -67,7 +68,7 @@ function MyProgramList() {
     {needsLogin && <Link href="/login" className="rti-link inline-block text-sm">Iniciar sesión</Link>}
     {result && <>
       <ul className="grid gap-4 sm:grid-cols-2">{result.items.map(program => <li key={program.id} className="rounded-2xl border border-border/70 bg-background/70 p-5 transition-colors hover:border-primary/30">
-        <p className="rti-kicker">{program.status}</p>
+        <p className="rti-kicker">{programStatusLabels[program.status]}</p>
         <Link href={myProgramsPath(program.id)} className="rti-link mt-3 inline-block break-words text-lg">{program.name}</Link>
         <p className="mt-1 break-words text-sm text-muted-foreground">{program.organizationName}</p>
         <p className="mt-1 text-sm">{program.startDate ?? "Sin fecha"} — {program.endDate ?? "Sin fecha"}</p>
@@ -108,13 +109,14 @@ function MyProgramDetail({ programId, section }: { programId: string; section: "
         <dt className="font-medium">Nombre</dt><dd>{program.name}</dd>
         <dt className="font-medium">Organización</dt><dd>{program.organizationName}</dd>
         <dt className="font-medium">Descripción</dt><dd className="whitespace-pre-wrap">{program.description || "Sin descripción"}</dd>
-        <dt className="font-medium">Estado</dt><dd>{program.status}</dd>
+        <dt className="font-medium">Estado</dt><dd>{programStatusLabels[program.status]}</dd>
         <dt className="font-medium">Inicio</dt><dd>{program.startDate ?? "Sin fecha"}</dd>
         <dt className="font-medium">Fin</dt><dd>{program.endDate ?? "Sin fecha"}</dd>
       </dl>
-      <AssignedActivityList programId={programId} section="summary" />
+      <AssignedActivityList programId={programId} section="summary" programStatus={program.status} />
       </>}
-      {section === "activities" && <AssignedActivityList programId={programId} section="activities" />}
+      {program.status !== "ACTIVE" && <p className="rounded-2xl border border-border bg-muted/50 p-4 text-sm">{programStateMessage(program.status)}</p>}
+      {section === "activities" && <AssignedActivityList programId={programId} section="activities" programStatus={program.status} />}
     </div>}
   </div>;
 }
@@ -147,7 +149,9 @@ function groupAssignedActivities(activities: AssignedActivity[]): ActivityDimens
   }));
 }
 
-function AssignedActivityList({ programId, section }: { programId: string; section: "summary" | "activities" }) {
+function AssignedActivityList({ programId, section, programStatus }: { programId: string; section: "summary" | "activities"; programStatus: MyProgram["status"] }) {
+  const readOnly = programStatus !== "ACTIVE";
+  const preparing = programStatus === "DRAFT" || programStatus === "SCHEDULED";
   const shared = useCollaboratorActivities();
   const [localActivities, setLocalActivities] = useState<AssignedActivity[]>();
   const [localMessage, setLocalMessage] = useState("Cargando actividades asignadas…");
@@ -173,12 +177,12 @@ function AssignedActivityList({ programId, section }: { programId: string; secti
   }
 
   return <div className="space-y-8">
-    {section === "summary" && activities && <CollaboratorProgressOverview activities={activities} />}
+    {section === "summary" && !preparing && activities && <CollaboratorProgressOverview activities={activities} />}
     {section === "activities" && <section aria-labelledby="assigned-activities-title">
-    {activities && activities.length > 0 && <NextActivityNotice activities={activities} />}
+    {!readOnly && activities && activities.length > 0 && <NextActivityNotice activities={activities} />}
     <h2 id="assigned-activities-title" className="text-xl font-semibold">Actividades asignadas</h2>
-    {message && <p role="status" className="mt-3 rounded-2xl bg-muted/60 px-4 py-3 text-sm">{message}</p>}
-    {activities && activities.length > 0 && <div className="mt-4 space-y-4">
+    {!preparing && message && <p role="status" className="mt-3 rounded-2xl bg-muted/60 px-4 py-3 text-sm">{message}</p>}
+    {!preparing && activities && activities.length > 0 && <div className="mt-4 space-y-4">
       {groupAssignedActivities(activities).map(dimension => {
         const dimensionTotal = dimension.sessions.reduce((total, session) => total + session.activities.length, 0);
         return <details key={dimension.id} className="group/dimension overflow-hidden rounded-2xl border border-border/70 bg-background/65">
@@ -203,7 +207,7 @@ function AssignedActivityList({ programId, section }: { programId: string; secti
               </summary>
               <ol className="space-y-3 border-t border-border/70 p-3 sm:p-4">
                 {session.activities.map(activity => <AssignedActivityAccordion key={activity.id} programId={programId}
-                  activity={activity} onSubmitted={updateActivity} />)}
+                  activity={activity} readOnly={readOnly} onSubmitted={updateActivity} />)}
               </ol>
             </details>)}
           </div>
@@ -248,8 +252,8 @@ function NextActivityNotice({ activities }: { activities: AssignedActivity[] }) 
   </aside>;
 }
 
-function AssignedActivityAccordion({ programId, activity, onSubmitted }: {
-  programId: string; activity: AssignedActivity; onSubmitted: (activity: AssignedActivity) => void;
+function AssignedActivityAccordion({ programId, activity, onSubmitted, readOnly }: {
+  programId: string; activity: AssignedActivity; onSubmitted: (activity: AssignedActivity) => void; readOnly: boolean;
 }) {
   return <li id={`activity-${activity.id}`}><details className="group/activity overflow-hidden rounded-xl border border-border/70 bg-background">
     <summary className="flex cursor-pointer list-none flex-col gap-3 px-4 py-3 marker:hidden sm:flex-row sm:items-center sm:justify-between [&::-webkit-details-marker]:hidden">
@@ -262,18 +266,18 @@ function AssignedActivityAccordion({ programId, activity, onSubmitted }: {
       </span>
     </summary>
     <div className="border-t border-border/70 p-4">
-      <AssignedActivityCard programId={programId} activity={activity} onSubmitted={onSubmitted} />
+      <AssignedActivityCard programId={programId} activity={activity} readOnly={readOnly} onSubmitted={onSubmitted} />
     </div>
   </details></li>;
 }
 
-function AssignedActivityCard({ programId, activity, onSubmitted }: {
-  programId: string; activity: AssignedActivity; onSubmitted: (activity: AssignedActivity) => void;
+function AssignedActivityCard({ programId, activity, onSubmitted, readOnly }: {
+  programId: string; activity: AssignedActivity; onSubmitted: (activity: AssignedActivity) => void; readOnly: boolean;
 }) {
   const [response, setResponse] = useState(activity.responseText ?? "");
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
-  const editable = activity.assignmentStatus === "ASSIGNED" || activity.assignmentStatus === "CHANGES_REQUESTED";
+  const editable = !readOnly && (activity.assignmentStatus === "ASSIGNED" || activity.assignmentStatus === "CHANGES_REQUESTED");
 
   async function submit() {
     const clean = response.trim();
@@ -321,10 +325,10 @@ function AssignedActivityCard({ programId, activity, onSubmitted }: {
     </div> : activity.responseText && <div className="mt-4 text-sm"><p className="font-medium">Tu respuesta</p>
       <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{activity.responseText}</p></div>}
     {message && <p role="status" className="mt-3 rounded-xl bg-muted/60 px-3 py-2 text-sm">{message}</p>}
-    {activity.survey?.status === "LOCKED" && <p className="mt-4 rounded-xl border border-border/70 bg-muted/45 px-3 py-3 text-sm text-muted-foreground">
+    {!readOnly && activity.survey?.status === "LOCKED" && <p className="mt-4 rounded-xl border border-border/70 bg-muted/45 px-3 py-3 text-sm text-muted-foreground">
       La encuesta se habilitará después de enviar la actividad y completará el 50% restante.
     </p>}
-    {activity.survey?.status === "PENDING" && <ActivitySurveyForm programId={programId} activityId={activity.id}
+    {!readOnly && activity.survey?.status === "PENDING" && <ActivitySurveyForm programId={programId} activityId={activity.id}
       survey={activity.survey} onCompleted={submission => onSubmitted({ ...activity,
         survey: { ...activity.survey!, status: "COMPLETED", completedAt: submission.completedAt },
         completionPercentage: 100 })} />}

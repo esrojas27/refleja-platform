@@ -45,6 +45,7 @@ public class ActivityEvaluationService {
             UUID activityId, String title, String instructions,
             List<ActivityEvaluations.QuestionInput> questions, String requestId) {
         var context = authorize(subject, organizationId, programId, "CREATE_ACTIVITY_EVALUATION", requestId);
+        programs.lock(context.organizationId(), programId).orElseThrow(ProgramActivities.Missing::new).requireEditable();
         if (activities.findAll(context.organizationId(), programId, List.of(activityId)).isEmpty()) {
             throw new ProgramActivities.Missing();
         }
@@ -92,6 +93,7 @@ public class ActivityEvaluationService {
             var enrollment = enrollments.findOwned(membership.organizationId(), membership.id(), programId);
             if (enrollment.isEmpty()) continue;
             if (!"ACTIVE".equals(enrollment.get().status())) throw new ActivityWorkflowConflict();
+            programs.lock(membership.organizationId(), programId).orElseThrow(MyProgramNotFound::new).requireActive();
             var assignment = assignments.listOwned(membership.organizationId(), programId, enrollment.get().id())
                     .stream().filter(item -> item.activityId().equals(activityId)).findFirst()
                     .orElseThrow(ActivityAssignmentNotFound::new);

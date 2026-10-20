@@ -50,7 +50,11 @@ public class EnrollmentService {
                                      String email, String firstName, String lastName,
                                      CollaboratorInvitations.InvitedRole role, String requestId) {
         // No external side effect before authorization, resource scoping and validation.
-        transactions.execute(status -> authorize(subject, organizationId, programId, requestId));
+        transactions.execute(status -> {
+            var context = authorize(subject, organizationId, programId, requestId);
+            requireEditable(context.organizationId(), programId);
+            return context;
+        });
         var input = new NewCollaborator(email, firstName, lastName);
         var person = new CollaboratorInvitations.Person(input.email(), input.firstName(), input.lastName());
         var invitedRole = role == null ? CollaboratorInvitations.InvitedRole.COLLABORATOR : role;
@@ -58,6 +62,7 @@ public class EnrollmentService {
         var created = transactions.execute(status -> {
             // The external round trip must not preserve a stale authorization decision.
             var context = authorize(subject, organizationId, programId, requestId);
+            requireEditable(context.organizationId(), programId);
             var invitation = invitations.create(organizationId, context.userId(), account, person, invitedRole);
             var enrollment = enrollments.create(organizationId, programId, invitation.membershipId(), invitation.id());
             auditAfterCommit("PROGRAM_PARTICIPANT_INVITED", context.userId(), organizationId, enrollment.id(), requestId);
@@ -80,6 +85,7 @@ public class EnrollmentService {
                                             UUID enrollmentId, String requestId) {
         var existing = transactions.execute(status -> {
             authorize(subject, organizationId, programId, requestId);
+            requireEditable(organizationId, programId);
             var enrollment = enrollments.find(organizationId, programId, enrollmentId).orElseThrow(EnrollmentNotFound::new);
             if (enrollment.invitationId() == null || !"INVITED".equals(enrollment.status())) throw new EnrollmentConflict();
             return response(enrollment);
@@ -112,6 +118,8 @@ public class EnrollmentService {
         var organization = organizations.findSummaries(Set.of(owned.organizationId())).stream()
                 .filter(o -> "ACTIVE".equals(o.status())).findFirst().orElseThrow(CollaboratorInvitations.Denied::new);
         programs.find(organization.id(), enrollment.programId()).orElseThrow(EnrollmentNotFound::new);
+        // Retrying an already accepted invitation remains a read-compatible no-op after closure.
+        if (!"ACCEPTED".equals(owned.status())) requireEditable(organization.id(), enrollment.programId());
         if (!Set.of("INVITED", "ACTIVE").contains(enrollment.status())) throw new EnrollmentConflict();
         var accepted = invitations.accept(subject, invitationId);
         var activated = enrollments.activate(accepted.organizationId(), invitationId);
@@ -232,6 +240,10 @@ public class EnrollmentService {
                 : invitationInfo(invitations.findInOrganization(enrollment.organizationId(), enrollment.invitationId()));
         return new EnrollmentResponse(enrollment.id(), enrollment.organizationId(), enrollment.programId(), enrollment.status(),
                 participant, invitation);
+    }
+
+    private void requireEditable(UUID organizationId, UUID programId) {
+        programs.lock(organizationId, programId).orElseThrow(EnrollmentNotFound::new).requireEditable();
     }
 
     private EnrollmentResponse deliver(EnrollmentResponse enrollment, String requestId) {

@@ -7,6 +7,8 @@ import { fetchCurrentIdentity, IdentityRequestError, type CurrentIdentity } from
 import { createProgram, getProgram, listPrograms, programsPath, programErrorMessage, ProgramRequestError,
   type Program, type ProgramInput, type ProgramPage } from "@/lib/programs/program-api";
 import { ProgramModal } from "@/components/programs/program-modal";
+import { ProgramLifecyclePanel } from "@/components/programs/program-lifecycle-panel";
+import { programStatusLabels } from "@/lib/programs/program-lifecycle";
 import { createProgramFromTemplate, createProgramTemplate, getProgramTemplateReadiness, listProgramTemplates,
   programTemplateErrorMessage, type ProgramTemplate,
   type ProgramTemplateReadiness } from "@/lib/programs/program-template-api";
@@ -69,7 +71,7 @@ function ProgramList({ organizationId, canCreate }: { organizationId: string; ca
     {message && <p role="status" className="rounded-2xl bg-muted/60 px-4 py-3 text-sm">{message}</p>}
     {result && <>
       <ul className="grid gap-4 sm:grid-cols-2">{result.items.map(program => <li key={program.id} className="rounded-2xl border border-border/70 bg-background/70 p-5 transition-colors hover:border-primary/30">
-        <p className="rti-kicker">{program.status}</p>
+        <p className="rti-kicker">{programStatusLabels[program.status]}</p>
         <Link href={`${programsPath(organizationId)}/${program.id}`} className="rti-link mt-3 inline-block break-words text-lg">{program.name}</Link>
         <p className="mt-3 text-sm text-muted-foreground">{program.startDate ?? "Sin fecha"} — {program.endDate ?? "Sin fecha"}</p>
       </li>)}</ul>
@@ -87,7 +89,7 @@ function ProgramValues({ program }: { program: Program }) {
   return <dl className="mt-6 grid gap-x-8 gap-y-2 break-words rounded-2xl border border-border/70 bg-background/70 p-5 sm:grid-cols-[auto_1fr]">
     <dt className="font-medium">Nombre</dt><dd>{program.name}</dd>
     <dt className="font-medium">Descripción</dt><dd className="whitespace-pre-wrap">{program.description || "Sin descripción"}</dd>
-    <dt className="font-medium">Estado</dt><dd>{program.status}</dd>
+    <dt className="font-medium">Estado</dt><dd>{programStatusLabels[program.status]}</dd>
     <dt className="font-medium">Inicio</dt><dd>{program.startDate ?? "Sin fecha"}</dd>
     <dt className="font-medium">Fin</dt><dd>{program.endDate ?? "Sin fecha"}</dd>
     <dt className="font-medium">Versión</dt><dd>{program.version}</dd>
@@ -107,6 +109,7 @@ function ProgramDetail({ organizationId, programId, canEnroll }: { organizationI
   return <>{message && <p className="mt-5 rounded-2xl bg-muted/60 px-4 py-3 text-sm" role="status">{message}</p>}{program && <>
     <ProgramValues program={program} />
     {canEnroll && <>
+      <ProgramLifecyclePanel program={program} onChanged={setProgram} />
       <div className="mt-5 flex flex-wrap gap-3">
         <Link href={`${programsPath(organizationId)}/${encodeURIComponent(programId)}/enrollments`} className="rti-button-primary">Colaboradores del programa</Link>
       </div>
@@ -164,7 +167,7 @@ export function CreateProgramForm({ organizationId }: { organizationId: string }
       </button>
     </div>
     {creationMode === "template" ? <CreateFromTemplateForm organizationId={organizationId} /> : <>
-      <p className="mt-6 text-sm text-muted-foreground">El programa se creará en DRAFT. Esta operación no activa el programa.</p>
+      <p className="mt-6 text-sm text-muted-foreground">El programa se creará en Borrador. Actívalo desde su resumen cuando esté preparado para comenzar.</p>
       {message && <p className="mt-4 rounded-2xl bg-muted/60 px-4 py-3 text-sm" role="status">{message}</p>}
       {created ? <><ProgramValues program={created} /><Link className="rti-link mt-5 inline-block" href={`${programsPath(organizationId)}/${created.id}`}>Consultar programa creado</Link></>
       : <form className="mt-6 space-y-5" aria-label="Crear programa" onSubmit={submit} noValidate>

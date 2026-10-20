@@ -3,6 +3,8 @@ package com.reflejatuinterior.program.infrastructure.persistence;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
+import com.reflejatuinterior.program.ProgramDirectory;
+import com.reflejatuinterior.program.domain.ProgramLifecycle;
 
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -52,6 +54,9 @@ class ProgramJpaEntity {
     @Column(name = "end_date")
     private LocalDate endDate;
 
+    @Column(name = "activated_at")
+    private Instant activatedAt;
+
     @Column(name = "primary_consultant_membership_id")
     private UUID primaryConsultantMembershipId;
 
@@ -82,6 +87,7 @@ class ProgramJpaEntity {
         this.name = name;
         this.description = description;
         this.status = status;
+        if (status == ProgramStatus.ACTIVE || status == ProgramStatus.COMPLETED) this.activatedAt = Instant.now();
         this.startDate = startDate;
         this.endDate = endDate;
         this.primaryConsultantMembershipId = primaryConsultantMembershipId;
@@ -98,6 +104,19 @@ class ProgramJpaEntity {
     ProgramStatus status() {
         return status;
     }
+
+    void transitionTo(ProgramStatus target, long expectedVersion) {
+        if (version != expectedVersion) throw new ProgramDirectory.StateConflict("PROGRAM_VERSION_CONFLICT");
+        if (!ProgramLifecycle.canTransition(status.name(), target.name())) {
+            throw new ProgramDirectory.StateConflict("PROGRAM_TRANSITION_NOT_ALLOWED");
+        }
+        if (activatedAt == null && (target == ProgramStatus.ACTIVE || status == ProgramStatus.ACTIVE)) {
+            activatedAt = Instant.now();
+        }
+        status = target;
+    }
+
+    boolean activated() { return activatedAt != null || status == ProgramStatus.ACTIVE || status == ProgramStatus.COMPLETED; }
 
     LocalDate startDate() {
         return startDate;

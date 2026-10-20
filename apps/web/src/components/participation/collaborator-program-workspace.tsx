@@ -8,16 +8,16 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { CollaboratorActivitiesContext } from "@/components/participation/collaborator-activities-state";
 import { activityErrorMessage, listMyProgramActivities, pendingAssignedActivities,
   type AssignedActivity } from "@/lib/participation/activity-api";
-import { myProgramsPath } from "@/lib/participation/participation-api";
+import { getMyProgram, myProgramsPath, type MyProgram } from "@/lib/participation/participation-api";
 
 export function CollaboratorProgramWorkspace({ programId, children }: { programId: string; children: ReactNode }) {
   const pathname = usePathname();
   const summaryPath = myProgramsPath(programId);
-  const [result, setResult] = useState<{ programId: string; activities?: AssignedActivity[]; message: string }>();
+  const [result, setResult] = useState<{ programId: string; activities?: AssignedActivity[]; message: string; status?: MyProgram["status"] }>();
   const currentResult = result?.programId === programId ? result : undefined;
   const activities = currentResult?.activities;
   const message = currentResult?.message ?? "Cargando actividades asignadas…";
-  const pendingCount = activities ? pendingAssignedActivities(activities).length : 0;
+  const pendingCount = activities && currentResult?.status === "ACTIVE" ? pendingAssignedActivities(activities).length : 0;
   const items = [
     { href: summaryPath, label: "Resumen", icon: BookOpenText },
     { href: `${summaryPath}/activities`, label: "Actividades", icon: CheckSquare2 },
@@ -25,9 +25,9 @@ export function CollaboratorProgramWorkspace({ programId, children }: { programI
 
   useEffect(() => {
     const controller = new AbortController();
-    listMyProgramActivities(programId, controller.signal).then(result => {
+    Promise.all([listMyProgramActivities(programId, controller.signal), getMyProgram(programId, controller.signal)]).then(([result, program]) => {
       if (controller.signal.aborted) return;
-      setResult({ programId, activities: result.items,
+      setResult({ programId, activities: result.items, status: program.status,
         message: result.items.length ? "" : "Todavía no tienes actividades asignadas en este programa." });
     }).catch(error => {
       if (!controller.signal.aborted) setResult({ programId, message: activityErrorMessage(error) });

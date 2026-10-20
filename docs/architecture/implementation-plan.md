@@ -5,7 +5,18 @@ La secuencia y los criterios de aceptación oficiales están en el
 Este archivo registra el punto de continuación; no reemplaza los tickets ni los
 [ADR aceptados](../adr/README.md).
 
-## Estado al 2026-09-13
+## Incremento local del 2026-10-19
+
+El [ciclo de vida del programa](program-lifecycle.md) incorpora activación manual,
+finalización y cancelación por consultor, confirmación de cierre con pendientes,
+consulta posterior y bloqueo de escrituras en programas cerrados. Borrador queda
+reservado a preparación: los programas existentes requieren activación expresa.
+La versión del programa y el bloqueo de fila controlan cambios concurrentes.
+El usuario autorizó el commit y push de esta iteración. La evidencia de pruebas
+está en la guía del incremento; la ejecución remota de los gates y el despliegue
+se comprueban después de publicar.
+
+## Estado histórico al 2026-09-13
 
 - **001–005:** implementaciones registradas en Git: monorepo, API, web,
   PostgreSQL/Flyway y modelo inicial de persistencia.

@@ -6,8 +6,10 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { fetchCurrentIdentity, IdentityRequestError } from "@/lib/auth/authenticated-api";
 import { DiscProfileInput, DiscRequestError, ProgramDiscParticipant, discErrorMessage,
   listProgramDiscProfiles, saveProgramDiscProfile } from "@/lib/participation/disc-api";
+import { useProgramState } from "@/components/programs/program-state-context";
 
 export function ProgramDiscArea({ organizationId, programId }: { organizationId: string; programId: string }) {
+  const canEdit = useProgramState()?.canEdit ?? true;
   const [items, setItems] = useState<ProgramDiscParticipant[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("Consultando fichas DISC…");
@@ -79,8 +81,8 @@ export function ProgramDiscArea({ organizationId, programId }: { organizationId:
         <section aria-labelledby="disc-queue-title" className="mt-7 rounded-3xl border border-primary/15 bg-accent/25 p-5 sm:p-7">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div><p className="rti-kicker">Recorrido individual</p>
-              <h2 id="disc-queue-title" className="mt-2 text-xl font-semibold">Completar fichas DISC</h2></div>
-            {!queueOpen && <button type="button" className="rti-button-primary" onClick={() => openQueue()}>
+              <h2 id="disc-queue-title" className="mt-2 text-xl font-semibold">{canEdit ? "Completar fichas DISC" : "Consultar fichas DISC"}</h2></div>
+            {canEdit && !queueOpen && <button type="button" className="rti-button-primary" onClick={() => openQueue()}>
               {pending.length > 0 ? `Completar pendientes (${pending.length})` : "Revisar fichas"}
             </button>}
           </div>
@@ -89,7 +91,7 @@ export function ProgramDiscArea({ organizationId, programId }: { organizationId:
               : <CircleDashed aria-hidden="true" className="size-5 shrink-0 text-primary" />}
             <p>{pending.length === 0 ? "Todas las fichas DISC están completas."
               : `Hay ${pending.length} ${pending.length === 1 ? "ficha pendiente" : "fichas pendientes"}.`}</p>
-          </div> : selected && <DiscForm key={`${selected.enrollmentId}-${selected.profile?.version ?? "new"}`}
+          </div> : canEdit && selected && <DiscForm key={`${selected.enrollmentId}-${selected.profile?.version ?? "new"}`}
             organizationId={organizationId} programId={programId} participant={selected}
             onSaved={saved} onClose={() => setQueueOpen(false)} />}
         </section>
@@ -106,9 +108,13 @@ export function ProgramDiscArea({ organizationId, programId }: { organizationId:
                 <span className={`rounded-full px-3 py-1 text-xs font-semibold ${item.profile ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
                   {item.profile ? "Completa" : "Pendiente"}</span>
               </div>
-              <button type="button" onClick={() => openQueue(item)} className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline">
+              {canEdit ? <button type="button" onClick={() => openQueue(item)} className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline">
                 {item.profile ? "Editar ficha" : "Completar ficha"}<ChevronRight aria-hidden="true" className="size-4" />
-              </button>
+              </button> : item.profile && <dl className="mt-4 space-y-2 text-sm">
+                {([["D · Dominante", item.profile.dominant], ["I · Influyente", item.profile.influential],
+                  ["S · Sereno", item.profile.serene], ["C · Concienzudo", item.profile.conscientious]] as const)
+                  .map(([label, text]) => <div key={label}><dt className="font-semibold">{label}</dt><dd className="whitespace-pre-wrap break-words text-muted-foreground">{text}</dd></div>)}
+              </dl>}
             </article>)}
           </div>
         </section>

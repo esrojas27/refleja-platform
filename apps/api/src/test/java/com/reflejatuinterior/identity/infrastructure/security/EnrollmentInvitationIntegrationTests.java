@@ -402,6 +402,30 @@ class EnrollmentInvitationIntegrationTests extends PostgreSqlIntegrationTestSupp
         assertState("user_invitations", invitation(second), "PENDING");
     }
 
+    @ParameterizedTest @ValueSource(strings = {"COMPLETED", "CANCELLED"})
+    void closedProgramRefusesNewInvitationsDeliveryAndPendingAcceptance(String terminal) throws Exception {
+        var enrollment = enroll(EMAIL);
+        var statusPath = "/api/v1/organizations/" + organization + "/programs/" + program + "/status";
+        mvc.perform(post(statusPath).header("Authorization", consultant).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"ACTIVE\",\"version\":0}"))
+                .andExpect(status().isOk());
+        mvc.perform(post(statusPath).header("Authorization", consultant).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"" + terminal + "\",\"version\":1}"))
+                .andExpect(status().isOk());
+        clearInvocations(gateway);
+
+        create(organization, program, valid("another-010@example.test"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PROGRAM_READ_ONLY"));
+        retry(enrollment, organization, program)
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PROGRAM_READ_ONLY"));
+        accept(enrollment, SUBJECT)
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PROGRAM_READ_ONLY"));
+
+        assertPending(enrollment);
+        assertThat(count("enrollments")).isEqualTo(1);
+        verifyNoInteractions(gateway);
+    }
+
     private JsonNode enroll(String email) throws Exception {
         return json.readTree(create(organization, program, valid(email)).andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString());

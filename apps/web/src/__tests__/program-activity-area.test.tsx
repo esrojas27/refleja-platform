@@ -6,6 +6,7 @@ import { listEnrollments } from "@/lib/participation/participation-api";
 import { createProgramActivity, listProgramActivities, reviewActivityAssignment,
   type ProgramActivity } from "@/lib/participation/activity-api";
 import { listProgramDimensions } from "@/lib/programs/program-content-api";
+import { ProgramStateContext } from "@/components/programs/program-state-context";
 
 vi.mock("@/lib/auth/authenticated-api", async original => ({
   ...await original<typeof import("@/lib/auth/authenticated-api")>(), fetchCurrentIdentity: vi.fn(),
@@ -57,6 +58,18 @@ it("renders real sessions, assignments and existing activities", async () => {
   expect(screen.queryByRole("form", { name: "Crear actividad" })).toBeNull();
   expect(screen.getByRole("link", { name: "Ver video en YouTube" }).getAttribute("href")).toBe("https://youtu.be/dQw4w9WgXcQ");
   expect(listEnrollments).toHaveBeenCalledWith("org-a", "program-a", 0, expect.any(AbortSignal), 100);
+});
+
+it("preserves consultant access to submitted work after closure without creation or review controls", async () => {
+  render(<ProgramStateContext.Provider value={{ canEdit: false, canExecute: false, update: vi.fn() }}>
+    <ProgramActivityArea organizationId="org-a" programId="program-a" />
+  </ProgramStateContext.Provider>);
+  await screen.findByText("Reflexión inicial");
+  fireEvent.click(screen.getByText("Consultar entregas (1)"));
+  expect(screen.getByText("Mi avance")).toBeTruthy();
+  expect(screen.getByText("Avance conservado: 100%")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Crear y asignar" })).toBeNull();
+  expect(screen.queryByRole("button", { name: /Revisar actividades/ })).toBeNull();
 });
 
 it("assigns the next activity to every active enrollment by default", async () => {
