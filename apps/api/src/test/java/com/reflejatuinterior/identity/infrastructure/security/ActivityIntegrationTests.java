@@ -337,6 +337,265 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("PROGRAM_NOT_FOUND"));
     }
 
+    @Test void editsContentWithoutChangingIdentityAndRejectsStaleVersions() throws Exception {
+        var activity = createAdminActivity(true, 1);
+        mvc.perform(put(adminPath("dimensions", module)).header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("""
+                {"name":"Interior actualizado","description":"Descripción","version":0}
+                """)).andExpect(status().isNoContent());
+        mvc.perform(put(adminPath("sessions", session)).header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("""
+                {"name":"Sesión actualizada","objective":"Objetivo revisado","scheduledDate":"2026-10-02","version":0}
+                """)).andExpect(status().isNoContent());
+        mvc.perform(put(adminPath("activities", activity)).header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(editBody(0, "Nuevas instrucciones")))
+                .andExpect(status().isNoContent()).andExpect(header().string("Cache-Control", "no-store"));
+        mvc.perform(get(collaboratorPath()).header("Authorization", token(collaborator)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].id").value(activity.toString()))
+                .andExpect(jsonPath("$.items[0].instructions").value("Nuevas instrucciones"))
+                .andExpect(jsonPath("$.items[0].dimensionName").value("Interior actualizado"))
+                .andExpect(jsonPath("$.items[0].sessionName").value("Sesión actualizada"));
+        mvc.perform(put(adminPath("activities", activity)).header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(editBody(0, "No sobrescribir")))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CONTENT_VERSION_CONFLICT"));
+    }
+
+    @Test void reordersActivitiesAtomicallyAndKeepsUniquePositivePositions() throws Exception {
+        var first = createAdminActivity(true, 1);
+        var second = createAdminActivity(true, 2);
+        mvc.perform(post(adminPath("activities", second) + "/move").header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0,\"direction\":\"UP\"}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(get(collaboratorPath()).header("Authorization", token(collaborator)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].id").value(second.toString()))
+                .andExpect(jsonPath("$.items[0].position").value(1))
+                .andExpect(jsonPath("$.items[1].id").value(first.toString()))
+                .andExpect(jsonPath("$.items[1].position").value(2));
+        mvc.perform(post(adminPath("activities", first) + "/move").header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0,\"direction\":\"UP\"}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CONTENT_VERSION_CONFLICT"));
+    }
+
+    @Test void reordersDimensionsAndSessionsOnlyAmongTheirSiblings() throws Exception {
+        var base = consultantPath().replace("/activities", "");
+        var dimResponse = mvc.perform(post(base + "/modules").header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Otra\",\"position\":2}"))
+                .andExpect(status().isCreated()).andReturn().getResponse();
+        var dimension = UUID.fromString(json.readTree(dimResponse.getContentAsString()).path("id").asText());
+        mvc.perform(post(adminPath("dimensions", dimension) + "/move").header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0,\"direction\":\"UP\"}"))
+                .andExpect(status().isNoContent());
+        var sessionResponse = mvc.perform(post(base + "/modules/" + module + "/sessions").header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Segunda\",\"scheduledDate\":\"2026-10-02\",\"position\":2}"))
+                .andExpect(status().isCreated()).andReturn().getResponse();
+        var second = UUID.fromString(json.readTree(sessionResponse.getContentAsString()).path("id").asText());
+        mvc.perform(post(adminPath("sessions", second) + "/move").header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0,\"direction\":\"UP\"}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(get(base + "/modules").header("Authorization", token(consultant)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].id").value(dimension.toString()))
+                .andExpect(jsonPath("$.items[1].sessions[0].id").value(second.toString()));
+        assertThat(jdbcTemplate.queryForObject("select module_id from rti.program_sessions where id=?", UUID.class, second)).isEqualTo(module);
+    }
+
+    @Test void archivesPendingAssignmentsAndRestoresThemWithoutDeletingData() throws Exception {
+        var activity = createAdminActivity(true, 1);
+        mvc.perform(post(adminPath("dimensions", module) + "/archive").header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0,\"archived\":true}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(get(collaboratorPath()).header("Authorization", token(collaborator)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items").isEmpty());
+        mvc.perform(get(consultantPath()).header("Authorization", token(consultant)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items").isEmpty());
+        mvc.perform(get(consultantPath() + "?includeArchived=true").header("Authorization", token(consultant)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].id").value(activity.toString()));
+        mvc.perform(post(adminPath("activities", activity) + "/archive").header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0,\"archived\":false}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CONTENT_PARENT_ARCHIVED"));
+        mvc.perform(post(adminPath("dimensions", module) + "/archive").header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":1,\"archived\":false}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(get(collaboratorPath()).header("Authorization", token(collaborator)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].id").value(activity.toString()));
+        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.activity_assignments where activity_id=?", Long.class, activity)).isEqualTo(2);
+    }
+
+    @Test void deletionRequiresNoAssignmentsAtAnyDescendant() throws Exception {
+        var activity = createAdminActivity(true, 1);
+        for (var target : java.util.Map.of("dimensions", module, "sessions", session, "activities", activity).entrySet()) {
+            mvc.perform(post(adminPath(target.getKey(), target.getValue()) + "/delete").header("Authorization", token(consultant))
+                    .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0}"))
+                    .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CONTENT_HAS_ASSIGNMENTS"));
+        }
+        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.program_activities where id=?", Long.class, activity)).isEqualTo(1);
+    }
+
+    @Test void deletesUnassignedSubtreeIncludingItsSurvey() throws Exception {
+        var activity = createAdminActivity(false, 1);
+        createAdminSurvey(activity);
+        mvc.perform(post(adminPath("dimensions", module) + "/delete").header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0}"))
+                .andExpect(status().isNoContent());
+        for (String table : java.util.List.of("program_modules", "program_sessions", "program_activities", "activity_evaluations", "activity_evaluation_questions")) {
+            assertThat(jdbcTemplate.queryForObject("select count(*) from rti." + table + " where organization_id=?", Long.class, organization)).isZero();
+        }
+    }
+
+    @Test void protectsDeliveredInstructionsSurveyAndArchiveButAllowsMetadataCorrections() throws Exception {
+        var activity = createAdminActivity(true, 1);
+        createAdminSurvey(activity);
+        mvc.perform(post(collaboratorPath() + "/" + activity + "/submission").header("Authorization", token(collaborator))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"Entrega conservada\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(put(adminPath("activities", activity)).header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(editBody(0, "Cambiar instrucciones")))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CONTENT_HAS_SUBMISSIONS"));
+        mvc.perform(put(adminPath("activities", activity)).header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(editBody(0, "Describe tu avance.")))
+                .andExpect(status().isNoContent());
+        mvc.perform(put(adminPath("activities", activity) + "/survey").header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(adminSurveyBody().replaceFirst("\\{", "{\"version\":0,")))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CONTENT_HAS_SUBMISSIONS"));
+        for (var target : java.util.Map.of("dimensions", module, "sessions", session).entrySet()) {
+            mvc.perform(post(adminPath(target.getKey(), target.getValue()) + "/archive").header("Authorization", token(consultant))
+                    .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0,\"archived\":true}"))
+                    .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CONTENT_HAS_SUBMISSIONS"));
+        }
+        mvc.perform(post(adminPath("activities", activity) + "/archive").header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":1,\"archived\":true}"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CONTENT_HAS_SUBMISSIONS"));
+        mvc.perform(get(collaboratorPath()).header("Authorization", token(collaborator)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].responseText").value("Entrega conservada"));
+    }
+
+    @Test void editsSurveyBeforeDeliveryAndAdvancesVersionEvenWhenOnlyQuestionsChange() throws Exception {
+        var activity = createAdminActivity(true, 1);
+        var original = createAdminSurvey(activity);
+        mvc.perform(put(adminPath("activities", activity) + "/survey").header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(adminSurveyBody().replace("¿Qué aprendiste?", "¿Qué descubriste?").replaceFirst("\\{", "{\"version\":0,")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.version").value(1))
+                .andExpect(jsonPath("$.questions[0].prompt").value("¿Qué descubriste?"));
+        var newQuestion = jdbcTemplate.queryForObject("select id from rti.activity_evaluation_questions where evaluation_id=?", UUID.class, UUID.fromString(original.path("id").asText()));
+        assertThat(newQuestion.toString()).isNotEqualTo(original.path("questions").get(0).path("id").asText());
+        mvc.perform(put(adminPath("activities", activity) + "/survey").header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(adminSurveyBody().replaceFirst("\\{", "{\"version\":0,")))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CONTENT_VERSION_CONFLICT"));
+    }
+
+    @Test void duplicateCopiesDefinitionAndSurveyButNotSubmissionsAndDefaultsToNoAssignments() throws Exception {
+        var activity = createAdminActivity(true, 1);
+        var survey = createAdminSurvey(activity);
+        mvc.perform(post(collaboratorPath() + "/" + activity + "/submission").header("Authorization", token(collaborator))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"No copiar\"}")).andExpect(status().isOk());
+        var response = mvc.perform(post(adminPath("activities", activity) + "/duplicate").header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0,\"assignToAll\":false,\"enrollmentIds\":[]}"))
+                .andExpect(status().isCreated()).andReturn().getResponse();
+        var copy = UUID.fromString(json.readTree(response.getContentAsString()).path("id").asText());
+        assertThat(copy).isNotEqualTo(activity);
+        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.activity_assignments where activity_id=?", Long.class, copy)).isZero();
+        var copiedSurvey = jdbcTemplate.queryForObject("select id from rti.activity_evaluations where activity_id=?", UUID.class, copy);
+        assertThat(copiedSurvey.toString()).isNotEqualTo(survey.path("id").asText());
+        var copiedQuestion = jdbcTemplate.queryForObject("select id from rti.activity_evaluation_questions where evaluation_id=?", UUID.class, copiedSurvey);
+        assertThat(copiedQuestion.toString()).isNotEqualTo(survey.path("questions").get(0).path("id").asText());
+        mvc.perform(get(consultantPath()).header("Authorization", token(consultant)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[1].title").value("Reflexión general (copia)"))
+                .andExpect(jsonPath("$.items[1].position").value(2));
+    }
+
+    @Test void duplicateCanAssignSelectedCollaboratorsAndDoesNotExposeOtherOrganizations() throws Exception {
+        var activity = createAdminActivity(false, 1);
+        mvc.perform(post(adminPath("activities", activity) + "/duplicate").header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0,\"assignToAll\":false,\"enrollmentIds\":[\"" + enrollment + "\"]}"))
+                .andExpect(status().isCreated());
+        mvc.perform(post(adminPath("activities", activity) + "/delete").header("Authorization", token(collaborator))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0}")).andExpect(status().isForbidden());
+        mvc.perform(post(adminPath("activities", activity) + "/delete").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"version\":0}")).andExpect(status().isUnauthorized());
+        mvc.perform(put(adminPath("activities", uuid7(0xeff))).header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(editBody(0, "No existe"))).andExpect(status().isNotFound());
+        mvc.perform(put(adminPath("activities", activity).replace(organization.toString(), uuid7(0xefe).toString()))
+                .header("Authorization", token(consultant)).contentType(MediaType.APPLICATION_JSON).content(editBody(0, "Ajeno")))
+                .andExpect(status().isNotFound());
+        mvc.perform(get(collaboratorPath()).header("Authorization", token(collaborator)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(1));
+        mvc.perform(get(collaboratorPath()).header("Authorization", token(otherCollaborator)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items").isEmpty());
+    }
+
+    @Test void completedProgramRejectsAllContentAdministration() throws Exception {
+        var activity = createAdminActivity(true, 1);
+        createAdminSurvey(activity);
+        mvc.perform(post(consultantPath().replace("/activities", "/status")).header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"COMPLETED\",\"version\":0}"))
+                .andExpect(status().isOk());
+        for (String action : java.util.List.of("delete", "archive", "move", "duplicate")) {
+            mvc.perform(post(adminPath("activities", activity) + "/" + action).header("Authorization", token(consultant))
+                    .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0,\"archived\":true,\"direction\":\"UP\",\"assignToAll\":false,\"enrollmentIds\":[]}"))
+                    .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PROGRAM_READ_ONLY"));
+        }
+        mvc.perform(put(adminPath("activities", activity)).header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(editBody(0, "Bloqueada")))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PROGRAM_READ_ONLY"));
+    }
+
+    @Test void restoringParentPreservesTheOwnArchiveFlagOfItsChildren() throws Exception {
+        var archived = createAdminActivity(true, 1);
+        var visible = createAdminActivity(true, 2);
+        mvc.perform(post(adminPath("activities", archived) + "/archive").header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0,\"archived\":true}")).andExpect(status().isNoContent());
+        mvc.perform(post(adminPath("dimensions", module) + "/archive").header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0,\"archived\":true}")).andExpect(status().isNoContent());
+        mvc.perform(post(adminPath("dimensions", module) + "/archive").header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":1,\"archived\":false}")).andExpect(status().isNoContent());
+        mvc.perform(get(collaboratorPath()).header("Authorization", token(collaborator)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].id").value(visible.toString()));
+        mvc.perform(post(collaboratorPath() + "/" + archived + "/submission").header("Authorization", token(collaborator))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"No guardar en archivada\"}"))
+                .andExpect(status().isNotFound());
+        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.activity_assignments where activity_id=? and submitted_at is not null", Long.class, archived)).isZero();
+    }
+
+    @Test void cannotAddASurveyRetroactivelyAfterTheFirstSubmission() throws Exception {
+        var activity = createAdminActivity(true, 1);
+        mvc.perform(post(collaboratorPath() + "/" + activity + "/submission").header("Authorization", token(collaborator))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"Entrega sin encuesta\"}")).andExpect(status().isOk());
+        mvc.perform(post(evaluationPath(activity)).header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(adminSurveyBody()))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CONTENT_HAS_SUBMISSIONS"));
+        mvc.perform(post(adminPath("activities", activity) + "/duplicate").header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0,\"assignToAll\":true,\"enrollmentIds\":[]}"))
+                .andExpect(status().isCreated());
+        mvc.perform(get(consultantPath()).header("Authorization", token(consultant)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[1].assignees.length()").value(2))
+                .andExpect(jsonPath("$.items[1].assignees[0].status").value("ASSIGNED"))
+                .andExpect(jsonPath("$.items[1].assignees[0].submittedAt").doesNotExist());
+    }
+
+    private UUID createAdminActivity(boolean assigned, int position) throws Exception {
+        if (!assigned) jdbcTemplate.update("update rti.enrollments set status='INVITED' where program_id=?", program);
+        var response = mvc.perform(post(consultantPath()).header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(allBody().replace("\"position\":1", "\"position\":" + position)))
+                .andExpect(status().isCreated()).andReturn().getResponse();
+        if (!assigned) jdbcTemplate.update("update rti.enrollments set status='ACTIVE' where program_id=?", program);
+        return UUID.fromString(json.readTree(response.getContentAsString()).path("id").asText());
+    }
+    private tools.jackson.databind.JsonNode createAdminSurvey(UUID activity) throws Exception {
+        var response = mvc.perform(post(evaluationPath(activity)).header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(adminSurveyBody()))
+                .andExpect(status().isCreated()).andReturn().getResponse();
+        return json.readTree(response.getContentAsString());
+    }
+    private String adminSurveyBody() { return """
+            {"title":"Encuesta","instructions":"Responde","questions":[{"prompt":"¿Qué aprendiste?","type":"OPEN_TEXT","position":1}]}
+            """; }
+    private String editBody(long version, String instructions) {
+        return "{\"title\":\"Actividad corregida\",\"instructions\":\"" + instructions + "\",\"youtubeUrl\":\"https://youtu.be/dQw4w9WgXcQ\",\"dueDate\":\"2026-11-01\",\"version\":" + version + "}";
+    }
+    private String adminPath(String kind, UUID id) {
+        return consultantPath().replace("/activities", "/content/") + kind + "/" + id;
+    }
+
     private String consultantPath() {
         return "/api/v1/organizations/" + organization + "/programs/" + program + "/activities";
     }

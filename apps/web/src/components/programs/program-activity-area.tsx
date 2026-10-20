@@ -8,7 +8,8 @@ import { listEnrollments, ParticipationRequestError, type Enrollment } from "@/l
 import { ActivityRequestError, activityErrorMessage, createProgramActivity, listProgramActivities,
   isYoutubeVideoUrl, reviewActivityAssignment, type ActivityAssignee, type ActivityInput, type ProgramActivity }
   from "@/lib/participation/activity-api";
-import { listProgramDimensions, ProgramContentRequestError, type ProgramDimension } from "@/lib/programs/program-content-api";
+import { listProgramDimensions, ProgramContentRequestError, programContentErrorMessage, type ProgramDimension } from "@/lib/programs/program-content-api";
+import { editActivity } from "@/lib/programs/content-administration-api";
 import { ActivityStatusBadges } from "@/components/participation/progress-overview";
 import { ProgramModal } from "@/components/programs/program-modal";
 import { useProgramState } from "@/components/programs/program-state-context";
@@ -43,7 +44,7 @@ function ActivityContent({ organizationId, programId }: { organizationId: string
         const [structure, enrollmentPage, activityList] = await Promise.all([
           listProgramDimensions(organizationId, programId, controller.signal),
           listEnrollments(organizationId, programId, 0, controller.signal, 100),
-          listProgramActivities(organizationId, programId, controller.signal),
+          listProgramActivities(organizationId, programId, controller.signal, true),
         ]);
         if (controller.signal.aborted) return;
         setDimensions(structure.items);
@@ -65,6 +66,7 @@ function ActivityContent({ organizationId, programId }: { organizationId: string
     id: session.id, label: `${dimension.name} · ${session.name}`,
   }))), [dimensions]);
   const sessionNames = useMemo(() => new Map(sessions.map(session => [session.id, session.label])), [sessions]);
+  const visibleActivities = activities?.filter(activity => !activity.archived && sessionNames.has(activity.sessionId));
 
   function refresh(saved?: ProgramActivity) {
     setDimensions(undefined); setEnrollments(undefined); setActivities(undefined);
@@ -95,14 +97,14 @@ function ActivityContent({ organizationId, programId }: { organizationId: string
     {notice && <p role="status" className="mt-5 rounded-2xl border border-accent bg-accent/60 px-4 py-3 text-sm">{notice}</p>}
     {message && <p role="status" className="mt-5 rounded-2xl bg-muted/60 px-4 py-3 text-sm">{message}</p>}
     {dimensions && enrollments && activities && <div className="mt-7 space-y-8">
-      {canExecute ? <ReviewQueue organizationId={organizationId} programId={programId} activities={activities}
+      {canExecute ? <ReviewQueue organizationId={organizationId} programId={programId} activities={visibleActivities ?? []}
         onReviewed={reviewed} /> : <p className="rounded-2xl border border-border bg-muted/50 p-4 text-sm">
           La revisión de entregas está disponible mientras el programa está activo.
         </p>}
       <section aria-labelledby="activity-list-title" className="border-t border-border/70 pt-7">
         <h2 id="activity-list-title" className="text-xl font-semibold">Actividades creadas</h2>
-        {activities.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">Aún no hay actividades en este programa.</p>
-          : <ol className="mt-4 space-y-4">{activities.map(activity => <li key={activity.id}
+        {visibleActivities?.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">Aún no hay actividades en este programa.</p>
+          : <ol className="mt-4 space-y-4">{visibleActivities?.map(activity => <li key={activity.id}
             className="rounded-2xl border border-border/70 bg-background/70 p-5">
             <p className="rti-kicker">{sessionNames.get(activity.sessionId) ?? "Sesión"} · Actividad {activity.position}</p>
             <h3 className="mt-2 text-lg font-semibold">{activity.title}</h3>
@@ -145,11 +147,13 @@ function ActivityContent({ organizationId, programId }: { organizationId: string
   </section>;
 }
 
-export function ActivityForm({ organizationId, programId, sessions, enrollments, activities, onSaved }: {
+export function ActivityForm({ organizationId, programId, sessions, enrollments, activities, onSaved, initial }: {
   organizationId: string; programId: string; sessions: SessionOption[]; enrollments: Enrollment[];
-  activities: ProgramActivity[]; onSaved: (saved: ProgramActivity) => void;
+  activities: ProgramActivity[]; onSaved: (saved: ProgramActivity) => void; initial?: ProgramActivity;
 }) {
-  const [input, setInput] = useState({ sessionId: sessions[0]?.id ?? "", title: "", instructions: "", youtubeUrl: "", dueDate: "" });
+  const [input, setInput] = useState({ sessionId: initial?.sessionId ?? sessions[0]?.id ?? "", title: initial?.title ?? "",
+    instructions: initial?.instructions ?? "", youtubeUrl: initial?.youtubeUrl ?? "", dueDate: initial?.dueDate ?? "" });
+  const instructionsLocked = initial?.assignees.some(person => person.submittedAt != null) ?? false;
   const [selected, setSelected] = useState<string[]>([]);
   const [assignToAll, setAssignToAll] = useState(true);
   const [pending, setPending] = useState(false);
@@ -193,40 +197,45 @@ export function ActivityForm({ organizationId, programId, sessions, enrollments,
       ...(!clean.instructions || clean.instructions.length > 10000 ? ["instructions"] : []),
       ...(clean.youtubeUrl !== null && !isYoutubeVideoUrl(clean.youtubeUrl) ? ["youtubeUrl"] : []),
       ...(!/^\d{4}-\d{2}-\d{2}$/.test(clean.dueDate) ? ["dueDate"] : []),
-      ...(!assignToAll && !selected.length ? ["enrollmentIds"] : []),
+      ...(!initial && !assignToAll && !selected.length ? ["enrollmentIds"] : []),
     ];
     if (invalid.length) {
       setInvalidFields(invalid);
-      setMessage("Revisa los campos resaltados antes de crear la actividad.");
+      setMessage("Revisa los campos resaltados antes de guardar la actividad.");
       focusFirstInvalid(invalid);
       return;
     }
     submitting.current = true; setPending(true);
-    setMessage(enrollments.length ? "Creando y asignando actividad…" : "Creando actividad…");
+    setMessage(initial ? "Guardando actividad…" : enrollments.length ? "Creando y asignando actividad…" : "Creando actividad…");
     const controller = new AbortController(); request.current = controller;
     try {
-      const saved = await createProgramActivity(organizationId, programId, clean, controller.signal);
+      let saved: ProgramActivity;
+      if (initial) {
+        await editActivity(organizationId, programId, initial.id, { ...clean, version: initial.version }, controller.signal);
+        saved = { ...initial, title: clean.title, instructions: clean.instructions, youtubeUrl: clean.youtubeUrl, dueDate: clean.dueDate };
+      } else saved = await createProgramActivity(organizationId, programId, clean, controller.signal);
       if (!controller.signal.aborted) { setBlocked(true);
-        setMessage(saved.assignees.length ? "Actividad creada y asignada." : "Actividad creada sin asignaciones.");
+        setMessage(initial ? "Actividad actualizada." : saved.assignees.length ? "Actividad creada y asignada." : "Actividad creada sin asignaciones.");
         onSaved(saved); }
     } catch (error) {
       if (!controller.signal.aborted) {
-        const failure = error instanceof ActivityRequestError ? error : new ActivityRequestError(0);
+        const failure = error instanceof ActivityRequestError ? error : error instanceof ProgramContentRequestError
+          ? new ActivityRequestError(error.status, error.fields, error.requestId) : new ActivityRequestError(0);
         setInvalidFields(failure.fields);
         if (failure.fields.length) focusFirstInvalid(failure.fields);
         setBlocked(failure.status === 0 || failure.status >= 500 || [401, 403, 404, 409].includes(failure.status));
-        setMessage(activityErrorMessage(failure));
+        setMessage(error instanceof ProgramContentRequestError ? programContentErrorMessage(error) : activityErrorMessage(failure));
       }
     } finally { submitting.current = false; if (!controller.signal.aborted) setPending(false); }
   }
 
   const unavailable = sessions.length === 0;
-  return <form aria-label="Crear actividad" onSubmit={submit} noValidate className="space-y-5">
+  return <form aria-label={initial ? "Editar actividad" : "Crear actividad"} onSubmit={submit} noValidate className="space-y-5">
     <div><p className="rti-kicker">Nueva actividad</p><h2 id="create-activity-title" className="mt-2 text-xl font-semibold">
-      {enrollments.length ? "Crear y asignar" : "Crear actividad"}</h2></div>
+      {initial ? "Editar actividad" : enrollments.length ? "Crear y asignar" : "Crear actividad"}</h2></div>
     {message && <p role="status" className="rounded-xl bg-muted/60 px-3 py-2 text-sm">{message}</p>}
     {sessions.length === 0 && <p className="text-sm text-muted-foreground">Crea primero una sesión en Contenido.</p>}
-    {enrollments.length === 0 && <p className="rounded-xl border border-border/70 bg-muted/60 px-3 py-3 text-sm text-muted-foreground">
+    {!initial && enrollments.length === 0 && <p className="rounded-xl border border-border/70 bg-muted/60 px-3 py-3 text-sm text-muted-foreground">
       Puedes preparar esta actividad sin participantes. Quedará como contenido del programa y no será visible para colaboradores hasta que tenga asignaciones.
     </p>}
     <div><label htmlFor="activity-session" className="block text-sm font-medium">Sesión</label>
@@ -234,7 +243,7 @@ export function ActivityForm({ organizationId, programId, sessions, enrollments,
         aria-invalid={invalidFields.includes("sessionId") || undefined}
         aria-describedby={invalidFields.includes("sessionId") ? "activity-session-error" : undefined}
         onChange={event => { clearInvalid("sessionId"); setInput({ ...input, sessionId: event.target.value }); }}
-        disabled={pending || blocked || unavailable}>
+        disabled={!!initial || pending || blocked || unavailable}>
         {sessions.map(session => <option key={session.id} value={session.id}>{session.label}</option>)}
       </select>
       {invalidFields.includes("sessionId") && <p id="activity-session-error" className="mt-1 text-sm text-destructive">Selecciona una sesión.</p>}</div>
@@ -247,10 +256,11 @@ export function ActivityForm({ organizationId, programId, sessions, enrollments,
       {invalidFields.includes("title") && <p id="activity-title-error" className="mt-1 text-sm text-destructive">Escribe el título de la actividad.</p>}</div>
     <div><label htmlFor="activity-instructions" className="block text-sm font-medium">Instrucciones</label>
       <textarea id="activity-instructions" className="rti-field min-h-32 resize-y" required maxLength={10000}
-        value={input.instructions} aria-invalid={invalidFields.includes("instructions") || undefined}
+        value={input.instructions} readOnly={instructionsLocked} aria-invalid={invalidFields.includes("instructions") || undefined}
         aria-describedby={invalidFields.includes("instructions") ? "activity-instructions-error" : undefined}
         onChange={event => { clearInvalid("instructions"); setInput({ ...input, instructions: event.target.value }); }}
         disabled={pending || blocked || unavailable} />
+      {instructionsLocked && <p className="mt-2 text-sm text-muted-foreground">Las instrucciones y la encuesta están protegidas porque ya existen entregas. Duplica la actividad para cambiarlas.</p>}
       {invalidFields.includes("instructions") && <p id="activity-instructions-error" className="mt-1 text-sm text-destructive">Escribe las instrucciones que debe seguir el colaborador.</p>}</div>
     <div><label htmlFor="activity-youtube-url" className="block text-sm font-medium">Video de YouTube (opcional)</label>
       <input id="activity-youtube-url" type="url" className="rti-field" maxLength={2048}
@@ -269,7 +279,7 @@ export function ActivityForm({ organizationId, programId, sessions, enrollments,
         onChange={event => { clearInvalid("dueDate"); setInput({ ...input, dueDate: event.target.value }); }}
         disabled={pending || blocked || unavailable} />
       {invalidFields.includes("dueDate") && <p id="activity-due-date-error" className="mt-1 text-sm text-destructive">Selecciona la fecha límite.</p>}</div>
-    {enrollments.length > 0 && <fieldset disabled={pending || blocked || unavailable} className="space-y-3">
+    {!initial && enrollments.length > 0 && <fieldset disabled={pending || blocked || unavailable} className="space-y-3">
       <legend className="text-sm font-medium">Destinatarios</legend>
       <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-primary/25 bg-accent/35 px-3 py-3 text-sm">
         <input id="activity-assign-to-all" type="checkbox" className="mt-1 size-4 accent-primary" checked={assignToAll}
@@ -289,7 +299,7 @@ export function ActivityForm({ organizationId, programId, sessions, enrollments,
       {invalidFields.includes("enrollmentIds") && <p id="activity-enrollments-error" className="text-sm text-destructive">Selecciona al menos un colaborador o activa la asignación para todos.</p>}
     </fieldset>}
     <button className="rti-button-primary" disabled={pending || blocked || unavailable}>
-      {pending ? "Creando…" : enrollments.length ? "Crear y asignar actividad" : "Crear actividad"}
+      {pending ? "Guardando…" : initial ? "Guardar cambios" : enrollments.length ? "Crear y asignar actividad" : "Crear actividad"}
     </button>
   </form>;
 }

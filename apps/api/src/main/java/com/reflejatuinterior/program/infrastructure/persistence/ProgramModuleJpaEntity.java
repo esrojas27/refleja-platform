@@ -26,6 +26,8 @@ class ProgramModuleJpaEntity {
     private String description;
     @Column(name = "position", nullable = false)
     private int position;
+    @Column(name = "archived", nullable = false)
+    private boolean archived;
     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
     @UpdateTimestamp @Column(name = "updated_at", nullable = false)
@@ -49,5 +51,11 @@ class ProgramModuleJpaEntity {
     String name() { return name; }
     String description() { return description; }
     int position() { return position; }
+    boolean archived() { return archived; }
+    void edit(com.reflejatuinterior.program.domain.NewProgramModule input) {
+        name = input.name(); description = input.description();
+    }
+    void archive(boolean value) { archived = value; }
+    void moveTo(int value) { position = value; }
     long version() { return version; }
 }

@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.UUID;
 
 public record ProgramModuleData(UUID id, UUID organizationId, UUID programId, String name,
-        String description, int position, long version, List<ProgramSessionData> sessions) {
+        String description, int position, long version, List<ProgramSessionData> sessions, boolean archived) {
     public ProgramModuleData {
         sessions = List.copyOf(sessions);
     }

@@ -63,6 +63,10 @@ class ActuatorHealthSecurityConfiguration {
                                 "/api/v1/invitations").authenticated()
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/enrollments",
+                                "/api/v1/organizations/{organizationId}/programs/{programId}/content/{kind}/{id}/archive",
+                                "/api/v1/organizations/{organizationId}/programs/{programId}/content/{kind}/{id}/move",
+                                "/api/v1/organizations/{organizationId}/programs/{programId}/content/{kind}/{id}/delete",
+                                "/api/v1/organizations/{organizationId}/programs/{programId}/content/activities/{id}/duplicate",
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/modules",
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/modules/{moduleId}/sessions",
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/activities",
@@ -73,6 +77,10 @@ class ActuatorHealthSecurityConfiguration {
                                 "/api/v1/invitations/{invitationId}/accept",
                                 "/api/v1/me/programs/{programId}/activities/{activityId}/submission").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/api/v1/me/profile",
+                                "/api/v1/organizations/{organizationId}/programs/{programId}/content/dimensions/{id}",
+                                "/api/v1/organizations/{organizationId}/programs/{programId}/content/sessions/{id}",
+                                "/api/v1/organizations/{organizationId}/programs/{programId}/content/activities/{id}",
+                                "/api/v1/organizations/{organizationId}/programs/{programId}/content/activities/{id}/survey",
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/disc-profiles/{enrollmentId}")
                                 .authenticated()
                         .anyRequest().denyAll())

@@ -1,0 +1,85 @@
+"use client";
+
+import { Archive, ArrowDown, ArrowUp, Copy, Pencil, RotateCcw, Trash2 } from "lucide-react";
+import { useRef, useState } from "react";
+import { archiveContent, deleteContent, duplicateActivity, moveContent, type ContentKind } from "@/lib/programs/content-administration-api";
+import { programContentErrorMessage } from "@/lib/programs/program-content-api";
+import type { Enrollment } from "@/lib/participation/participation-api";
+import { ProgramModal } from "./program-modal";
+
+export function ContentTools({ organizationId, programId, kind, item, parentArchived = false, hasAssignments,
+  hasSubmissions, first, last, enrollments, onEdit, onSaved }: {
+  organizationId: string; programId: string; kind: ContentKind;
+  item: { id: string; version: number; archived?: boolean; name?: string; title?: string };
+  parentArchived?: boolean; hasAssignments: boolean; hasSubmissions: boolean; first: boolean; last: boolean;
+  enrollments: Enrollment[]; onEdit: () => void; onSaved: (message: string) => void;
+}) {
+  const name = item.name ?? item.title ?? "";
+  const [dialog, setDialog] = useState<"archive" | "delete" | "duplicate" | null>(null);
+  const [pending, setPending] = useState(false);
+  const [blocked, setBlocked] = useState(false);
+  const [message, setMessage] = useState("");
+  const [mode, setMode] = useState("none");
+  const [selected, setSelected] = useState<string[]>([]);
+  const submitting = useRef(false);
+  const unavailable = pending || blocked;
+  const visible = !item.archived && !parentArchived;
+  async function perform(action: () => Promise<unknown>, notice: string) {
+    if (submitting.current || blocked) return;
+    submitting.current = true; setPending(true); setMessage("Guardando…");
+    try { await action(); setDialog(null); onSaved(notice); }
+    catch (error) { setBlocked(true); setMessage(programContentErrorMessage(error) + " Actualiza el contenido antes de repetir la operación."); }
+    finally { submitting.current = false; setPending(false); }
+  }
+  const buttonClass = "inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 py-2 text-xs font-medium hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-45";
+  return <div className="px-4 py-3">
+    {(item.archived || parentArchived) && <p className="mb-2 text-xs font-semibold text-muted-foreground">Archivado{parentArchived ? " por su dimensión o sesión" : ""}</p>}
+    <div className="flex flex-wrap gap-2" role="group" aria-label={`Administrar ${name}`}>
+      <button type="button" className={buttonClass} disabled={unavailable || !visible} onClick={onEdit}><Pencil aria-hidden="true" className="size-3.5" />Editar</button>
+      <button type="button" className={buttonClass} aria-label={`Subir ${name}`} disabled={unavailable || !visible || first}
+        onClick={() => void perform(() => moveContent(organizationId, programId, kind, item.id, item.version, "UP"), "Orden actualizado.")}><ArrowUp aria-hidden="true" className="size-3.5" /></button>
+      <button type="button" className={buttonClass} aria-label={`Bajar ${name}`} disabled={unavailable || !visible || last}
+        onClick={() => void perform(() => moveContent(organizationId, programId, kind, item.id, item.version, "DOWN"), "Orden actualizado.")}><ArrowDown aria-hidden="true" className="size-3.5" /></button>
+      {kind === "activities" && <button type="button" className={buttonClass} disabled={unavailable || !visible} onClick={() => setDialog("duplicate")}><Copy aria-hidden="true" className="size-3.5" />Duplicar</button>}
+      <button type="button" className={buttonClass} disabled={unavailable || parentArchived || (!item.archived && hasSubmissions)}
+        onClick={() => item.archived ? void perform(() => archiveContent(organizationId, programId, kind, item.id, item.version, false), "Contenido restaurado.") : setDialog("archive")}>
+        {item.archived ? <RotateCcw aria-hidden="true" className="size-3.5" /> : <Archive aria-hidden="true" className="size-3.5" />}{item.archived ? "Restaurar" : "Archivar"}
+      </button>
+      <button type="button" className={buttonClass} disabled={unavailable || hasAssignments || hasSubmissions || parentArchived}
+        onClick={() => setDialog("delete")}><Trash2 aria-hidden="true" className="size-3.5" />Eliminar</button>
+    </div>
+    {hasSubmissions ? <p className="mt-2 text-xs text-muted-foreground">Hay entregas: no se puede archivar ni eliminar. Las instrucciones y encuestas de las actividades quedan protegidas.</p>
+      : hasAssignments && <p className="mt-2 text-xs text-muted-foreground">Tiene asignaciones: puedes archivar, pero no eliminar.</p>}
+    {message && !dialog && <p role="status" className="mt-2 text-sm">{message}</p>}
+    {dialog && <ProgramModal titleId={`content-action-${item.id}`} closeLabel="Cerrar administración" onClose={() => { if (!pending) setDialog(null); }}>
+      <h2 id={`content-action-${item.id}`} className="text-2xl font-semibold">{dialog === "delete" ? "Eliminar definitivamente" : dialog === "archive" ? "Archivar contenido" : "Duplicar actividad"}</h2>
+      <p className="mt-3 break-words font-medium">{name}</p>
+      <p className="mt-3 text-sm leading-6 text-muted-foreground">{dialog === "delete"
+        ? "Se eliminará este elemento y su contenido descendiente, incluidas las encuestas. Solo está permitido sin asignaciones ni respuestas. Esta acción no se puede deshacer."
+        : dialog === "archive"
+          ? "Este elemento y su contenido descendiente dejarán de aparecer en las tareas y el progreso vigente del colaborador y en nuevas plantillas. Las asignaciones se conservan y volverán a estar disponibles al restaurarlo."
+          : "La copia incluye instrucciones, video, fecha y encuesta con nuevos identificadores. No copia entregas, respuestas, revisiones ni progreso."}</p>
+      {dialog === "duplicate" && <fieldset className="mt-5 space-y-3" disabled={unavailable}>
+        <legend className="mb-2 text-sm font-semibold">Asignación de la copia</legend>
+        <label className="block text-sm"><input type="radio" name={`targets-${item.id}`} checked={mode === "none"} onChange={() => setMode("none")} /> Preparar sin asignaciones</label>
+        <label className="block text-sm"><input type="radio" name={`targets-${item.id}`} checked={mode === "all"} onChange={() => setMode("all")} /> Todos los colaboradores inscritos</label>
+        <label className="block text-sm"><input type="radio" name={`targets-${item.id}`} checked={mode === "selected"} onChange={() => setMode("selected")} /> Elegir colaboradores</label>
+        {mode === "selected" && <div className="max-h-56 space-y-2 overflow-y-auto rounded-xl border border-border p-3">
+          {enrollments.length === 0 && <p className="text-sm">No hay colaboradores activos.</p>}
+          {enrollments.map(person => <label key={person.id} className="flex items-start gap-2 break-all text-sm">
+            <input type="checkbox" checked={selected.includes(person.id)} onChange={() => setSelected(ids => ids.includes(person.id) ? ids.filter(id => id !== person.id) : [...ids, person.id])} />
+            {person.participant.email}
+          </label>)}
+        </div>}
+      </fieldset>}
+      {message && <p role="status" className="mt-4 text-sm">{message}</p>}
+      <button type="button" className="rti-button-primary mt-6" disabled={unavailable || (dialog === "duplicate" && mode === "selected" && !selected.length)}
+        onClick={() => void perform(() => dialog === "delete" ? deleteContent(organizationId, programId, kind, item.id, item.version)
+          : dialog === "archive" ? archiveContent(organizationId, programId, kind, item.id, item.version, true)
+            : duplicateActivity(organizationId, programId, item.id, item.version, mode === "all", mode === "selected" ? selected : []),
+          dialog === "delete" ? "Contenido eliminado." : dialog === "archive" ? "Contenido archivado." : "Actividad duplicada.")}>
+        {pending ? "Guardando…" : dialog === "delete" ? "Confirmar eliminación" : dialog === "archive" ? "Confirmar archivado" : "Crear copia"}
+      </button>
+    </ProgramModal>}
+  </div>;
+}

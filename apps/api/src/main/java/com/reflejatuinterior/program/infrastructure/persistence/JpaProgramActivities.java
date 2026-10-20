@@ -42,6 +42,7 @@ class JpaProgramActivities implements ProgramActivities {
         }
         var module = modules.findByOrganizationIdAndProgramIdAndId(organizationId, programId, session.moduleId())
                 .orElseThrow(Missing::new);
+        if (module.archived() || session.archived()) throw new com.reflejatuinterior.program.ProgramContent.Conflict("CONTENT_ARCHIVED");
         return data(activities.saveAndFlush(new ProgramActivityJpaEntity(organizationId, programId,
                 session.moduleId(), session.id(), input.title(), input.instructions(), input.youtubeUrl(),
                 input.dueDate(), input.position())), module.name(), module.position(),
@@ -55,6 +56,11 @@ class JpaProgramActivities implements ProgramActivities {
                         organizationId, programId));
     }
 
+    @Override public List<Activity> listIncludingArchived(UUID organizationId, UUID programId) {
+        return contextualize(organizationId, programId,
+                activities.findByOrganizationIdAndProgramIdOrderBySessionIdAscPositionAscIdAsc(organizationId, programId), true);
+    }
+
     @Override
     public List<Activity> findAll(UUID organizationId, UUID programId, Collection<UUID> activityIds) {
         if (activityIds.isEmpty()) return List.of();
@@ -64,6 +70,11 @@ class JpaProgramActivities implements ProgramActivities {
 
     private List<Activity> contextualize(UUID organizationId, UUID programId,
             List<ProgramActivityJpaEntity> entities) {
+        return contextualize(organizationId, programId, entities, false);
+    }
+
+    private List<Activity> contextualize(UUID organizationId, UUID programId,
+            List<ProgramActivityJpaEntity> entities, boolean includeArchived) {
         if (entities.isEmpty()) return List.of();
         Map<UUID, ProgramModuleJpaEntity> dimensions = modules
                 .findByOrganizationIdAndProgramIdOrderByPositionAscIdAsc(organizationId, programId).stream()
@@ -71,7 +82,8 @@ class JpaProgramActivities implements ProgramActivities {
         Map<UUID, ProgramSessionJpaEntity> programSessions = sessions
                 .findByOrganizationIdAndProgramIdOrderByModuleIdAscPositionAscIdAsc(organizationId, programId).stream()
                 .collect(Collectors.toMap(ProgramSessionJpaEntity::id, Function.identity()));
-        return entities.stream().map(entity -> {
+        return entities.stream().filter(entity -> includeArchived || (!entity.archived()
+                && !dimensions.get(entity.moduleId()).archived() && !programSessions.get(entity.sessionId()).archived())).map(entity -> {
             var dimension = dimensions.get(entity.moduleId());
             var session = programSessions.get(entity.sessionId());
             if (dimension == null || session == null) throw new Missing();
@@ -89,6 +101,6 @@ class JpaProgramActivities implements ProgramActivities {
         return new Activity(entity.id(), entity.organizationId(), entity.programId(), entity.moduleId(),
                 entity.sessionId(), dimensionName, dimensionPosition, sessionName, sessionPosition,
                 entity.title(), entity.instructions(), entity.youtubeUrl(), entity.dueDate(),
-                entity.position(), entity.version());
+                entity.position(), entity.version(), entity.archived());
     }
 }

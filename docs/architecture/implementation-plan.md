@@ -133,6 +133,11 @@ fuera de VS1. El incremento busca validar un flujo real pequeño, no el diseño 
 
 ## Forma de trabajo
 
+Incremento local posterior al ciclo de vida: [edición y administración del
+contenido](program-content-administration.md). Incluye edición, orden, duplicación,
+archivo/restauración y eliminación condicionada, con protección de entregas y
+encuestas. Aprobado por el usuario para commit local; publicación remota pendiente.
+
 Ejecutar un ticket por vez: revisar el documento canónico y el repositorio,
 implementar sólo su alcance, verificar, registrar limitaciones y actualizar el
 estado. Publicar código no equivale a declarar completo un ticket sin cumplir sus

@@ -10,12 +10,13 @@ public interface ProgramActivities {
     Activity create(UUID organizationId, UUID programId, UUID sessionId, String title,
                     String instructions, String youtubeUrl, LocalDate dueDate, int position);
     List<Activity> list(UUID organizationId, UUID programId);
+    List<Activity> listIncludingArchived(UUID organizationId, UUID programId);
     List<Activity> findAll(UUID organizationId, UUID programId, Collection<UUID> activityIds);
 
     record Activity(UUID id, UUID organizationId, UUID programId, UUID moduleId, UUID sessionId,
                     String dimensionName, int dimensionPosition, String sessionName, int sessionPosition,
                     String title, String instructions, String youtubeUrl, LocalDate dueDate,
-                    int position, long version) {}
+                    int position, long version, boolean archived) {}
 
     class Missing extends RuntimeException {}
     class InvalidInput extends RuntimeException {

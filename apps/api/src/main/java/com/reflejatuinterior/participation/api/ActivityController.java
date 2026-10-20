@@ -34,11 +34,12 @@ class ActivityController {
             produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "List activities and assignments for an authorized consultant")
     ResponseEntity<ActivityListResponse> consultantActivities(@AuthenticationPrincipal Jwt jwt,
-            @PathVariable UUID organizationId, @PathVariable UUID programId, HttpServletRequest request) {
+            @PathVariable UUID organizationId, @PathVariable UUID programId,
+            @RequestParam(defaultValue = "false") boolean includeArchived, HttpServletRequest request) {
         var id = EnrollmentController.requestId(request);
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("X-Request-ID", id)
                 .body(new ActivityListResponse(service.listForConsultant(
-                        jwt.getSubject(), organizationId, programId, id)));
+                        jwt.getSubject(), organizationId, programId, includeArchived, id)));
     }
 
     @PostMapping(path = "/api/v1/organizations/{organizationId}/programs/{programId}/activities",

@@ -37,6 +37,8 @@ class ProgramActivityJpaEntity {
     private LocalDate dueDate;
     @Column(name = "position", nullable = false)
     private int position;
+    @Column(name = "archived", nullable = false)
+    private boolean archived;
     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
     @UpdateTimestamp @Column(name = "updated_at", nullable = false)
@@ -69,5 +71,11 @@ class ProgramActivityJpaEntity {
     String youtubeUrl() { return youtubeUrl; }
     LocalDate dueDate() { return dueDate; }
     int position() { return position; }
+    boolean archived() { return archived; }
+    void edit(com.reflejatuinterior.program.domain.NewProgramActivity input) {
+        title = input.title(); instructions = input.instructions(); youtubeUrl = input.youtubeUrl(); dueDate = input.dueDate();
+    }
+    void archive(boolean value) { archived = value; }
+    void moveTo(int value) { position = value; }
     long version() { return version; }
 }

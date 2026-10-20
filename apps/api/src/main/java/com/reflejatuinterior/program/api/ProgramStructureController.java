@@ -38,9 +38,10 @@ class ProgramStructureController {
     @GetMapping
     @Operation(summary = "List the ordered dimension and session structure of a program (legacy /modules path)")
     ResponseEntity<ModuleListResponse> list(@AuthenticationPrincipal Jwt jwt,
-            @PathVariable UUID organizationId, @PathVariable UUID programId, HttpServletRequest request) {
+            @PathVariable UUID organizationId, @PathVariable UUID programId,
+            @RequestParam(defaultValue = "false") boolean includeArchived, HttpServletRequest request) {
         var id = requestId(request);
-        var items = structure.list(jwt.getSubject(), organizationId, programId, id).stream()
+        var items = structure.list(jwt.getSubject(), organizationId, programId, includeArchived, id).stream()
                 .map(ModuleResponse::from).toList();
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("X-Request-ID", id)
                 .body(new ModuleListResponse(items));
@@ -91,18 +92,18 @@ class ProgramStructureController {
                                 @Positive int position) {}
     record ModuleListResponse(List<ModuleResponse> items) {}
     record ModuleResponse(UUID id, UUID organizationId, UUID programId, String name, String description,
-                          int position, long version, List<SessionResponse> sessions) {
+                          int position, long version, List<SessionResponse> sessions, boolean archived) {
         static ModuleResponse from(ProgramModuleData data) {
             return new ModuleResponse(data.id(), data.organizationId(), data.programId(), data.name(),
                     data.description(), data.position(), data.version(),
-                    data.sessions().stream().map(SessionResponse::from).toList());
+                    data.sessions().stream().map(SessionResponse::from).toList(), data.archived());
         }
     }
     record SessionResponse(UUID id, UUID organizationId, UUID programId, UUID moduleId, String name,
-                           String description, String objective, LocalDate scheduledDate, int position, long version) {
+                           String description, String objective, LocalDate scheduledDate, int position, long version, boolean archived) {
         static SessionResponse from(ProgramSessionData data) {
             return new SessionResponse(data.id(), data.organizationId(), data.programId(), data.moduleId(),
-                    data.name(), data.description(), data.objective(), data.scheduledDate(), data.position(), data.version());
+                    data.name(), data.description(), data.objective(), data.scheduledDate(), data.position(), data.version(), data.archived());
         }
     }
 }

@@ -84,8 +84,14 @@ public class ActivityService {
     @Transactional(readOnly = true)
     public List<ActivityResponse> listForConsultant(String subject, UUID organizationId, UUID programId,
             String requestId) {
+        return listForConsultant(subject, organizationId, programId, false, requestId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ActivityResponse> listForConsultant(String subject, UUID organizationId, UUID programId,
+            boolean includeArchived, String requestId) {
         authorizeConsultant(subject, organizationId, programId, "VIEW_PROGRAM_ACTIVITIES", requestId);
-        var definitions = activities.list(organizationId, programId);
+        var definitions = includeArchived ? activities.listIncludingArchived(organizationId, programId) : activities.list(organizationId, programId);
         var assigned = assignments.listByActivities(organizationId, programId,
                 definitions.stream().map(ProgramActivities.Activity::id).toList());
         var evaluationsByActivity = evaluations.list(organizationId, programId).stream()
@@ -151,10 +157,10 @@ public class ActivityService {
             if (enrollment.isEmpty()) continue;
             if (!"ACTIVE".equals(enrollment.get().status())) throw new ActivityWorkflowConflict();
             programs.lock(membership.organizationId(), programId).orElseThrow(MyProgramNotFound::new).requireActive();
-            var submitted = assignments.submit(membership.organizationId(), programId, activityId,
-                    enrollment.get().id(), cleanResponse).orElseThrow(ActivityAssignmentNotFound::new);
             var activity = activities.findAll(membership.organizationId(), programId, List.of(activityId)).stream()
                     .findFirst().orElseThrow(ActivityAssignmentNotFound::new);
+            var submitted = assignments.submit(membership.organizationId(), programId, activityId,
+                    enrollment.get().id(), cleanResponse).orElseThrow(ActivityAssignmentNotFound::new);
             auditAfterCommit("PROGRAM_ACTIVITY_SUBMITTED", context.userId(), membership.organizationId(), activityId, requestId);
             var evaluation = evaluations.find(membership.organizationId(), programId, activityId);
             var completedAt = evaluationResponses.findByAssignment(membership.organizationId(), programId, submitted.id())
@@ -229,7 +235,7 @@ public class ActivityService {
                 activity.moduleId(), activity.sessionId(), activity.dimensionName(), activity.dimensionPosition(),
                 activity.sessionName(), activity.sessionPosition(),
                 activity.title(), activity.instructions(), activity.youtubeUrl(), activity.dueDate(),
-                activity.position(), activity.version(), assignees);
+                activity.position(), activity.version(), assignees, activity.archived());
     }
 
     private AssigneeResponse assignee(UUID organizationId, UUID programId, ActivityAssignments.Data assignment,
@@ -304,7 +310,7 @@ public class ActivityService {
             String dimensionName, int dimensionPosition, String sessionName, int sessionPosition,
             String title, String instructions, String youtubeUrl,
             LocalDate dueDate, int position, long version,
-            List<AssigneeResponse> assignees) {
+            List<AssigneeResponse> assignees, boolean archived) {
         public ActivityResponse { assignees = List.copyOf(assignees); }
     }
     public record AssignedActivityResponse(UUID id, UUID organizationId, UUID programId, UUID moduleId,

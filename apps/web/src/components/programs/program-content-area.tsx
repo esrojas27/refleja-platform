@@ -17,11 +17,13 @@ import { ActivityForm } from "@/components/programs/program-activity-area";
 import { ActivityEvaluationForm } from "@/components/programs/activity-evaluation-form";
 import { ProgramModal } from "@/components/programs/program-modal";
 import { useProgramState } from "@/components/programs/program-state-context";
+import { editDimension, editSession } from "@/lib/programs/content-administration-api";
+import { ContentTools } from "./content-tools";
 
-type ContentDialog = { kind: "dimension" }
-  | { kind: "session"; dimension: ProgramDimension }
-  | { kind: "activity"; dimensionName: string; session: ProgramSession }
-  | { kind: "evaluation"; activity: ProgramActivity };
+type ContentDialog = { kind: "dimension"; initial?: ProgramDimension }
+  | { kind: "session"; dimension: ProgramDimension; initial?: ProgramSession }
+  | { kind: "activity"; dimensionName: string; session: ProgramSession; initial?: ProgramActivity }
+  | { kind: "evaluation"; activity: ProgramActivity; initial?: ActivityEvaluation };
 
 export function ProgramContentArea({ organizationId, programId }: { organizationId: string; programId: string }) {
   return <ProgramContent key={`${organizationId}/${programId}`} organizationId={organizationId} programId={programId} />;
@@ -40,6 +42,7 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
   const [dialog, setDialog] = useState<ContentDialog | null>(null);
   const [openDimensionId, setOpenDimensionId] = useState<string>();
   const [openSessionId, setOpenSessionId] = useState<string>();
+  const [showArchived, setShowArchived] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -52,8 +55,8 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
           return;
         }
         const [structure, activityList, evaluationList, enrollmentPage] = await Promise.all([
-          listProgramDimensions(organizationId, programId, controller.signal),
-          listProgramActivities(organizationId, programId, controller.signal),
+          listProgramDimensions(organizationId, programId, controller.signal, true),
+          listProgramActivities(organizationId, programId, controller.signal, true),
           listActivityEvaluations(organizationId, programId, controller.signal),
           listEnrollments(organizationId, programId, 0, controller.signal, 100),
         ]);
@@ -96,6 +99,15 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
   const ready = dimensions !== undefined && activities !== undefined && evaluations !== undefined
     && enrollments !== undefined;
   const nextDimensionPosition = dimensions ? Math.max(0, ...dimensions.map(dimension => dimension.position)) + 1 : 1;
+  const toolsContext = { organizationId, programId, enrollments: enrollments ?? [], onSaved: refresh };
+  function usage(items: ProgramActivity[]) {
+    return { hasAssignments: items.some(a => a.assignees.length > 0),
+      hasSubmissions: items.some(a => a.assignees.some(person => person.submittedAt != null)) };
+  }
+  function bounds<T extends { id: string; archived?: boolean }>(item: T, siblings: T[]) {
+    const current = siblings.filter(s => !s.archived);
+    return { first: current[0]?.id === item.id, last: current.at(-1)?.id === item.id };
+  }
 
   return <section className="rti-surface mx-auto w-full max-w-6xl p-6 sm:p-8 lg:p-10">
     <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
@@ -116,54 +128,66 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
     {ready && <section aria-labelledby="dimensions-title" className="mt-7">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="dimensions-title" className="text-xl font-semibold">Dimensiones del programa</h2>
-        <p className="text-sm text-muted-foreground">{dimensions.length} {dimensions.length === 1 ? "dimensión" : "dimensiones"}</p>
+        <p className="text-sm text-muted-foreground">{dimensions.filter(d => showArchived || !d.archived).length} dimensiones {showArchived ? "(incluye archivadas)" : "vigentes"}</p>
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={showArchived} onChange={event => setShowArchived(event.target.checked)} />Mostrar archivados</label>
       </div>
+      {!showArchived && dimensions.length > 0 && dimensions.every(d => d.archived) && <p className="mt-4 text-sm text-muted-foreground">Todo el contenido está archivado. Activa “Mostrar archivados” para consultarlo o restaurarlo.</p>}
       {dimensions.length === 0 ? <p className="mt-4 rounded-2xl border border-dashed border-border px-5 py-8 text-sm text-muted-foreground">
         Crea la primera dimensión para comenzar la estructura del programa.
-      </p> : <ol className="mt-4 space-y-4">{dimensions.map(dimension => {
+      </p> : <ol className="mt-4 space-y-4">{dimensions.filter(d => showArchived || !d.archived).map(dimension => {
         const dimensionOpen = openDimensionId === dimension.id;
-        const activityCount = dimension.sessions.reduce((total, session) => total + (activitiesBySession.get(session.id)?.length ?? 0), 0);
+        const visibleSessions = dimension.sessions.filter(s => showArchived || (!dimension.archived && !s.archived));
+        const activityCount = visibleSessions.reduce((total, session) => total + (activitiesBySession.get(session.id)?.filter(a => showArchived || !a.archived).length ?? 0), 0);
         return <li key={dimension.id} className="overflow-hidden rounded-2xl border border-border/70 bg-background/70">
           <button type="button" aria-expanded={dimensionOpen} aria-controls={`dimension-panel-${dimension.id}`}
             onClick={() => { setOpenDimensionId(dimensionOpen ? undefined : dimension.id); setOpenSessionId(undefined); }}
             className="flex w-full items-start justify-between gap-4 px-5 py-5 text-left hover:bg-secondary/45 sm:px-6">
             <span className="min-w-0"><span className="rti-kicker">Dimensión {dimension.position}</span>
               <span className="mt-2 block text-xl font-semibold">{dimension.name}</span>
+              {dimension.archived && <span className="mt-2 inline-block rounded-full bg-muted px-3 py-1 text-xs font-medium">Archivada</span>}
               {dimension.description && <span className="mt-2 block whitespace-pre-wrap text-sm text-muted-foreground">{dimension.description}</span>}
               <span className="mt-3 block text-xs font-medium text-muted-foreground">
-                {dimension.sessions.length} {dimension.sessions.length === 1 ? "sesión" : "sesiones"} · {activityCount} {activityCount === 1 ? "actividad" : "actividades"}
+                {visibleSessions.length} {visibleSessions.length === 1 ? "sesión" : "sesiones"} · {activityCount} {activityCount === 1 ? "actividad" : "actividades"}
               </span>
             </span>
             <ChevronDown aria-hidden="true" className={`mt-1 size-5 shrink-0 transition-transform ${dimensionOpen ? "rotate-180" : ""}`} />
           </button>
+          {canEdit && <ContentTools {...toolsContext} kind="dimensions" item={dimension}
+            {...usage((activities ?? []).filter(a => a.moduleId === dimension.id))} {...bounds(dimension, dimensions)}
+            onEdit={() => setDialog({ kind: "dimension", initial: dimension })} />}
 
           {dimensionOpen && <div id={`dimension-panel-${dimension.id}`} className="border-t border-border/70 px-5 py-5 sm:px-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h3 className="font-semibold">Sesiones</h3>
-              <button type="button" disabled={!canEdit} className="rti-button-secondary" onClick={() => setDialog({ kind: "session", dimension })}>
+              <button type="button" disabled={!canEdit || dimension.archived} className="rti-button-secondary" onClick={() => setDialog({ kind: "session", dimension })}>
                 <Plus aria-hidden="true" className="size-4" />Agregar sesión
               </button>
             </div>
             {dimension.sessions.length === 0 ? <p className="mt-4 text-sm text-muted-foreground">Esta dimensión todavía no tiene sesiones.</p>
-              : <ol className="mt-4 space-y-3">{dimension.sessions.map(session => {
+              : <ol className="mt-4 space-y-3">{visibleSessions.map(session => {
                 const sessionOpen = openSessionId === session.id;
-                const sessionActivities = activitiesBySession.get(session.id) ?? [];
+                const allSessionActivities = activitiesBySession.get(session.id) ?? [];
+                const sessionActivities = allSessionActivities.filter(a => showArchived || (!dimension.archived && !session.archived && !a.archived));
                 return <li key={session.id} className="overflow-hidden rounded-xl border border-border/70 bg-card">
                   <button type="button" aria-expanded={sessionOpen} aria-controls={`session-panel-${session.id}`}
                     onClick={() => setOpenSessionId(sessionOpen ? undefined : session.id)}
                     className="flex w-full items-center justify-between gap-4 px-4 py-4 text-left hover:bg-secondary/45">
                     <span className="min-w-0"><span className="text-xs font-semibold uppercase tracking-wide text-primary">Sesión {session.position}</span>
                       <span className="mt-1 block font-semibold">{session.name}</span>
+                      {(dimension.archived || session.archived) && <span className="mt-1 block text-xs text-muted-foreground">Sesión archivada</span>}
                       <span className="mt-1 block text-sm text-muted-foreground">{session.scheduledDate} · {sessionActivities.length} {sessionActivities.length === 1 ? "actividad" : "actividades"}</span>
                     </span>
                     <ChevronDown aria-hidden="true" className={`size-5 shrink-0 transition-transform ${sessionOpen ? "rotate-180" : ""}`} />
                   </button>
+                  {canEdit && <ContentTools {...toolsContext} kind="sessions" item={session} parentArchived={dimension.archived}
+                    {...usage(allSessionActivities)} {...bounds(session, dimension.sessions)}
+                    onEdit={() => setDialog({ kind: "session", dimension, initial: session })} />}
 
                   {sessionOpen && <div id={`session-panel-${session.id}`} className="border-t border-border/70 px-4 py-4">
                     {session.objective && <p className="whitespace-pre-wrap text-sm text-muted-foreground"><span className="font-medium text-foreground">Objetivo: </span>{session.objective}</p>}
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                       <h4 className="font-semibold">Actividades</h4>
-                      <button type="button" disabled={!canEdit} className="rti-button-secondary"
+                      <button type="button" disabled={!canEdit || dimension.archived || session.archived} className="rti-button-secondary"
                         onClick={() => setDialog({ kind: "activity", dimensionName: dimension.name, session })}>
                         <Plus aria-hidden="true" className="size-4" />Crear actividad
                       </button>
@@ -174,9 +198,13 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
                         return <li key={activity.id} className="rounded-xl border border-border/70 bg-background/70 p-4">
                         <p className="rti-kicker">Actividad {activity.position}</p>
                         <p className="mt-2 font-semibold">{activity.title}</p>
+                        {(activity.archived || dimension.archived || session.archived) && <p className="mt-1 text-xs text-muted-foreground">Actividad archivada</p>}
                         <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{activity.instructions}</p>
                         <p className="mt-3 text-xs font-medium text-muted-foreground">Fecha límite: {activity.dueDate}</p>
                         <p className="mt-1 text-xs font-medium text-muted-foreground">Asignaciones: {activity.assignees.length}</p>
+                        {canEdit && <ContentTools {...toolsContext} kind="activities" item={activity} parentArchived={dimension.archived || session.archived}
+                          {...usage([activity])} {...bounds(activity, allSessionActivities)}
+                          onEdit={() => setDialog({ kind: "activity", dimensionName: dimension.name, session, initial: activity })} />}
                         {activity.youtubeUrl && <a href={activity.youtubeUrl} target="_blank" rel="noopener noreferrer"
                           className="rti-link mt-3 inline-block text-sm">Ver video en YouTube</a>}
                         {evaluation ? <div className="mt-4 rounded-xl border border-primary/20 bg-accent/35 p-3">
@@ -185,7 +213,9 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
                           <p className="mt-1 text-xs text-muted-foreground">{evaluation.questions.length} {evaluation.questions.length === 1 ? "pregunta" : "preguntas"}</p>
                           <ol className="mt-2 space-y-1">{evaluation.questions.map(question => <li key={question.id}
                             className="text-xs text-muted-foreground">{question.position}. {question.prompt}</li>)}</ol>
-                        </div> : <button type="button" disabled={!canEdit} className="rti-button-secondary mt-4 w-full"
+                          {canEdit && <button type="button" className="rti-button-secondary mt-3" disabled={activity.archived || dimension.archived || session.archived || usage([activity]).hasSubmissions}
+                            onClick={() => setDialog({ kind: "evaluation", activity, initial: evaluation })}>Editar encuesta</button>}
+                        </div> : <button type="button" disabled={!canEdit || activity.archived || dimension.archived || session.archived || usage([activity]).hasSubmissions} className="rti-button-secondary mt-4 w-full"
                           onClick={() => setDialog({ kind: "evaluation", activity })}>
                           <BarChart3 aria-hidden="true" className="size-4" />Crear encuesta
                         </button>}
@@ -202,28 +232,31 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
     {dialog?.kind === "dimension" && <ProgramModal titleId="create-dimension-title" closeLabel="Cerrar creación de dimensión"
       onClose={() => setDialog(null)}>
       <DimensionForm organizationId={organizationId} programId={programId} position={nextDimensionPosition}
-        onSaved={() => { setDialog(null); refresh("Dimensión creada."); }} />
+        initial={dialog.initial} onSaved={() => { setDialog(null); refresh(dialog.initial ? "Dimensión actualizada." : "Dimensión creada."); }} />
     </ProgramModal>}
     {dialog?.kind === "session" && <ProgramModal titleId={`create-session-title-${dialog.dimension.id}`}
       closeLabel="Cerrar creación de sesión" onClose={() => setDialog(null)}>
       <SessionForm organizationId={organizationId} programId={programId} dimensionId={dialog.dimension.id}
+        initial={dialog.initial}
         position={Math.max(0, ...dialog.dimension.sessions.map(session => session.position)) + 1}
-        onSaved={() => { setDialog(null); refresh(`Sesión creada en ${dialog.dimension.name}.`); }} />
+        onSaved={() => { setDialog(null); refresh(dialog.initial ? "Sesión actualizada." : `Sesión creada en ${dialog.dimension.name}.`); }} />
     </ProgramModal>}
     {dialog?.kind === "activity" && <ProgramModal titleId="create-activity-title" closeLabel="Cerrar creación de actividad"
       onClose={() => setDialog(null)}>
       <ActivityForm organizationId={organizationId} programId={programId}
+        initial={dialog.initial}
         sessions={[{ id: dialog.session.id, label: `${dialog.dimensionName} · ${dialog.session.name}` }]}
         enrollments={enrollments ?? []} activities={activities ?? []}
-        onSaved={saved => { setDialog(null); refresh(saved.assignees.length
+        onSaved={saved => { setDialog(null); refresh(dialog.initial ? "Actividad actualizada." : saved.assignees.length
           ? `Actividad creada y asignada a ${saved.assignees.length} colaborador${saved.assignees.length === 1 ? "" : "es"}.`
           : "Actividad creada sin asignaciones."); }} />
     </ProgramModal>}
     {dialog?.kind === "evaluation" && <ProgramModal titleId="create-evaluation-title"
       closeLabel="Cerrar creación de encuesta" onClose={() => setDialog(null)}>
       <ActivityEvaluationForm organizationId={organizationId} programId={programId}
+        initial={dialog.initial}
         activityId={dialog.activity.id} activityTitle={dialog.activity.title}
-        onSaved={saved => { setDialog(null); refresh(`Encuesta “${saved.title}” creada.`); }} />
+        onSaved={saved => { setDialog(null); refresh(`Encuesta “${saved.title}” ${dialog.initial ? "actualizada" : "creada"}.`); }} />
     </ProgramModal>}
 
     <button className="rti-button-secondary mt-6" disabled={pending} onClick={() => refresh("")}>Actualizar contenido</button>
@@ -234,10 +267,10 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
   </section>;
 }
 
-export function DimensionForm({ organizationId, programId, position, onSaved }: {
-  organizationId: string; programId: string; position: number; onSaved: () => void;
+export function DimensionForm({ organizationId, programId, position, onSaved, initial }: {
+  organizationId: string; programId: string; position: number; onSaved: () => void; initial?: ProgramDimension;
 }) {
-  const [input, setInput] = useState({ name: "", description: "" });
+  const [input, setInput] = useState({ name: initial?.name ?? "", description: initial?.description ?? "" });
   const [pending, setPending] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [message, setMessage] = useState("");
@@ -252,10 +285,11 @@ export function DimensionForm({ organizationId, programId, position, onSaved }: 
     if (!clean.name || clean.name.length > 255 || clean.description.length > 10000) {
       setMessage("Revisa el nombre y la descripción."); return;
     }
-    submitting.current = true; setPending(true); setMessage("Creando dimensión…");
+    submitting.current = true; setPending(true); setMessage(initial ? "Guardando dimensión…" : "Creando dimensión…");
     const controller = new AbortController(); request.current = controller;
     try {
-      await createProgramDimension(organizationId, programId, clean, controller.signal);
+      if (initial) await editDimension(organizationId, programId, initial.id, { ...clean, version: initial.version }, controller.signal);
+      else await createProgramDimension(organizationId, programId, clean, controller.signal);
       if (!controller.signal.aborted) onSaved();
     } catch (error) {
       if (!controller.signal.aborted) {
@@ -266,8 +300,8 @@ export function DimensionForm({ organizationId, programId, position, onSaved }: 
     } finally { submitting.current = false; if (!controller.signal.aborted) setPending(false); }
   }
 
-  return <form onSubmit={submit} noValidate aria-label="Crear dimensión" className="space-y-4">
-    <div><p className="rti-kicker">Nueva dimensión</p><h2 id="create-dimension-title" className="mt-2 text-xl font-semibold">Crear dimensión</h2></div>
+  return <form onSubmit={submit} noValidate aria-label={initial ? "Editar dimensión" : "Crear dimensión"} className="space-y-4">
+    <div><p className="rti-kicker">Dimensión</p><h2 id="create-dimension-title" className="mt-2 text-xl font-semibold">{initial ? "Editar dimensión" : "Crear dimensión"}</h2></div>
     {message && <p role="status" className="rounded-xl bg-muted/60 px-3 py-2 text-sm">{message}</p>}
     <div><label htmlFor="dimension-name" className="block text-sm font-medium">Nombre</label>
       <input id="dimension-name" className="rti-field" required maxLength={255} value={input.name}
@@ -275,14 +309,14 @@ export function DimensionForm({ organizationId, programId, position, onSaved }: 
     <div><label htmlFor="dimension-description" className="block text-sm font-medium">Descripción opcional</label>
       <textarea id="dimension-description" className="rti-field min-h-24 resize-y" maxLength={10000} value={input.description}
         onChange={event => setInput({ ...input, description: event.target.value })} disabled={pending || blocked} /></div>
-    <button className="rti-button-primary" disabled={pending || blocked}>{pending ? "Creando…" : "Crear dimensión"}</button>
+    <button className="rti-button-primary" disabled={pending || blocked}>{pending ? "Guardando…" : initial ? "Guardar cambios" : "Crear dimensión"}</button>
   </form>;
 }
 
-export function SessionForm({ organizationId, programId, dimensionId, position, onSaved }: {
-  organizationId: string; programId: string; dimensionId: string; position: number; onSaved: () => void;
+export function SessionForm({ organizationId, programId, dimensionId, position, onSaved, initial }: {
+  organizationId: string; programId: string; dimensionId: string; position: number; onSaved: () => void; initial?: ProgramSession;
 }) {
-  const [input, setInput] = useState({ name: "", objective: "", scheduledDate: "" });
+  const [input, setInput] = useState({ name: initial?.name ?? "", objective: initial?.objective ?? "", scheduledDate: initial?.scheduledDate ?? "" });
   const [pending, setPending] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [message, setMessage] = useState("");
@@ -298,10 +332,11 @@ export function SessionForm({ organizationId, programId, dimensionId, position, 
     if (!clean.name || clean.name.length > 255 || clean.objective.length > 10000 || !/^\d{4}-\d{2}-\d{2}$/.test(clean.scheduledDate)) {
       setMessage("Revisa el nombre, el objetivo y la fecha."); return;
     }
-    submitting.current = true; setPending(true); setMessage("Creando sesión…");
+    submitting.current = true; setPending(true); setMessage(initial ? "Guardando sesión…" : "Creando sesión…");
     const controller = new AbortController(); request.current = controller;
     try {
-      await createProgramSession(organizationId, programId, dimensionId, clean, controller.signal);
+      if (initial) await editSession(organizationId, programId, initial.id, { ...clean, version: initial.version }, controller.signal);
+      else await createProgramSession(organizationId, programId, dimensionId, clean, controller.signal);
       if (!controller.signal.aborted) onSaved();
     } catch (error) {
       if (!controller.signal.aborted) {
@@ -313,8 +348,8 @@ export function SessionForm({ organizationId, programId, dimensionId, position, 
   }
 
   const prefix = `session-${dimensionId}`;
-  return <form onSubmit={submit} noValidate aria-label="Crear sesión" className="space-y-4">
-    <div><p className="rti-kicker">Nueva sesión</p><h2 id={`create-session-title-${dimensionId}`} className="mt-2 text-xl font-semibold">Agregar sesión</h2></div>
+  return <form onSubmit={submit} noValidate aria-label={initial ? "Editar sesión" : "Crear sesión"} className="space-y-4">
+    <div><p className="rti-kicker">Sesión</p><h2 id={`create-session-title-${dimensionId}`} className="mt-2 text-xl font-semibold">{initial ? "Editar sesión" : "Agregar sesión"}</h2></div>
     {message && <p role="status" className="text-sm">{message}</p>}
     <div><label htmlFor={`${prefix}-name`} className="block text-sm font-medium">Nombre</label>
       <input id={`${prefix}-name`} className="rti-field" required maxLength={255} value={input.name}
@@ -325,6 +360,6 @@ export function SessionForm({ organizationId, programId, dimensionId, position, 
     <div><label htmlFor={`${prefix}-objective`} className="block text-sm font-medium">Objetivo opcional</label>
       <textarea id={`${prefix}-objective`} className="rti-field min-h-20 resize-y" maxLength={10000} value={input.objective}
         onChange={event => setInput({ ...input, objective: event.target.value })} disabled={pending || blocked} /></div>
-    <button className="rti-button-primary" disabled={pending || blocked}>{pending ? "Creando…" : "Agregar sesión"}</button>
+    <button className="rti-button-primary" disabled={pending || blocked}>{pending ? "Guardando…" : initial ? "Guardar cambios" : "Agregar sesión"}</button>
   </form>;
 }

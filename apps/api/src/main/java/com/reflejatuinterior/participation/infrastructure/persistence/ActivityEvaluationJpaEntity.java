@@ -39,4 +39,9 @@ class ActivityEvaluationJpaEntity {
     String title() { return title; }
     String instructions() { return instructions; }
     long version() { return version; }
+    void edit(String title, String instructions) {
+        this.title = title; this.instructions = instructions;
+        // Question-only corrections must also advance the aggregate version.
+        updatedAt = Instant.now();
+    }
 }

@@ -3,11 +3,11 @@ import { programsPath } from "@/lib/programs/program-api";
 
 export type ProgramSession = {
   id: string; organizationId: string; programId: string; dimensionId: string;
-  name: string; objective: string | null; scheduledDate: string; position: number; version: number;
+  name: string; objective: string | null; scheduledDate: string; position: number; version: number; archived?: boolean;
 };
 export type ProgramDimension = {
   id: string; organizationId: string; programId: string; name: string;
-  description: string | null; position: number; version: number; sessions: ProgramSession[];
+  description: string | null; position: number; version: number; sessions: ProgramSession[]; archived?: boolean;
 };
 export type ProgramDimensionInput = { name: string; description: string; position: number };
 export type ProgramSessionInput = { name: string; objective: string; scheduledDate: string; position: number };
@@ -18,7 +18,7 @@ type LegacyProgramSession = Omit<ProgramSession, "dimensionId" | "objective"> & 
 type LegacyProgramDimension = Omit<ProgramDimension, "sessions"> & { sessions: LegacyProgramSession[] };
 
 export class ProgramContentRequestError extends Error {
-  constructor(public readonly status: number, public readonly fields: string[] = [], public readonly requestId?: string) {
+  constructor(public readonly status: number, public readonly fields: string[] = [], public readonly requestId?: string, public readonly code?: string) {
     super("Program content request failed");
     this.name = "ProgramContentRequestError";
   }
@@ -50,7 +50,7 @@ async function request<T>(path: string, method: "GET" | "POST", input?: ProgramD
       : [];
     const requestId = typeof body?.requestId === "string" && /^[a-f0-9-]{36}$/i.test(body.requestId)
       ? body.requestId : undefined;
-    throw new ProgramContentRequestError(response.status, fields, requestId);
+    throw new ProgramContentRequestError(response.status, fields, requestId, typeof body?.code === "string" ? body.code : undefined);
   }
   return response.json() as Promise<T>;
 }
@@ -60,13 +60,13 @@ function dimension(data: LegacyProgramDimension): ProgramDimension {
     id: session.id, organizationId: session.organizationId, programId: session.programId,
     dimensionId: session.moduleId, name: session.name,
     objective: session.objective ?? session.description, scheduledDate: session.scheduledDate,
-    position: session.position, version: session.version,
+    position: session.position, version: session.version, archived: session.archived ?? false,
   })) };
 }
 
-export async function listProgramDimensions(organizationId: string, programId: string, signal?: AbortSignal) {
+export async function listProgramDimensions(organizationId: string, programId: string, signal?: AbortSignal, includeArchived = false) {
   const result = await request<{ items: LegacyProgramDimension[] }>(
-    programDimensionsPath(organizationId, programId), "GET", undefined, signal);
+    programDimensionsPath(organizationId, programId) + (includeArchived ? "?includeArchived=true" : ""), "GET", undefined, signal);
   return { items: result.items.map(dimension) };
 }
 
@@ -88,11 +88,21 @@ export async function createProgramSession(organizationId: string, programId: st
 
 export function programContentErrorMessage(error: unknown) {
   const status = error instanceof ProgramContentRequestError ? error.status : 0;
-  const message = status === 401 ? "Tu sesión no está disponible. Inicia sesión de nuevo."
+  const code = error instanceof ProgramContentRequestError ? error.code : undefined;
+  const messages: Record<string, string> = {
+    CONTENT_HAS_SUBMISSIONS: "Ya existen entregas. Conserva las instrucciones y la encuesta; duplica la actividad para preparar una nueva versión.",
+    CONTENT_HAS_ASSIGNMENTS: "No se puede eliminar contenido con asignaciones o respuestas. Si todavía no tiene entregas, puedes archivarlo.",
+    CONTENT_VERSION_CONFLICT: "El contenido cambió. Actualiza antes de guardar nuevamente.",
+    CONTENT_ARCHIVED: "Este contenido está archivado. Restáuralo antes de modificarlo.",
+    CONTENT_PARENT_ARCHIVED: "Restaura primero la dimensión o sesión que contiene este elemento.",
+    CONTENT_ORDER_BOUNDARY: "El elemento ya está en el extremo del orden. Actualiza el contenido.",
+    PROGRAM_READ_ONLY: "El programa está cerrado y solo permite consulta.",
+  };
+  const message = (code && messages[code]) || (status === 401 ? "Tu sesión no está disponible. Inicia sesión de nuevo."
     : status === 403 ? "Sólo un consultor autorizado puede gestionar el contenido."
     : status === 404 ? "El programa no está disponible en esta organización."
     : status === 400 ? "Revisa los campos indicados."
     : status === 409 ? "El orden cambió. Actualiza el contenido antes de intentarlo de nuevo."
-    : "No se pudo completar la operación. Inténtalo de nuevo.";
+    : "No se pudo completar la operación. Inténtalo de nuevo.");
   return message + (error instanceof ProgramContentRequestError && error.requestId ? ` Referencia: ${error.requestId}` : "");
 }

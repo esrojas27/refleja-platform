@@ -10,6 +10,8 @@ public interface ActivityEvaluations {
             String instructions, List<QuestionInput> questions);
     List<Evaluation> list(UUID organizationId, UUID programId);
     Optional<Evaluation> find(UUID organizationId, UUID programId, UUID activityId);
+    Evaluation replace(UUID org, UUID program, UUID activity, long version, String title, String instructions, List<QuestionInput> questions);
+    void deleteUnassignedDefinitions(UUID org, UUID program, java.util.Collection<UUID> activityIds);
 
     record QuestionInput(String prompt, EvaluationQuestionType type, int position) {}
     record Question(UUID id, String prompt, EvaluationQuestionType type, int position, long version) {}

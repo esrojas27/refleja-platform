@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 interface ActivityAssignmentJpaRepository extends JpaRepository<ActivityAssignmentJpaEntity, UUID> {
+    boolean existsByOrganizationIdAndProgramIdAndActivityIdIn(UUID organizationId, UUID programId, java.util.Collection<UUID> activityIds);
     List<ActivityAssignmentJpaEntity> findByOrganizationIdAndProgramIdAndActivityIdInOrderByActivityIdAscEnrollmentIdAsc(
             UUID organizationId, UUID programId, Collection<UUID> activityIds);
     List<ActivityAssignmentJpaEntity> findByOrganizationIdAndProgramIdAndEnrollmentIdOrderByActivityIdAsc(

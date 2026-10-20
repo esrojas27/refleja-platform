@@ -30,10 +30,15 @@ public class ProgramStructureService {
 
     @Transactional(readOnly = true)
     public List<ProgramModuleData> list(String subject, UUID organizationId, UUID programId, String requestId) {
+        return list(subject, organizationId, programId, false, requestId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProgramModuleData> list(String subject, UUID organizationId, UUID programId, boolean includeArchived, String requestId) {
         var context = policy.authorizeConsultant(subject, organizationId, "VIEW_PROGRAM_STRUCTURE", requestId);
         tenantContext.activate(context.organizationId());
         requireProgram(context.organizationId(), programId);
-        return structure.listModules(context.organizationId(), programId);
+        return structure.listModules(context.organizationId(), programId, includeArchived);
     }
 
     @Transactional
@@ -55,8 +60,11 @@ public class ProgramStructureService {
         var context = policy.authorizeConsultant(subject, organizationId, "CREATE_PROGRAM_SESSION", requestId);
         tenantContext.activate(context.organizationId());
         requireProgram(context.organizationId(), programId);
-        if (structure.findModule(context.organizationId(), programId, moduleId).isEmpty()) throw new ProgramNotFound();
         requireEditable(context.organizationId(), programId);
+        // Read the parent only after the program lock: a concurrent archive must
+        // not be hidden by a dimension cached before acquiring that lock.
+        if (structure.findModule(context.organizationId(), programId, moduleId).orElseThrow(ProgramNotFound::new).archived())
+            throw new com.reflejatuinterior.program.ProgramContent.Conflict("CONTENT_ARCHIVED");
         var created = structure.createSession(context.organizationId(), programId, moduleId,
                 new NewProgramSession(name, description, objective, scheduledDate, position));
         auditAfterCommit("PROGRAM_SESSION_CREATED", context.userId(), context.organizationId(), created.id(), requestId);

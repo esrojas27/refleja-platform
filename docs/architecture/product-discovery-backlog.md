@@ -14,6 +14,16 @@ El siguiente backlog extiende esa base sin alterar el comportamiento aceptado.
 
 ## Necesidades registradas
 
+### Edición y administración del contenido
+
+Incremento implementado el 2026-10-19 y aprobado por el usuario para commit:
+edición de dimensiones, sesiones, actividades y encuestas sin entregas;
+reordenamiento entre hermanos, duplicación con encuesta, eliminación solo sin
+asignaciones/respuestas y archivado/restauración sin entregas. Las instrucciones
+y encuestas se congelan desde la primera entrega; título, video y fecha siguen
+editables. Programas cerrados conservan la consulta sin escrituras.
+Véanse las [reglas y el recorrido de validación](program-content-administration.md).
+
 ### Perfil inicial del colaborador
 
 Decisión implementada localmente el 2026-09-20: después de aceptar una invitación,

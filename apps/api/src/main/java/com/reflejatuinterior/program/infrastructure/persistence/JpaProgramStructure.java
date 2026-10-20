@@ -28,11 +28,13 @@ class JpaProgramStructure implements ProgramStructure {
                 input.name(), input.description(), input.position())), List.of());
     }
 
-    @Override public List<ProgramModuleData> listModules(UUID organizationId, UUID programId) {
+    @Override public List<ProgramModuleData> listModules(UUID organizationId, UUID programId, boolean includeArchived) {
         var allSessions = sessions.findByOrganizationIdAndProgramIdOrderByModuleIdAscPositionAscIdAsc(organizationId, programId);
         return modules.findByOrganizationIdAndProgramIdOrderByPositionAscIdAsc(organizationId, programId).stream()
+                .filter(module -> includeArchived || !module.archived())
                 .map(module -> moduleData(module, allSessions.stream()
                         .filter(session -> session.moduleId().equals(module.id()))
+                        .filter(session -> includeArchived || !session.archived())
                         .map(JpaProgramStructure::sessionData).toList()))
                 .toList();
     }
@@ -50,11 +52,11 @@ class JpaProgramStructure implements ProgramStructure {
 
     private static ProgramModuleData moduleData(ProgramModuleJpaEntity entity, List<ProgramSessionData> sessions) {
         return new ProgramModuleData(entity.id(), entity.organizationId(), entity.programId(), entity.name(),
-                entity.description(), entity.position(), entity.version(), sessions);
+                entity.description(), entity.position(), entity.version(), sessions, entity.archived());
     }
 
     private static ProgramSessionData sessionData(ProgramSessionJpaEntity entity) {
         return new ProgramSessionData(entity.id(), entity.organizationId(), entity.programId(), entity.moduleId(),
-                entity.name(), entity.description(), entity.objective(), entity.scheduledDate(), entity.position(), entity.version());
+                entity.name(), entity.description(), entity.objective(), entity.scheduledDate(), entity.position(), entity.version(), entity.archived());
     }
 }

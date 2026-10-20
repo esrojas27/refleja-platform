@@ -161,6 +161,26 @@ class ProgramTemplateIntegrationTests extends PostgreSqlIntegrationTestSupport {
     private String programPath(UUID programId) {
         return "/api/v1/organizations/" + organization + "/programs/" + programId;
     }
+    @Test void archiveExcludesContentFromNewTemplatesButDoesNotChangeExistingSnapshots() throws Exception {
+        var response = mvc.perform(post(templatePath()).header("Authorization", bearer)
+                .contentType(MediaType.APPLICATION_JSON).content("""
+                {"sourceProgramId":"%s","name":"Snapshot conservado","description":"Antes del archivo"}
+                """.formatted(sourceProgram))).andExpect(status().isCreated()).andReturn().getResponse();
+        var template = json.readTree(response.getContentAsString()).path("id").asText();
+        mvc.perform(post(programPath(sourceProgram) + "/content/activities/" + activity + "/archive").header("Authorization", bearer)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0,\"archived\":true}")).andExpect(status().isNoContent());
+        mvc.perform(get(programPath(sourceProgram) + "/template-readiness").header("Authorization", bearer))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.eligible").value(false))
+                .andExpect(jsonPath("$.activityCount").value(0)).andExpect(jsonPath("$.surveyCount").value(0));
+        var created = mvc.perform(post(templatePath() + "/" + template + "/programs").header("Authorization", bearer)
+                .contentType(MediaType.APPLICATION_JSON).content("""
+                {"name":"Desde snapshot","description":"Conservado","startDate":"2027-02-01","endDate":"2027-03-03"}
+                """)).andExpect(status().isCreated()).andReturn().getResponse();
+        var cloned = UUID.fromString(json.readTree(created.getContentAsString()).path("id").asText());
+        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.program_activities where program_id=? and archived=false", Long.class, cloned)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.activity_evaluations where program_id=?", Long.class, cloned)).isEqualTo(1);
+    }
+
     private String token() {
         var now = Instant.now();
         var claims = JwtClaimsSet.builder().issuer(TEST_COGNITO_ISSUER).subject("cognito-" + user)

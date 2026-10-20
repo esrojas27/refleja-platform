@@ -46,6 +46,8 @@ public class ActivityEvaluationService {
             List<ActivityEvaluations.QuestionInput> questions, String requestId) {
         var context = authorize(subject, organizationId, programId, "CREATE_ACTIVITY_EVALUATION", requestId);
         programs.lock(context.organizationId(), programId).orElseThrow(ProgramActivities.Missing::new).requireEditable();
+        if (assignments.listByActivities(context.organizationId(), programId, List.of(activityId)).stream().anyMatch(a -> a.submittedAt() != null))
+            throw new com.reflejatuinterior.program.ProgramContent.Conflict("CONTENT_HAS_SUBMISSIONS");
         if (activities.findAll(context.organizationId(), programId, List.of(activityId)).isEmpty()) {
             throw new ProgramActivities.Missing();
         }

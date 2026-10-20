@@ -33,6 +33,8 @@ class ProgramSessionJpaEntity {
     private LocalDate scheduledDate;
     @Column(name = "position", nullable = false)
     private int position;
+    @Column(name = "archived", nullable = false)
+    private boolean archived;
     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
     @UpdateTimestamp @Column(name = "updated_at", nullable = false)
@@ -63,5 +65,11 @@ class ProgramSessionJpaEntity {
     String objective() { return objective; }
     LocalDate scheduledDate() { return scheduledDate; }
     int position() { return position; }
+    boolean archived() { return archived; }
+    void edit(com.reflejatuinterior.program.domain.NewProgramSession input) {
+        name = input.name(); objective = input.objective(); scheduledDate = input.scheduledDate();
+    }
+    void archive(boolean value) { archived = value; }
+    void moveTo(int value) { position = value; }
     long version() { return version; }
 }

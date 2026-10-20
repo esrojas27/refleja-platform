@@ -5,6 +5,9 @@ import java.util.Optional;
 import java.util.UUID;
 import com.reflejatuinterior.participation.application.ActivityEvaluations;
 import com.reflejatuinterior.participation.domain.InvalidActivityEvaluation;
+import com.reflejatuinterior.program.ProgramActivities;
+import com.reflejatuinterior.program.ProgramContent;
+import com.reflejatuinterior.program.ProgramContentUsage;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,15 +17,52 @@ import org.springframework.transaction.annotation.Transactional;
 class JpaActivityEvaluations implements ActivityEvaluations {
     private final ActivityEvaluationJpaRepository evaluations;
     private final ActivityEvaluationQuestionJpaRepository questions;
+    private final ProgramContentUsage usage;
 
     JpaActivityEvaluations(ActivityEvaluationJpaRepository evaluations,
-            ActivityEvaluationQuestionJpaRepository questions) {
-        this.evaluations = evaluations; this.questions = questions;
+            ActivityEvaluationQuestionJpaRepository questions, ProgramContentUsage usage) {
+        this.evaluations = evaluations; this.questions = questions; this.usage = usage;
     }
 
     @Override
     public Evaluation create(UUID organizationId, UUID programId, UUID activityId, String title,
             String instructions, List<QuestionInput> inputQuestions) {
+        var text = validate(title, instructions, inputQuestions);
+        var saved = evaluations.saveAndFlush(new ActivityEvaluationJpaEntity(
+                organizationId, programId, activityId, text.title(), text.instructions()));
+        return data(saved, saveQuestions(organizationId, programId, saved.id(), inputQuestions));
+    }
+
+    @Override public Evaluation replace(UUID org, UUID program, UUID activity, long version, String title,
+            String instructions, List<QuestionInput> inputQuestions) {
+        if (usage.hasResponses(org, program, List.of(activity))) throw new ProgramContent.Conflict("CONTENT_HAS_SUBMISSIONS");
+        var stored = evaluations.findByOrganizationIdAndProgramIdAndActivityId(org, program, activity)
+                .orElseThrow(ProgramActivities.Missing::new);
+        if (stored.version() != version) throw new ProgramContent.Conflict("CONTENT_VERSION_CONFLICT");
+        var text = validate(title, instructions, inputQuestions);
+        questions.deleteAll(questions.findByEvaluationIdOrderByPositionAsc(stored.id()));
+        questions.flush();
+        stored.edit(text.title(), text.instructions());
+        evaluations.saveAndFlush(stored);
+        return data(stored, saveQuestions(org, program, stored.id(), inputQuestions));
+    }
+
+    @Override public void deleteUnassignedDefinitions(UUID org, UUID program, java.util.Collection<UUID> ids) {
+        if (ids.isEmpty()) return;
+        if (usage.hasAssignments(org, program, ids) || usage.hasResponses(org, program, ids))
+            throw new ProgramContent.Conflict("CONTENT_HAS_ASSIGNMENTS");
+        var stored = evaluations.findByOrganizationIdAndProgramIdOrderByActivityIdAsc(org, program).stream()
+                .filter(e -> ids.contains(e.activityId())).toList();
+        questions.deleteAll(questions.findByEvaluationIdInOrderByEvaluationIdAscPositionAsc(stored.stream().map(ActivityEvaluationJpaEntity::id).toList()));
+        questions.flush(); evaluations.deleteAll(stored); evaluations.flush();
+    }
+
+    private List<ActivityEvaluationQuestionJpaEntity> saveQuestions(UUID org, UUID program, UUID evaluation, List<QuestionInput> input) {
+        return questions.saveAllAndFlush(input.stream().map(q -> new ActivityEvaluationQuestionJpaEntity(
+                org, program, evaluation, q.prompt().trim(), q.type(), q.position())).toList());
+    }
+
+    private static Texts validate(String title, String instructions, List<QuestionInput> inputQuestions) {
         var cleanTitle = title == null ? "" : title.trim();
         var cleanInstructions = instructions == null || instructions.isBlank() ? null : instructions.trim();
         if (cleanTitle.isEmpty() || cleanTitle.length() > 255) throw new InvalidActivityEvaluation("title");
@@ -43,13 +83,9 @@ class JpaActivityEvaluations implements ActivityEvaluations {
                 throw new InvalidActivityEvaluation("questions");
             }
         }
-        var saved = evaluations.saveAndFlush(new ActivityEvaluationJpaEntity(
-                organizationId, programId, activityId, cleanTitle, cleanInstructions));
-        var savedQuestions = questions.saveAllAndFlush(inputQuestions.stream()
-                .map(question -> new ActivityEvaluationQuestionJpaEntity(organizationId, programId, saved.id(),
-                        question.prompt().trim(), question.type(), question.position())).toList());
-        return data(saved, savedQuestions);
+        return new Texts(cleanTitle, cleanInstructions);
     }
+    private record Texts(String title, String instructions) {}
 
     @Override
     public List<Evaluation> list(UUID organizationId, UUID programId) {

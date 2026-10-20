@@ -38,13 +38,13 @@ class JpaProgramBlueprints implements ProgramBlueprints {
             var storedActivities = activities.findByOrganizationIdAndProgramIdOrderBySessionIdAscPositionAscIdAsc(
                     organizationId, programId);
             var storedDimensions = dimensions.findByOrganizationIdAndProgramIdOrderByPositionAscIdAsc(
-                    organizationId, programId).stream().map(dimension -> new Dimension(
+                    organizationId, programId).stream().filter(d -> !d.archived()).map(dimension -> new Dimension(
                             dimension.name(), dimension.description(), dimension.position(),
-                            storedSessions.stream().filter(session -> session.moduleId().equals(dimension.id()))
+                            storedSessions.stream().filter(session -> !session.archived() && session.moduleId().equals(dimension.id()))
                                     .map(session -> new Session(session.name(), session.description(),
                                             session.objective(), session.scheduledDate(), session.position(),
                                             storedActivities.stream()
-                                                    .filter(activity -> activity.sessionId().equals(session.id()))
+                                                    .filter(activity -> !activity.archived() && activity.sessionId().equals(session.id()))
                                                     .map(activity -> new Activity(activity.id(), activity.title(),
                                                             activity.instructions(), activity.youtubeUrl(),
                                                             activity.dueDate(), activity.position()))

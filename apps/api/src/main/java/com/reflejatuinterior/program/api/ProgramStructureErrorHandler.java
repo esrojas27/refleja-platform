@@ -17,6 +17,10 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 
 @RestControllerAdvice(assignableTypes = ProgramStructureController.class)
 class ProgramStructureErrorHandler {
+    @ExceptionHandler(com.reflejatuinterior.program.ProgramContent.Conflict.class)
+    ResponseEntity<ErrorResponse> contentConflict(com.reflejatuinterior.program.ProgramContent.Conflict exception, HttpServletRequest request) {
+        return error(request, 409, exception.code(), List.of());
+    }
     @ExceptionHandler(com.reflejatuinterior.program.ProgramDirectory.StateConflict.class)
     ResponseEntity<ErrorResponse> lifecycleConflict(com.reflejatuinterior.program.ProgramDirectory.StateConflict exception,
             HttpServletRequest request) {

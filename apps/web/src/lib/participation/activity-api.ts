@@ -20,7 +20,7 @@ export type ProgramActivity = {
   id: string; organizationId: string; programId: string; moduleId: string; sessionId: string;
   dimensionName: string; dimensionPosition: number; sessionName: string; sessionPosition: number;
   title: string; instructions: string; youtubeUrl: string | null; dueDate: string; position: number; version: number;
-  assignees: ActivityAssignee[];
+  assignees: ActivityAssignee[]; archived?: boolean;
 };
 export type AssignedActivity = Omit<ProgramActivity, "assignees"> & {
   assignmentId: string; assignmentStatus: ActivityAssignmentStatus; responseText: string | null;
@@ -96,8 +96,8 @@ async function request<T>(path: string, method: "GET" | "POST", expected: number
   return response.json() as Promise<T>;
 }
 
-export const listProgramActivities = (organizationId: string, programId: string, signal?: AbortSignal) =>
-  request<{ items: ProgramActivity[] }>(programActivitiesPath(organizationId, programId), "GET", 200, undefined, signal);
+export const listProgramActivities = (organizationId: string, programId: string, signal?: AbortSignal, includeArchived = false) =>
+  request<{ items: ProgramActivity[] }>(programActivitiesPath(organizationId, programId) + (includeArchived ? "?includeArchived=true" : ""), "GET", 200, undefined, signal);
 
 export const createProgramActivity = (organizationId: string, programId: string, input: ActivityInput,
   signal?: AbortSignal) => request<ProgramActivity>(programActivitiesPath(organizationId, programId),

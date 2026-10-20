@@ -2,6 +2,8 @@
 
 import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { editSurvey } from "@/lib/programs/content-administration-api";
+import { ProgramContentRequestError, programContentErrorMessage } from "@/lib/programs/program-content-api";
 import {
   AGREEMENT_OPTIONS, createActivityEvaluation, EMOTION_OPTIONS, evaluationErrorMessage,
   EvaluationRequestError, LIKELIHOOD_OPTIONS, type ActivityEvaluation, type EvaluationQuestionType,
@@ -15,16 +17,16 @@ const TYPE_LABELS: Record<EvaluationQuestionType, string> = {
   EMOTION_MULTI_SELECT: "Emociones · Máximo 2",
 };
 
-export function ActivityEvaluationForm({ organizationId, programId, activityId, activityTitle, onSaved }: {
+export function ActivityEvaluationForm({ organizationId, programId, activityId, activityTitle, onSaved, initial }: {
   organizationId: string; programId: string; activityId: string; activityTitle: string;
-  onSaved: (evaluation: ActivityEvaluation) => void;
+  onSaved: (evaluation: ActivityEvaluation) => void; initial?: ActivityEvaluation;
 }) {
-  const nextKey = useRef(1);
+  const nextKey = useRef(initial?.questions.length ?? 1);
   const request = useRef<AbortController | null>(null);
   const submitting = useRef(false);
-  const [title, setTitle] = useState(`Encuesta posterior · ${activityTitle}`);
-  const [instructions, setInstructions] = useState("Responde estas preguntas desde tu experiencia con la actividad.");
-  const [questions, setQuestions] = useState<DraftQuestion[]>([
+  const [title, setTitle] = useState(initial?.title ?? `Encuesta posterior · ${activityTitle}`);
+  const [instructions, setInstructions] = useState(initial ? initial.instructions ?? "" : "Responde estas preguntas desde tu experiencia con la actividad.");
+  const [questions, setQuestions] = useState<DraftQuestion[]>(initial ? [...initial.questions].sort((a, b) => a.position - b.position).map((q, key) => ({ key, prompt: q.prompt, type: q.type })) : [
     { key: 0, prompt: "", type: "AGREEMENT_SCALE" },
   ]);
   const [invalid, setInvalid] = useState<string[]>([]);
@@ -61,36 +63,39 @@ export function ActivityEvaluationForm({ organizationId, programId, activityId, 
         .map(question => `question-${question.key}`),
     ];
     if (missing.length) {
-      setInvalid(missing); setMessage("Revisa los campos resaltados antes de crear la encuesta.");
+      setInvalid(missing); setMessage("Revisa los campos resaltados antes de guardar la encuesta.");
       window.setTimeout(() => document.getElementById(missing[0] === "title" ? "evaluation-title"
         : missing[0] === "instructions" ? "evaluation-instructions"
           : missing[0] === "questions" ? "evaluation-add-question" : `evaluation-${missing[0]}-prompt`)?.focus(), 0);
       return;
     }
-    submitting.current = true; setPending(true); setMessage("Creando encuesta…");
+    submitting.current = true; setPending(true); setMessage(initial ? "Guardando encuesta…" : "Creando encuesta…");
     const controller = new AbortController(); request.current = controller;
     try {
-      const saved = await createActivityEvaluation(organizationId, programId, activityId, {
+      const input = {
         title: cleanTitle, instructions: cleanInstructions || null,
         questions: questions.map((question, index) => ({
           prompt: question.prompt.trim(), type: question.type, position: index + 1,
         })),
-      }, controller.signal);
-      if (!controller.signal.aborted) { setBlocked(true); setMessage("Encuesta creada."); onSaved(saved); }
+      };
+      const saved = initial ? await editSurvey(organizationId, programId, activityId, { ...input, version: initial.version }, controller.signal)
+        : await createActivityEvaluation(organizationId, programId, activityId, input, controller.signal);
+      if (!controller.signal.aborted) { setBlocked(true); setMessage(initial ? "Encuesta actualizada." : "Encuesta creada."); onSaved(saved); }
     } catch (error) {
       if (!controller.signal.aborted) {
-        const failure = error instanceof EvaluationRequestError ? error : new EvaluationRequestError(0);
+        const failure = error instanceof EvaluationRequestError ? error : error instanceof ProgramContentRequestError
+          ? new EvaluationRequestError(error.status, error.fields, error.requestId) : new EvaluationRequestError(0);
         setInvalid(failure.fields.includes("title") ? ["title"] : failure.fields.includes("instructions")
           ? ["instructions"] : failure.fields.length ? ["questions"] : []);
         setBlocked(failure.status === 0 || failure.status >= 500 || [401, 403, 404, 409].includes(failure.status));
-        setMessage(evaluationErrorMessage(failure));
+        setMessage(error instanceof ProgramContentRequestError ? programContentErrorMessage(error) : evaluationErrorMessage(failure));
       }
     } finally { submitting.current = false; if (!controller.signal.aborted) setPending(false); }
   }
 
-  return <form aria-label="Crear encuesta" onSubmit={submit} noValidate className="space-y-6">
+  return <form aria-label={initial ? "Editar encuesta" : "Crear encuesta"} onSubmit={submit} noValidate className="space-y-6">
     <div><p className="rti-kicker">Después de la actividad</p>
-      <h2 id="create-evaluation-title" className="mt-2 text-2xl font-semibold">Crear encuesta</h2>
+      <h2 id="create-evaluation-title" className="mt-2 text-2xl font-semibold">{initial ? "Editar encuesta" : "Crear encuesta"}</h2>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">El colaborador responderá esta encuesta después de realizar la actividad.</p></div>
     {message && <p role="status" className="rounded-xl bg-muted/60 px-3 py-2 text-sm">{message}</p>}
     <div><label htmlFor="evaluation-title" className="block text-sm font-medium">Nombre de la encuesta</label>
@@ -142,7 +147,7 @@ export function ActivityEvaluationForm({ organizationId, programId, activityId, 
         <Plus aria-hidden="true" className="size-4" />Agregar pregunta
       </button>
     </section>
-    <button className="rti-button-primary" disabled={pending || blocked}>{pending ? "Creando…" : "Crear encuesta"}</button>
+    <button className="rti-button-primary" disabled={pending || blocked}>{pending ? "Guardando…" : initial ? "Guardar cambios" : "Crear encuesta"}</button>
   </form>;
 }
 
