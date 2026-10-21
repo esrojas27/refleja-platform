@@ -53,7 +53,7 @@ it("shows unavailable without revealing a foreign program", async () => {
 it("registers once and refreshes the real list", async () => {
   render(<EnrollmentArea organizationId="org-a" programId="program-a" />);
   await screen.findByRole("form"); fill(); fireEvent.submit(screen.getByRole("form"));
-  await screen.findByText(/Registro guardado: INVITED/);
+  await screen.findByText(/Registro guardado: Invitada/);
   expect(createEnrollment).toHaveBeenCalledWith("org-a", "program-a", { email: "participant@example.test", firstName: "Ana", lastName: "Prueba", role: "COLLABORATOR" }, expect.any(AbortSignal));
   await waitFor(() => expect(listEnrollments).toHaveBeenCalledTimes(2));
 });

@@ -94,8 +94,10 @@ public class ActivityEvaluationService {
             tenantContext.activate(membership.organizationId());
             var enrollment = enrollments.findOwned(membership.organizationId(), membership.id(), programId);
             if (enrollment.isEmpty()) continue;
-            if (!"ACTIVE".equals(enrollment.get().status())) throw new ActivityWorkflowConflict();
             programs.lock(membership.organizationId(), programId).orElseThrow(MyProgramNotFound::new).requireActive();
+            var currentEnrollment=enrollments.lock(membership.organizationId(),programId,enrollment.get().id());
+            if(!Set.of("ACTIVE","COMPLETED").contains(currentEnrollment.status())) throw new ActivityAssignmentNotFound();
+            if(!"ACTIVE".equals(currentEnrollment.status())) throw new EnrollmentAdministrationConflict("PARTICIPATION_READ_ONLY");
             var assignment = assignments.listOwned(membership.organizationId(), programId, enrollment.get().id())
                     .stream().filter(item -> item.activityId().equals(activityId)).findFirst()
                     .orElseThrow(ActivityAssignmentNotFound::new);

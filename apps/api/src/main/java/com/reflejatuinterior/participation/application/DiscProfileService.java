@@ -51,6 +51,12 @@ public class DiscProfileService {
             Long expectedVersion, String requestId) {
         var context = authorize(subject, organizationId, programId, "EDIT_PROGRAM_DISC", requestId);
         programs.lock(context.organizationId(), programId).orElseThrow(ProgramActivities.Missing::new).requireEditable();
+        context=authorize(subject,organizationId,programId,"EDIT_PROGRAM_DISC",requestId);
+        if(!context.roles().contains("CONSULTANT")) {
+            var own=enrollments.findOwned(organizationId,context.membershipId(),programId).orElseThrow(OrganizationAccess.Denied::new);
+            var locked=enrollments.lock(organizationId,programId,own.id());
+            if(!"ACTIVE".equals(locked.status())) throw new EnrollmentAdministrationConflict("PARTICIPATION_READ_ONLY");
+        }
         var eligible = eligibleEnrollments(context.organizationId(), programId).stream()
                 .filter(enrollment -> enrollment.id().equals(enrollmentId)).findFirst()
                 .orElseThrow(EnrollmentNotFound::new);

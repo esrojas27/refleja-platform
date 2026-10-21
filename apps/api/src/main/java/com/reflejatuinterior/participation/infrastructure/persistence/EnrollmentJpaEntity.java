@@ -49,6 +49,8 @@ class EnrollmentJpaEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private EnrollmentStatus status;
+    @Column(name = "suspended_from_status")
+    private String suspendedFromStatus;
 
     @Column(name = "approved_at")
     private Instant approvedAt;
@@ -118,7 +120,34 @@ class EnrollmentJpaEntity {
         }
         // Activation grants enrollment access, not program attendance or progress.
         status = EnrollmentStatus.ACTIVE;
+        if (approvedAt == null) approvedAt = Instant.now();
     }
+
+    String suspendedFromStatus() { return suspendedFromStatus; }
+    void change(String action, UUID invitation, long expectedVersion) {
+        if (version != expectedVersion) throw new com.reflejatuinterior.participation.application.EnrollmentAdministrationConflict("ENROLLMENT_VERSION_CONFLICT");
+        var previous = status;
+        switch (action) {
+            case "REVOKE" -> { if (status != EnrollmentStatus.INVITED) invalid(); status = EnrollmentStatus.WITHDRAWN; withdrawnAt = Instant.now(); }
+            case "WITHDRAW" -> { if (status != EnrollmentStatus.ACTIVE && status != EnrollmentStatus.COMPLETED && status != EnrollmentStatus.SUSPENDED) invalid();
+                status = EnrollmentStatus.WITHDRAWN; withdrawnAt = Instant.now(); suspendedFromStatus = null; }
+            case "SUSPEND" -> { if (status != EnrollmentStatus.ACTIVE && status != EnrollmentStatus.COMPLETED) invalid();
+                suspendedFromStatus = status.name(); status = EnrollmentStatus.SUSPENDED; }
+            case "COMPLETE" -> { if (status != EnrollmentStatus.ACTIVE) invalid(); status = EnrollmentStatus.COMPLETED; completedAt = Instant.now(); }
+            case "REINSTATE" -> {
+                if (status != EnrollmentStatus.WITHDRAWN && status != EnrollmentStatus.SUSPENDED && status != EnrollmentStatus.COMPLETED && status != EnrollmentStatus.INVITED) invalid();
+                status = invitation != null ? EnrollmentStatus.INVITED : suspendedFromStatus != null ? EnrollmentStatus.valueOf(suspendedFromStatus) : EnrollmentStatus.ACTIVE;
+                suspendedFromStatus = null; withdrawnAt = null;
+                if (status != EnrollmentStatus.COMPLETED) completedAt = null;
+                if (invitation != null) invitationId = invitation;
+            }
+            case "CHANGE_ROLE" -> { /* Membership-owned role mutation; still version the enrollment action. */ }
+            default -> invalid();
+        }
+        if (previous == status && !"CHANGE_ROLE".equals(action) && invitation == null) invalid();
+        updatedAt = Instant.now();
+    }
+    private static void invalid() { throw new com.reflejatuinterior.participation.application.EnrollmentAdministrationConflict("ENROLLMENT_TRANSITION_NOT_ALLOWED"); }
 
     EnrollmentStatus status() {
         return status;

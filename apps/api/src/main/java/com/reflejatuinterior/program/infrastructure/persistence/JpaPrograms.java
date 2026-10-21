@@ -39,6 +39,11 @@ class JpaPrograms implements Programs {
     @Override public Optional<ProgramData> find(UUID organizationId, UUID programId) {
         return repository.findByOrganizationIdAndId(organizationId, programId).map(JpaPrograms::data);
     }
+    @Override public ProgramPage listExcluding(UUID org,int page,int size,java.util.Set<UUID> excluded) {
+        if(excluded.isEmpty()) return list(org,page,size);
+        var result=repository.findByOrganizationIdAndIdNotIn(org,excluded,PageRequest.of(page,size,Sort.by("id").descending()));
+        return new ProgramPage(result.getContent().stream().map(JpaPrograms::data).toList(),page,size,result.getTotalElements(),result.getTotalPages());
+    }
 
     @Override public ChangedStatus transition(UUID organizationId, UUID programId, String target, long expectedVersion) {
         var entity = repository.lockByOrganizationIdAndId(organizationId, programId)

@@ -7,6 +7,8 @@ import { createEnrollment, listEnrollments, retryInvitationDelivery, deliveryMes
   inviteeRoleLabel, ParticipationRequestError, type Enrollment, type EnrollmentInput, type InviteeRole,
   type PageResult } from "@/lib/participation/participation-api";
 import { useProgramState } from "@/components/programs/program-state-context";
+import { EnrollmentAdministration,roleLabel } from "@/components/participation/enrollment-administration";
+import { enrollmentStatusLabels } from "@/lib/participation/enrollment-administration-api";
 
 const button = "rti-button-secondary";
 
@@ -47,7 +49,7 @@ function EnrollmentContent({ organizationId, programId }: { organizationId: stri
   }, [organizationId, programId, page, attempt]);
   function refresh(nextPage = page, saved?: Enrollment) {
     setIdentity(undefined); setResult(undefined); setPending(true); setMessage("Comprobando acceso al programa…");
-    if (saved) setNotice(`Registro guardado: ${saved.status}. ${saved.invitation ? deliveryMessage(saved.invitation.deliveryStatus) : "No hay invitación asociada."}`);
+    if (saved) setNotice(`Registro guardado: ${enrollmentStatusLabels[saved.status]}.${saved.status === "INVITED" && saved.invitation ? ` ${deliveryMessage(saved.invitation.deliveryStatus)}` : ""}`);
     setPage(nextPage); setAttempt(value => value + 1);
   }
   return <section className="rti-surface mx-auto w-full max-w-6xl p-6 sm:p-8 lg:p-10">
@@ -56,6 +58,7 @@ function EnrollmentContent({ organizationId, programId }: { organizationId: stri
     <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">Invita a un colaborador, líder o responsable de RRHH. El acceso se activa cuando acepta con su cuenta de Cognito.</p>
     {notice && <p className="mt-5 rounded-2xl border border-accent bg-accent/60 px-4 py-3 text-sm" role="status">{notice}</p>}
     {message && <p className="mt-5 rounded-2xl bg-muted/60 px-4 py-3 text-sm" role="status">{message}</p>}
+    {!canEdit&&identity&&<p className="mt-5 rounded-2xl border border-border p-4 text-sm text-muted-foreground">El contenido permanece en solo consulta. Puedes restringir accesos mediante retiro, suspensión o revocación, y consultar su historial.</p>}
     {identity && result && <div className={`mt-7 grid gap-8 ${canEdit ? "lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]" : ""}`}>
       {canEdit && <div className="rounded-2xl border border-border/70 bg-background/70 p-5 sm:p-6">
         <EnrollmentForm organizationId={organizationId} programId={programId} onSaved={saved => refresh(0, saved)} />
@@ -66,9 +69,11 @@ function EnrollmentContent({ organizationId, programId }: { organizationId: stri
           <p className="font-semibold">{[enrollment.participant.firstName, enrollment.participant.lastName].filter(Boolean).join(" ") || enrollment.participant.email}</p>
           <p className="break-all text-sm text-muted-foreground">{enrollment.participant.email}</p>
           {enrollment.invitation && <p className="text-sm text-muted-foreground">Rol invitado: {inviteeRoleLabel(enrollment.invitation.role)}</p>}
-          <p className="text-sm text-muted-foreground">Inscripción: {enrollment.status}{enrollment.invitation ? ` · Invitación: ${enrollment.invitation.status}` : ""}</p>
+          {enrollment.access&&<p className="text-sm text-muted-foreground">Roles actuales: {enrollment.access.roles.map(roleLabel).join(", ")||"Sin rol"}</p>}
+          <p className="text-sm text-muted-foreground">Inscripción: <span className="inline-block rounded-full border border-border bg-muted/70 px-2.5 py-1 text-xs font-semibold">{enrollmentStatusLabels[enrollment.status]}</span>{enrollment.invitation ? ` · Invitación: ${enrollment.invitation.status}` : ""}</p>
           {enrollment.invitation && <p className="text-sm text-muted-foreground">Vence: {enrollment.invitation.expiresAt}</p>}
           <DeliveryAction enrollment={enrollment} onSaved={saved => refresh(page, saved)} />
+          <EnrollmentAdministration enrollment={enrollment} onSaved={saved=>refresh(page,saved)} />
         </li>)}</ul>
         <p className="mt-4 text-sm text-muted-foreground">{result.totalElements} personas · Página {result.page + 1} de {Math.max(1, result.totalPages)}</p>
         <div className="mt-3 flex flex-wrap gap-3">

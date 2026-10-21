@@ -30,6 +30,13 @@ Al aceptar una invitación se activa la inscripción y se garantiza que la membr
 tenga el rol solicitado. Los roles preexistentes no se eliminan. Una invitación no
 puede conceder `CONSULTANT` ni `SUPER_ADMIN`.
 
+Extensión del 2026-10-20: el consultor puede reemplazar los roles de negocio de
+una membresía desde la administración de participantes, con advertencia de alcance
+organizacional y confirmación. Se actualizan también sus invitaciones no aceptadas
+para no volver a conceder un rol anterior. No se alteran los roles de invitaciones
+ya aceptadas ni se conceden roles administrativos. Reglas de revocación, renovación
+y retiro en [administración de participantes](participant-administration.md).
+
 ## Seguridad y límites
 
 Sólo un `CONSULTANT` activo de la organización puede crear o consultar estas

@@ -676,6 +676,145 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 UUID.fromString(survey.path("questions").get(2).path("id").asText()))).isEqualTo("=1+1");
     }
 
+    @Test void suspensionWithdrawAndReinstatementControlExistingTokensWithoutDeletingWork() throws Exception {
+        var activity=createAdminActivity(true,1); var survey=createResultsSurvey(activity);
+        sendResults(collaborator,activity,survey,"4","5","Respuesta conservada",java.util.List.of("Inspirado(a)"));
+        changeParticipant(enrollment,0,"SUSPEND").andExpect(status().isOk()).andExpect(jsonPath("$.status").value("SUSPENDED"));
+        mvc.perform(get(collaboratorPath()).header("Authorization",token(collaborator))).andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/me/programs/"+program).header("Authorization",token(collaborator))).andExpect(status().isNotFound());
+        mvc.perform(post(collaboratorPath()+"/"+activity+"/submission").header("Authorization",token(collaborator))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"No guardar\"}")).andExpect(status().isNotFound());
+        changeParticipant(enrollment,1,"REINSTATE").andExpect(status().isOk()).andExpect(jsonPath("$.status").value("ACTIVE"));
+        mvc.perform(get(collaboratorPath()).header("Authorization",token(collaborator))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].responseText").value("Entrega privada para revisión"))
+                .andExpect(jsonPath("$.items[0].completionPercentage").value(100));
+        changeParticipant(enrollment,2,"WITHDRAW").andExpect(status().isOk()).andExpect(jsonPath("$.status").value("WITHDRAWN"));
+        mvc.perform(get(collaboratorPath()).header("Authorization",token(collaborator))).andExpect(status().isNotFound());
+        mvc.perform(get(collaboratorPath()).header("Authorization",token(otherCollaborator))).andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(1));
+        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.activity_evaluation_responses where enrollment_id=?",Long.class,enrollment)).isEqualTo(1);
+        mvc.perform(get(participantPath(enrollment)+"/history").header("Authorization",token(consultant))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(3)).andExpect(jsonPath("$.items[0].action").value("WITHDRAW"))
+                .andExpect(jsonPath("$.items[0].previousStatus").value("ACTIVE")).andExpect(jsonPath("$.items[0].actorLabel").isNotEmpty());
+    }
+
+    @Test void completingWithPendingSurveyIsReadOnlyAndReinstatementPreservesTheFiftyPercent() throws Exception {
+        var activity=createAdminActivity(true,1); var survey=createResultsSurvey(activity);
+        mvc.perform(post(collaboratorPath()+"/"+activity+"/submission").header("Authorization",token(collaborator))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"Mi entrega\"}")).andExpect(status().isOk());
+        changeParticipant(enrollment,0,"COMPLETE").andExpect(status().isOk()).andExpect(jsonPath("$.status").value("COMPLETED"));
+        mvc.perform(get("/api/v1/me/programs/"+program).header("Authorization",token(collaborator))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.enrollmentStatus").value("COMPLETED"));
+        mvc.perform(get(collaboratorPath()).header("Authorization",token(collaborator))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].completionPercentage").value(50));
+        mvc.perform(post(surveyResponsePath(activity)).header("Authorization",token(collaborator)).contentType(MediaType.APPLICATION_JSON)
+                .content(surveyResponseBody(survey))).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PARTICIPATION_READ_ONLY"));
+        changeParticipant(enrollment,1,"REINSTATE").andExpect(status().isOk()).andExpect(jsonPath("$.status").value("ACTIVE"));
+        mvc.perform(post(surveyResponsePath(activity)).header("Authorization",token(collaborator)).contentType(MediaType.APPLICATION_JSON)
+                .content(surveyResponseBody(survey))).andExpect(status().isOk());
+        mvc.perform(get(collaboratorPath()).header("Authorization",token(collaborator))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].completionPercentage").value(100));
+    }
+
+    @Test void aSuspendedCompletedEnrollmentRestoresReadOnlyRatherThanActiveAccess() throws Exception {
+        changeParticipant(enrollment,0,"COMPLETE").andExpect(status().isOk());
+        changeParticipant(enrollment,1,"SUSPEND").andExpect(status().isOk()).andExpect(jsonPath("$.suspendedFromStatus").value("COMPLETED"));
+        changeParticipant(enrollment,2,"REINSTATE").andExpect(status().isOk()).andExpect(jsonPath("$.status").value("COMPLETED"));
+    }
+
+    @Test void withdrawingLeaderAlsoRemovesBasicProgramMetadataButNotOtherPrograms() throws Exception {
+        jdbcTemplate.update("insert into rti.membership_roles values (?, 'LEADER')",collaboratorMembership);
+        var otherProgram=uuid7(0xea1); var otherParticipant=uuid7(0xea2);
+        insertProgram(otherProgram,organization);
+        tenantContext.activate(organization);
+        jdbcTemplate.update("""
+                insert into rti.enrollments (id,organization_id,program_id,participant_membership_id,status,created_at,updated_at,version)
+                values (?,?,?,?,'ACTIVE',now(),now(),0)
+                """,otherParticipant,organization,otherProgram,collaboratorMembership);
+        changeParticipant(enrollment,0,"WITHDRAW").andExpect(status().isOk());
+        var base=consultantPath().replace("/activities","");
+        mvc.perform(get(base).header("Authorization",token(collaborator))).andExpect(status().isNotFound());
+        mvc.perform(get(base.replace("/"+program,"")).param("size","1").header("Authorization",token(collaborator)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1)).andExpect(jsonPath("$.items[0].id").value(otherProgram.toString()));
+        mvc.perform(get("/api/v1/me/programs/"+otherProgram).header("Authorization",token(collaborator))).andExpect(status().isOk());
+        mvc.perform(get(base+"/disc-profiles").header("Authorization",token(collaborator))).andExpect(status().isForbidden());
+    }
+
+    @Test void organizationRoleChangesAreVersionedAndVisibleInTheOtherEnrollmentHistory() throws Exception {
+        var otherProgram=uuid7(0xeb1);var otherParticipant=uuid7(0xeb2);
+        insertProgram(otherProgram,organization);tenantContext.activate(organization);
+        jdbcTemplate.update("""
+                insert into rti.enrollments (id,organization_id,program_id,participant_membership_id,status,created_at,updated_at,version)
+                values (?,?,?,?,'ACTIVE',now(),now(),0)
+                """,otherParticipant,organization,otherProgram,collaboratorMembership);
+        mvc.perform(post(participantPath(enrollment)+"/administration").header("Authorization",token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(participantBody(0,"CHANGE_ROLE") .replace("\"confirmed\":true","\"confirmed\":true,\"role\":\"LEADER\",\"roleVersion\":0")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.access.roles[0]").value("LEADER")).andExpect(jsonPath("$.access.version").value(1));
+        mvc.perform(get("/api/v1/me/programs").header("Authorization",token(collaborator))).andExpect(status().isForbidden());
+        mvc.perform(get(participantPath(otherParticipant).replace(program.toString(),otherProgram.toString())+"/history").header("Authorization",token(consultant)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1)).andExpect(jsonPath("$.items[0].action").value("CHANGE_ROLE"))
+                .andExpect(jsonPath("$.items[0].programId").value(program.toString()));
+        mvc.perform(post(participantPath(enrollment)+"/administration").header("Authorization",token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(participantBody(1,"CHANGE_ROLE").replace("\"confirmed\":true","\"confirmed\":true,\"role\":\"COLLABORATOR\",\"roleVersion\":0")))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("MEMBERSHIP_VERSION_CONFLICT"));
+        mvc.perform(post(participantPath(enrollment)+"/administration").header("Authorization",token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(participantBody(1,"CHANGE_ROLE").replace("\"confirmed\":true","\"confirmed\":true,\"role\":\"COLLABORATOR\",\"roleVersion\":1")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.access.roles[0]").value("COLLABORATOR"));
+        assertThat(jdbcTemplate.queryForObject("select profile_status from rti.organization_memberships where id=?",String.class,collaboratorMembership)).isEqualTo("COMPLETE");
+    }
+
+    @Test void participantAdministrationRequiresConfirmationScopeAndConsultantAndProtectsAdministrativeUsers() throws Exception {
+        mvc.perform(post(participantPath(enrollment)+"/administration").contentType(MediaType.APPLICATION_JSON).content(participantBody(0,"SUSPEND"))).andExpect(status().isUnauthorized());
+        mvc.perform(post(participantPath(enrollment)+"/administration").header("Authorization",token(collaborator))
+                .contentType(MediaType.APPLICATION_JSON).content(participantBody(0,"SUSPEND"))).andExpect(status().isForbidden());
+        mvc.perform(get(participantPath(enrollment)+"/history").header("Authorization",token(collaborator))).andExpect(status().isForbidden());
+        mvc.perform(post(participantPath(enrollment)+"/administration").header("Authorization",token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(participantBody(0,"SUSPEND").replace("\"confirmed\":true","\"confirmed\":false")))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("ENROLLMENT_CONFIRMATION_REQUIRED"));
+        mvc.perform(post(participantPath(enrollment)+"/administration").header("Authorization",token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(participantBody(0,"CHANGE_ROLE").replace("\"confirmed\":true","\"confirmed\":true,\"role\":\"CONSULTANT\",\"roleVersion\":0")))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post(participantPath(uuid7(0xeff))+"/administration").header("Authorization",token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(participantBody(0,"SUSPEND"))).andExpect(status().isNotFound());
+        jdbcTemplate.update("insert into rti.membership_roles values (?, 'CONSULTANT')",collaboratorMembership);
+        changeParticipant(enrollment,0,"WITHDRAW").andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PARTICIPANT_ADMINISTRATIVE_ACCESS"));
+        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.enrollment_changes where enrollment_id=?",Long.class,enrollment)).isZero();
+    }
+
+    @Test void staleOrInvalidTransitionsDoNotCreateAdditionalHistory() throws Exception {
+        changeParticipant(enrollment,0,"SUSPEND").andExpect(status().isOk());
+        changeParticipant(enrollment,0,"WITHDRAW").andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("ENROLLMENT_VERSION_CONFLICT"));
+        changeParticipant(enrollment,1,"COMPLETE").andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("ENROLLMENT_TRANSITION_NOT_ALLOWED"));
+        changeParticipant(enrollment,1,"REVOKE").andExpect(status().isConflict());
+        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.enrollment_changes where enrollment_id=?",Long.class,enrollment)).isEqualTo(1);
+    }
+
+    @Test void restrictingAccessRemainsPossibleAfterProgramClosureButReinstatementDoesNotReopenIt() throws Exception {
+        mvc.perform(post(consultantPath().replace("/activities","/status")).header("Authorization",token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"COMPLETED\",\"version\":0}")).andExpect(status().isOk());
+        changeParticipant(enrollment,0,"SUSPEND").andExpect(status().isOk());
+        changeParticipant(enrollment,1,"REINSTATE").andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PROGRAM_READ_ONLY"));
+        changeParticipant(enrollment,1,"WITHDRAW").andExpect(status().isOk()).andExpect(jsonPath("$.status").value("WITHDRAWN"));
+        mvc.perform(get(participantPath(enrollment)+"/history").header("Authorization",token(consultant))).andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(2));
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"UPDATE","DELETE"})
+    void enrollmentHistoryIsTenantIsolatedAndImmutableForTheRuntimeRole(String operation) throws Exception {
+        changeParticipant(enrollment,0,"SUSPEND").andExpect(status().isOk());
+        tenantContext.activate(uuid7(0xeec));
+        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.enrollment_changes where enrollment_id=?",Long.class,enrollment)).isZero();
+        tenantContext.activate(organization);
+        org.assertj.core.api.Assertions.assertThatThrownBy(()->jdbcTemplate.update(operation.equals("UPDATE")
+                ?"update rti.enrollment_changes set reason='No permitido' where enrollment_id=?"
+                :"delete from rti.enrollment_changes where enrollment_id=?",enrollment)).isInstanceOf(org.springframework.dao.DataAccessException.class);
+    }
+
+    private String participantPath(UUID id) {return consultantPath().replace("/activities","/enrollments/"+id);}
+    private String participantBody(long version,String action) {return "{\"version\":"+version+",\"action\":\""+action+"\",\"reason\":\"Cambio de prueba\",\"confirmed\":true}";}
+    private org.springframework.test.web.servlet.ResultActions changeParticipant(UUID id,long version,String action) throws Exception {
+        return mvc.perform(post(participantPath(id)+"/administration").header("Authorization",token(consultant)).contentType(MediaType.APPLICATION_JSON).content(participantBody(version,action)));
+    }
+
     private String resultsPath() { return consultantPath().replace("/activities", "/survey-results"); }
     private tools.jackson.databind.JsonNode createResultsSurvey(UUID activity) throws Exception {
         var response = mvc.perform(post(evaluationPath(activity)).header("Authorization", token(consultant))

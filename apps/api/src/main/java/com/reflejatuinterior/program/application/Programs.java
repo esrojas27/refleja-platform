@@ -7,6 +7,7 @@ import com.reflejatuinterior.program.domain.NewProgram;
 public interface Programs {
     ProgramData create(UUID organizationId, NewProgram input);
     ProgramPage list(UUID organizationId, int page, int size);
+    ProgramPage listExcluding(UUID organizationId,int page,int size,java.util.Set<UUID> excluded);
     Optional<ProgramData> find(UUID organizationId, UUID programId);
     ChangedStatus transition(UUID organizationId, UUID programId, String target, long expectedVersion);
     void requireEditable(UUID organizationId, UUID programId);

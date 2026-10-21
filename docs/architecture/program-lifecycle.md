@@ -48,6 +48,12 @@ de plantillas, y no se extiende al ciclo de vida de programas existentes.
 
 ## Contrato y concurrencia
 
+Extensión local del 2026-10-20: [administración de participantes](participant-administration.md)
+permite restringir accesos (revocar, retirar o suspender) incluso tras el cierre.
+También se puede marcar completada una participación de un programa finalizado,
+sin cambiar su progreso ni reabrirlo. Reincorporar y cambiar roles siguen bloqueados
+en programas cerrados. Esta excepción no habilita editar contenido ni nuevas entregas.
+
 `POST /api/v1/organizations/{organizationId}/programs/{programId}/status`
 
 ```json

@@ -147,6 +147,7 @@ export function activityErrorMessage(error: unknown) {
   const code = error instanceof ActivityRequestError ? error.code : undefined;
   const message = code === "PROGRAM_NOT_ACTIVE" ? "El programa no está activo. Actualiza la página para consultar su estado."
     : code === "PROGRAM_READ_ONLY" ? "El programa está cerrado y solo permite consulta."
+    : code === "PARTICIPATION_READ_ONLY" ? "Tu participación está completada y solo permite consulta."
     : status === 401 ? "Tu sesión no está disponible. Inicia sesión de nuevo."
     : status === 403 ? "No tienes permiso para gestionar estas actividades."
     : status === 404 ? "El programa, la sesión o la inscripción ya no está disponible."

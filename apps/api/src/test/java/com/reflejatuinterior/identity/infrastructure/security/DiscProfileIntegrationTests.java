@@ -102,6 +102,17 @@ class DiscProfileIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("dominant"));
     }
 
+    @Test void completedLeaderCanConsultButCannotEditAndSuspendedLeaderLosesAccess() throws Exception {
+        jdbcTemplate.update("update rti.enrollments set status='COMPLETED',completed_at=now() where id=?",leaderEnrollment);
+        mvc.perform(get(path()).header("Authorization",token(leader))).andExpect(status().isOk());
+        mvc.perform(put(path()+"/"+enrollment).header("Authorization",token(leader)).contentType(MediaType.APPLICATION_JSON).content(body(null,"Decide")))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PARTICIPATION_READ_ONLY"));
+        mvc.perform(put(path()+"/"+enrollment).header("Authorization",token(consultant)).contentType(MediaType.APPLICATION_JSON).content(body(null,"Decide")))
+                .andExpect(status().isOk());
+        jdbcTemplate.update("update rti.enrollments set status='SUSPENDED',suspended_from_status='COMPLETED' where id=?",leaderEnrollment);
+        mvc.perform(get(path()).header("Authorization",token(leader))).andExpect(status().isForbidden());
+    }
+
     private void insertInvitation(UUID id, UUID userId, UUID membershipId, String role) {
         jdbcTemplate.update("""
                 insert into rti.user_invitations

@@ -5,5 +5,6 @@ enum EnrollmentStatus {
     INVITED,
     ACTIVE,
     COMPLETED,
-    WITHDRAWN
+    WITHDRAWN,
+    SUSPENDED
 }

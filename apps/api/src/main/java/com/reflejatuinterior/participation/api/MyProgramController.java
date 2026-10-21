@@ -60,10 +60,10 @@ class MyProgramController {
     }
 
     record ProgramResponse(UUID id, UUID organizationId, String organizationName, String name, String description,
-                           String status, LocalDate startDate, LocalDate endDate, long version) {
+                           String status, LocalDate startDate, LocalDate endDate, long version, String enrollmentStatus) {
         static ProgramResponse from(EnrollmentService.MyProgramResponse program) {
             return new ProgramResponse(program.id(), program.organizationId(), program.organizationName(), program.name(),
-                    program.description(), program.status(), program.startDate(), program.endDate(), program.version());
+                    program.description(), program.status(), program.startDate(), program.endDate(), program.version(), program.enrollmentStatus());
         }
     }
 

@@ -16,4 +16,5 @@ interface ProgramJpaRepository extends JpaRepository<ProgramJpaEntity, UUID> {
     @Query("select p from ProgramJpaEntity p where p.organizationId = :organizationId and p.id = :id")
     Optional<ProgramJpaEntity> lockByOrganizationIdAndId(UUID organizationId, UUID id);
     Page<ProgramJpaEntity> findByOrganizationId(UUID organizationId, Pageable pageable);
+    Page<ProgramJpaEntity> findByOrganizationIdAndIdNotIn(UUID organizationId,java.util.Collection<UUID> ids,Pageable pageable);
 }

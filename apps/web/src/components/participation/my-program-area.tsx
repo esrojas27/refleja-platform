@@ -113,10 +113,11 @@ function MyProgramDetail({ programId, section }: { programId: string; section: "
         <dt className="font-medium">Inicio</dt><dd>{program.startDate ?? "Sin fecha"}</dd>
         <dt className="font-medium">Fin</dt><dd>{program.endDate ?? "Sin fecha"}</dd>
       </dl>
-      <AssignedActivityList programId={programId} section="summary" programStatus={program.status} />
+      <AssignedActivityList programId={programId} section="summary" programStatus={program.status} enrollmentStatus={program.enrollmentStatus} />
       </>}
       {program.status !== "ACTIVE" && <p className="rounded-2xl border border-border bg-muted/50 p-4 text-sm">{programStateMessage(program.status)}</p>}
-      {section === "activities" && <AssignedActivityList programId={programId} section="activities" programStatus={program.status} />}
+      {program.enrollmentStatus === "COMPLETED" && <p className="rounded-2xl border border-border bg-muted/50 p-4 text-sm">Tu participación está completada. Puedes consultar tu progreso y tus respuestas, pero no realizar nuevas entregas.</p>}
+      {section === "activities" && <AssignedActivityList programId={programId} section="activities" programStatus={program.status} enrollmentStatus={program.enrollmentStatus} />}
     </div>}
   </div>;
 }
@@ -149,8 +150,8 @@ function groupAssignedActivities(activities: AssignedActivity[]): ActivityDimens
   }));
 }
 
-function AssignedActivityList({ programId, section, programStatus }: { programId: string; section: "summary" | "activities"; programStatus: MyProgram["status"] }) {
-  const readOnly = programStatus !== "ACTIVE";
+function AssignedActivityList({ programId, section, programStatus, enrollmentStatus }: { programId: string; section: "summary" | "activities"; programStatus: MyProgram["status"]; enrollmentStatus?: MyProgram["enrollmentStatus"] }) {
+  const readOnly = programStatus !== "ACTIVE" || enrollmentStatus === "COMPLETED";
   const preparing = programStatus === "DRAFT" || programStatus === "SCHEDULED";
   const shared = useCollaboratorActivities();
   const [localActivities, setLocalActivities] = useState<AssignedActivity[]>();

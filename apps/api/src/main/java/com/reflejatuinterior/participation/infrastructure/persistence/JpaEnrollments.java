@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 @Transactional(propagation = Propagation.MANDATORY)
-class JpaEnrollments implements Enrollments {
+class JpaEnrollments implements Enrollments, com.reflejatuinterior.program.ProgramParticipantVisibility {
     private final EnrollmentJpaRepository repository;
     private final EntityManager entityManager;
     JpaEnrollments(EnrollmentJpaRepository repository, EntityManager entityManager) {
@@ -43,7 +43,30 @@ class JpaEnrollments implements Enrollments {
     }
 
     @Override public Optional<Data> findByInvitation(UUID organizationId, UUID invitationId) {
-        return repository.findByOrganizationIdAndInvitationId(organizationId, invitationId).map(JpaEnrollments::data);
+        return entityManager.createQuery("""
+                select e from EnrollmentJpaEntity e where e.organizationId=:org and
+                (e.invitationId=:invitation or exists(select h.id from EnrollmentChangeJpaEntity h
+                    where h.organizationId=:org and h.enrollmentId=e.id and
+                    (h.invitationId=:invitation or h.previousInvitationId=:invitation)))
+                """, EnrollmentJpaEntity.class).setParameter("org",organizationId).setParameter("invitation",invitationId)
+                .getResultStream().findFirst().map(JpaEnrollments::data);
+    }
+    @Override public Data lock(UUID org, UUID program, UUID id) {
+        var entity = repository.lockScoped(org,program,id).orElseThrow(EnrollmentNotFound::new);
+        entityManager.refresh(entity); return data(entity);
+    }
+    @Override public Data change(UUID org, UUID program, UUID id, long version, String action, UUID invitation) {
+        var entity = repository.lockScoped(org,program,id).orElseThrow(EnrollmentNotFound::new);
+        entityManager.refresh(entity); entity.change(action,invitation,version);
+        return data(repository.saveAndFlush(entity));
+    }
+    @Override public Set<UUID> blockedPrograms(UUID org, UUID membership) {
+        if (membership == null) return Set.of();
+        return Set.copyOf(entityManager.createQuery("""
+                select e.programId from EnrollmentJpaEntity e where e.organizationId=:org
+                and e.participantMembershipId=:member and e.status in :statuses
+                """,UUID.class).setParameter("org",org).setParameter("member",membership)
+                .setParameter("statuses",Set.of(EnrollmentStatus.WITHDRAWN,EnrollmentStatus.SUSPENDED)).getResultList());
     }
 
     @Override public Data activate(UUID organizationId, UUID invitationId) {
@@ -143,6 +166,6 @@ class JpaEnrollments implements Enrollments {
     }
 
     private static Data data(EnrollmentJpaEntity e) {
-        return new Data(e.id(), e.organizationId(), e.programId(), e.participantMembershipId(), e.invitationId(), e.status().name());
+        return new Data(e.id(), e.organizationId(), e.programId(), e.participantMembershipId(), e.invitationId(), e.status().name(), e.version(), e.suspendedFromStatus());
     }
 }

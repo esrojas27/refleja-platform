@@ -92,6 +92,18 @@ it("keeps submitted work visible after closure but removes response and survey f
   expect(screen.queryByLabelText("Tu próxima actividad")).toBeNull();
 });
 
+it("keeps a completed participation read-only in an otherwise active program without inflating progress", async () => {
+  vi.mocked(getMyProgram).mockResolvedValue({ ...program, enrollmentStatus: "COMPLETED" });
+  vi.mocked(listMyProgramActivities).mockResolvedValue({ items: [{ ...assignedActivity,
+    assignmentStatus: "SUBMITTED", responseText: "Mi entrega conservada", submittedAt: "2026-10-07T12:00:00Z",
+    completionPercentage: 50, survey: { ...assignedActivity.survey!, status: "PENDING" } }] });
+  render(<MyProgramArea mode="activities" programId="program-a" />);
+  await screen.findByText(/Tu participación está completada/);await openAssignedActivity();
+  expect(screen.getByText("Mi entrega conservada")).toBeTruthy();expect(screen.queryByRole("form")).toBeNull();
+  expect(screen.queryByLabelText("Tu próxima actividad")).toBeNull();
+  expect(submitMyActivitySurvey).not.toHaveBeenCalled();
+});
+
 it("opens the program summary with progress without requesting participant identifiers", async () => {
   render(<MyProgramArea mode="summary" programId="program-a" />);
   expect(await screen.findByText("Programa asignado")).toBeTruthy();

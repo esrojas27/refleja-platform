@@ -17,10 +17,12 @@ public class ProgramService {
     private final ProgramAccessPolicy policy;
     private final Programs programs;
     private final OrganizationTenantContext tenantContext;
-    ProgramService(ProgramAccessPolicy policy, Programs programs, OrganizationTenantContext tenantContext) {
+    private final com.reflejatuinterior.program.ProgramParticipantVisibility visibility;
+    ProgramService(ProgramAccessPolicy policy, Programs programs, OrganizationTenantContext tenantContext,com.reflejatuinterior.program.ProgramParticipantVisibility visibility) {
         this.policy = policy;
         this.programs = programs;
         this.tenantContext = tenantContext;
+        this.visibility=visibility;
     }
 
     @Transactional
@@ -46,7 +48,8 @@ public class ProgramService {
         if (page < 0) throw new InvalidProgramInput("page");
         if (size < 1 || size > 100) throw new InvalidProgramInput("size");
         if ((long) page * size > Integer.MAX_VALUE) throw new InvalidProgramInput("page");
-        return programs.list(context.organizationId(), page, size);
+        return context.roles().contains("CONSULTANT")?programs.list(context.organizationId(),page,size)
+                :programs.listExcluding(context.organizationId(),page,size,visibility.blockedPrograms(context.organizationId(),context.membershipId()));
     }
 
     @Transactional
@@ -72,6 +75,7 @@ public class ProgramService {
     public ProgramData detail(String subject, UUID organizationId, UUID programId, String requestId) {
         var context = policy.authorize(subject, organizationId, false, requestId);
         tenantContext.activate(context.organizationId());
+        if(!context.roles().contains("CONSULTANT")&&visibility.blockedPrograms(context.organizationId(),context.membershipId()).contains(programId)) throw new ProgramNotFound();
         return programs.find(context.organizationId(), programId).orElseThrow(ProgramNotFound::new);
     }
 }

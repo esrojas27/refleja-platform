@@ -101,6 +101,7 @@ class JpaInvitationStore implements InvitationStore {
     public Invitation accept(String subject, UUID invitationId) {
         var user = user(subject, true);
         var invitation = owned(user.id(), invitationId, true);
+        em.refresh(invitation);
         activeOrganization(invitation.organizationId);
         var member = em.find(OrganizationMembershipJpaEntity.class, invitation.membershipId, LockModeType.PESSIMISTIC_WRITE);
         enabled(member);

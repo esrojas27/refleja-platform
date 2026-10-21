@@ -17,4 +17,7 @@ interface EnrollmentJpaRepository extends JpaRepository<EnrollmentJpaEntity, UUI
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select e from EnrollmentJpaEntity e where e.organizationId = :organizationId and e.invitationId = :invitationId")
     Optional<EnrollmentJpaEntity> lockByInvitation(UUID organizationId, UUID invitationId);
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select e from EnrollmentJpaEntity e where e.organizationId=:org and e.programId=:program and e.id=:id")
+    Optional<EnrollmentJpaEntity> lockScoped(UUID org, UUID program, UUID id);
 }

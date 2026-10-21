@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Set;
 import com.reflejatuinterior.identity.CollaboratorAccess;
 import com.reflejatuinterior.identity.CollaboratorInvitations;
 import com.reflejatuinterior.identity.OrganizationAccess;
@@ -155,8 +156,10 @@ public class ActivityService {
             tenantContext.activate(membership.organizationId());
             var enrollment = enrollments.findOwned(membership.organizationId(), membership.id(), programId);
             if (enrollment.isEmpty()) continue;
-            if (!"ACTIVE".equals(enrollment.get().status())) throw new ActivityWorkflowConflict();
             programs.lock(membership.organizationId(), programId).orElseThrow(MyProgramNotFound::new).requireActive();
+            var currentEnrollment=enrollments.lock(membership.organizationId(),programId,enrollment.get().id());
+            if(!Set.of("ACTIVE","COMPLETED").contains(currentEnrollment.status())) throw new ActivityAssignmentNotFound();
+            if(!"ACTIVE".equals(currentEnrollment.status())) throw new EnrollmentAdministrationConflict("PARTICIPATION_READ_ONLY");
             var activity = activities.findAll(membership.organizationId(), programId, List.of(activityId)).stream()
                     .findFirst().orElseThrow(ActivityAssignmentNotFound::new);
             var submitted = assignments.submit(membership.organizationId(), programId, activityId,

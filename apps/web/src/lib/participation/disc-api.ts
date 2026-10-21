@@ -29,7 +29,7 @@ export type DiscProfileInput = {
 };
 
 export class DiscRequestError extends Error {
-  constructor(public readonly status: number, public readonly fields: string[] = [], public readonly requestId?: string) {
+  constructor(public readonly status: number, public readonly fields: string[] = [], public readonly requestId?: string, public readonly code?: string) {
     super("DISC request failed");
     this.name = "DiscRequestError";
   }
@@ -63,7 +63,7 @@ async function request<T>(path: string, method: "GET" | "PUT", expected: number,
         .filter((field: unknown): field is string => typeof field === "string" && allowed.includes(field)) : [];
     const requestId = typeof body?.requestId === "string" && /^[a-f0-9-]{36}$/i.test(body.requestId)
       ? body.requestId : undefined;
-    throw new DiscRequestError(response.status, fields, requestId);
+    throw new DiscRequestError(response.status, fields, requestId, typeof body?.code === "string" ? body.code : undefined);
   }
   return response.json() as Promise<T>;
 }
@@ -77,7 +77,8 @@ export const saveProgramDiscProfile = (organizationId: string, programId: string
 
 export function discErrorMessage(error: unknown) {
   const status = error instanceof DiscRequestError ? error.status : 0;
-  const message = status === 401 ? "Tu sesión no está disponible. Inicia sesión de nuevo."
+  const message = error instanceof DiscRequestError && error.code === "PARTICIPATION_READ_ONLY" ? "Tu participación está completada y solo permite consultar las fichas DISC."
+    : status === 401 ? "Tu sesión no está disponible. Inicia sesión de nuevo."
     : status === 403 ? "No tienes permiso para consultar o editar las fichas DISC de este programa."
     : status === 404 ? "El programa o el colaborador ya no está disponible."
     : status === 400 ? "Completa los cuatro campos de la ficha DISC."

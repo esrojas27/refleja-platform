@@ -10,6 +10,7 @@ import java.util.UUID;
 import com.reflejatuinterior.identity.CollaboratorInvitations;
 import com.reflejatuinterior.identity.CollaboratorAccess;
 import com.reflejatuinterior.identity.OrganizationAccess;
+import com.reflejatuinterior.identity.ParticipantIdentityAdministration;
 import com.reflejatuinterior.organization.OrganizationDirectory;
 import com.reflejatuinterior.organization.OrganizationTenantContext;
 import com.reflejatuinterior.participation.domain.InvalidEnrollmentInput;
@@ -34,15 +35,18 @@ public class EnrollmentService {
     private final Enrollments enrollments;
     private final OrganizationTenantContext tenantContext;
     private final TransactionTemplate transactions;
+    private final ParticipantIdentityAdministration identities;
+    private final EnrollmentChanges changes;
 
     EnrollmentService(OrganizationAccess access, OrganizationDirectory organizations, ProgramDirectory programs,
                       CollaboratorInvitations invitations, CollaboratorAccess collaboratorAccess,
                       Enrollments enrollments, OrganizationTenantContext tenantContext,
-                      PlatformTransactionManager transactionManager) {
+                      PlatformTransactionManager transactionManager,ParticipantIdentityAdministration identities,EnrollmentChanges changes) {
         this.access = access; this.organizations = organizations; this.programs = programs;
         this.invitations = invitations; this.collaboratorAccess = collaboratorAccess; this.enrollments = enrollments;
         this.tenantContext = tenantContext;
         this.transactions = new TransactionTemplate(transactionManager);
+        this.identities=identities; this.changes=changes;
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -65,6 +69,8 @@ public class EnrollmentService {
             requireEditable(context.organizationId(), programId);
             var invitation = invitations.create(organizationId, context.userId(), account, person, invitedRole);
             var enrollment = enrollments.create(organizationId, programId, invitation.membershipId(), invitation.id());
+            var roles=identities.inspect(organizationId,enrollment.membershipId()).roles();
+            changes.record(null,enrollment,"INVITED",Set.of(),roles,context.userId(),actorLabel(context),"Invitación creada.",requestId);
             auditAfterCommit("PROGRAM_PARTICIPANT_INVITED", context.userId(), organizationId, enrollment.id(), requestId);
             return response(enrollment);
         });
@@ -114,16 +120,22 @@ public class EnrollmentService {
         // This endpoint intentionally permits INVITED users, but only for their own invitation.
         var owned = invitations.findOwned(subject, invitationId);
         tenantContext.activate(owned.organizationId());
-        var enrollment = enrollments.findByInvitation(owned.organizationId(), invitationId).orElseThrow(EnrollmentNotFound::new);
+        var located = enrollments.findByInvitation(owned.organizationId(), invitationId).orElseThrow(EnrollmentNotFound::new);
         var organization = organizations.findSummaries(Set.of(owned.organizationId())).stream()
                 .filter(o -> "ACTIVE".equals(o.status())).findFirst().orElseThrow(CollaboratorInvitations.Denied::new);
-        programs.find(organization.id(), enrollment.programId()).orElseThrow(EnrollmentNotFound::new);
+        var program=programs.lock(organization.id(),located.programId()).orElseThrow(EnrollmentNotFound::new);
+        var enrollment=enrollments.lock(organization.id(),located.programId(),located.id());
+        if(!invitationId.equals(enrollment.invitationId())) throw new EnrollmentConflict();
         // Retrying an already accepted invitation remains a read-compatible no-op after closure.
-        if (!"ACCEPTED".equals(owned.status())) requireEditable(organization.id(), enrollment.programId());
+        if (!"ACCEPTED".equals(owned.status())) program.requireEditable();
         if (!Set.of("INVITED", "ACTIVE").contains(enrollment.status())) throw new EnrollmentConflict();
+        var previousRoles=identities.inspect(organization.id(),enrollment.membershipId()).roles();
         var accepted = invitations.accept(subject, invitationId);
         var activated = enrollments.activate(accepted.organizationId(), invitationId);
         if (!"ACCEPTED".equals(owned.status())) {
+            var person=invitations.participant(organization.id(),enrollment.membershipId());
+            changes.record(enrollment,activated,"ACCEPTED",previousRoles,identities.inspect(organization.id(),enrollment.membershipId()).roles(),
+                    person.userId(),personLabel(person),"Invitación aceptada por su destinatario.",requestId);
             auditAfterCommit("INVITATION_ACCEPTED", accepted.userId(), accepted.organizationId(), activated.id(), requestId);
         }
         return new AcceptanceResponse(accepted.id(), accepted.role().name(), accepted.status(), activated.id(), activated.status());
@@ -197,7 +209,7 @@ public class EnrollmentService {
         var program = programs.find(enrollment.organizationId(), enrollment.programId())
                 .orElseThrow(MyProgramNotFound::new);
         return new MyProgramResponse(program.id(), program.organizationId(), membership.organizationName(), program.name(),
-                program.description(), program.status(), program.startDate(), program.endDate(), program.version());
+                program.description(), program.status(), program.startDate(), program.endDate(), program.version(), enrollment.status());
     }
 
     private static List<CollaboratorAccess.Membership> orderedMemberships(CollaboratorAccess.Context context) {
@@ -234,12 +246,17 @@ public class EnrollmentService {
         return context;
     }
 
-    private EnrollmentResponse response(Enrollments.Data enrollment) {
+    EnrollmentResponse response(Enrollments.Data enrollment) {
         var participant = invitations.participant(enrollment.organizationId(), enrollment.membershipId());
         var invitation = enrollment.invitationId() == null ? null
                 : invitationInfo(invitations.findInOrganization(enrollment.organizationId(), enrollment.invitationId()));
         return new EnrollmentResponse(enrollment.id(), enrollment.organizationId(), enrollment.programId(), enrollment.status(),
-                participant, invitation);
+                participant, invitation,enrollment.version(),enrollment.suspendedFromStatus(),identities.inspect(enrollment.organizationId(),enrollment.membershipId()));
+    }
+    String actorLabel(OrganizationAccess.Context actor) { return personLabel(invitations.participant(actor.organizationId(),actor.membershipId())); }
+    private static String personLabel(CollaboratorInvitations.Participant person) {
+        var name=java.util.stream.Stream.of(person.firstName(),person.lastName()).filter(s->s!=null&&!s.isBlank()).collect(java.util.stream.Collectors.joining(" "));
+        return name.isBlank()?person.email():name;
     }
 
     private void requireEditable(UUID organizationId, UUID programId) {
@@ -250,7 +267,7 @@ public class EnrollmentService {
         try {
             var delivered = invitations.dispatch(enrollment.organizationId(), enrollment.invitation().id());
             return new EnrollmentResponse(enrollment.id(), enrollment.organizationId(), enrollment.programId(), enrollment.status(),
-                    enrollment.participant(), invitationInfo(delivered));
+                    enrollment.participant(), invitationInfo(delivered),enrollment.version(),enrollment.suspendedFromStatus(),enrollment.access());
         } catch (CollaboratorInvitations.DeliveryUnavailable exception) {
             // A completed enrollment must remain discoverable even when AWS or delivery bookkeeping fails.
             LoggerFactory.getLogger(EnrollmentService.class).warn(
@@ -287,7 +304,8 @@ public class EnrollmentService {
 
     public record InvitationInfo(UUID id, String role, String status, Instant expiresAt, String deliveryStatus) {}
     public record EnrollmentResponse(UUID id, UUID organizationId, UUID programId, String status,
-                                     CollaboratorInvitations.Participant participant, InvitationInfo invitation) {}
+                                     CollaboratorInvitations.Participant participant, InvitationInfo invitation,
+                                     long version,String suspendedFromStatus,ParticipantIdentityAdministration.State access) {}
     public record EnrollmentPage(List<EnrollmentResponse> items, int page, int size, long totalElements, int totalPages) {
         public EnrollmentPage { items = List.copyOf(items); }
     }
@@ -299,7 +317,7 @@ public class EnrollmentService {
     public record AcceptanceResponse(UUID invitationId, String role, String status, UUID enrollmentId, String enrollmentStatus) {}
     public record MyProgramResponse(UUID id, UUID organizationId, String organizationName, String name,
                                     String description, String status, java.time.LocalDate startDate,
-                                    java.time.LocalDate endDate, long version) {}
+                                    java.time.LocalDate endDate, long version, String enrollmentStatus) {}
     public record MyProgramPage(List<MyProgramResponse> items, int page, int size, long totalElements, int totalPages) {
         public MyProgramPage { items = List.copyOf(items); }
     }

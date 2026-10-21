@@ -13,11 +13,11 @@ import { getMyProgram, myProgramsPath, type MyProgram } from "@/lib/participatio
 export function CollaboratorProgramWorkspace({ programId, children }: { programId: string; children: ReactNode }) {
   const pathname = usePathname();
   const summaryPath = myProgramsPath(programId);
-  const [result, setResult] = useState<{ programId: string; activities?: AssignedActivity[]; message: string; status?: MyProgram["status"] }>();
+  const [result, setResult] = useState<{ programId: string; activities?: AssignedActivity[]; message: string; status?: MyProgram["status"]; enrollmentStatus?: MyProgram["enrollmentStatus"] }>();
   const currentResult = result?.programId === programId ? result : undefined;
   const activities = currentResult?.activities;
   const message = currentResult?.message ?? "Cargando actividades asignadas…";
-  const pendingCount = activities && currentResult?.status === "ACTIVE" ? pendingAssignedActivities(activities).length : 0;
+  const pendingCount = activities && currentResult?.status === "ACTIVE" && currentResult.enrollmentStatus !== "COMPLETED" ? pendingAssignedActivities(activities).length : 0;
   const items = [
     { href: summaryPath, label: "Resumen", icon: BookOpenText },
     { href: `${summaryPath}/activities`, label: "Actividades", icon: CheckSquare2 },
@@ -27,7 +27,7 @@ export function CollaboratorProgramWorkspace({ programId, children }: { programI
     const controller = new AbortController();
     Promise.all([listMyProgramActivities(programId, controller.signal), getMyProgram(programId, controller.signal)]).then(([result, program]) => {
       if (controller.signal.aborted) return;
-      setResult({ programId, activities: result.items, status: program.status,
+      setResult({ programId, activities: result.items, status: program.status, enrollmentStatus: program.enrollmentStatus,
         message: result.items.length ? "" : "Todavía no tienes actividades asignadas en este programa." });
     }).catch(error => {
       if (!controller.signal.aborted) setResult({ programId, message: activityErrorMessage(error) });

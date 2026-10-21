@@ -200,6 +200,19 @@ La numeración oficial debe asignarse al convertir cada bloque en ticket.
 
 ## Dependencias y decisiones pendientes
 
+### Administración de participantes — incremento local 2026-10-20
+
+Implementadas revocación, retiro, suspensión, cambio de rol, finalización de la
+participación, reincorporación e historial. Los roles conservan alcance de
+organización y el cambio exige confirmación; completar con pendientes conserva
+solo consulta y progreso real. Se restringe acceso en backend sin borrar trabajo
+ni deshabilitar Cognito globalmente. [Reglas y validación](participant-administration.md).
+Probado y aprobado por el usuario para commit local. Push y gates remotos pendientes.
+
+Los resultados agregados de encuestas por pregunta/dimensión/sesión/actividad y
+su exportación CSV ya están publicados; su alcance se detalla en
+[resultados de encuestas](activity-survey-results.md).
+
 | Tema | Responsable o decisión necesaria | Bloquea |
 | --- | --- | --- |
 | Campos del perfil básico | Resuelto: nombre completo, fecha de nacimiento, teléfono, ciudad, país y cargo; correo y empresa derivados | Implementado |

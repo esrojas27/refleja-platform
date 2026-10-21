@@ -4,8 +4,11 @@ export type PageResult<T> = { items: T[]; page: number; size: number; totalEleme
 export type InviteeRole = "COLLABORATOR" | "LEADER" | "COMPANY_ADMIN";
 export type EnrollmentInput = { email: string; firstName: string; lastName: string; role: InviteeRole };
 export type InvitationStatus = "PENDING" | "ACCEPTED" | "EXPIRED" | "REVOKED";
+export type EnrollmentStatus = "PENDING_APPROVAL" | "INVITED" | "ACTIVE" | "SUSPENDED" | "COMPLETED" | "WITHDRAWN";
 export type Enrollment = {
-  id: string; organizationId: string; programId: string; status: "INVITED" | "ACTIVE";
+  id: string; organizationId: string; programId: string; status: EnrollmentStatus;
+  version?: number; suspendedFromStatus?: "ACTIVE" | "COMPLETED" | null;
+  access?: { roles: string[]; version: number; membershipStatus: string; userStatus: string };
   participant: { userId: string; membershipId: string; email: string; firstName: string | null; lastName: string | null };
   invitation: { id: string; role: InviteeRole; status: InvitationStatus; expiresAt: string; deliveryStatus: "PENDING" | "SENDING" | "SENT" | "FAILED" } | null;
 };
@@ -18,6 +21,7 @@ export type MyProgram = {
   id: string; organizationId: string; organizationName: string; name: string; description: string | null;
   status: "DRAFT" | "SCHEDULED" | "ACTIVE" | "COMPLETED" | "CANCELLED";
   startDate: string | null; endDate: string | null; version: number;
+  enrollmentStatus?: "ACTIVE" | "COMPLETED";
 };
 
 export class ParticipationRequestError extends Error {

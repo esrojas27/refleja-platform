@@ -84,6 +84,7 @@ class EnrollmentInvitationIntegrationTests extends PostgreSqlIntegrationTestSupp
     @AfterEach void cleanup() {
         // This connection belongs exclusively to the disposable Testcontainers database.
         // Restrict deletion to this suite's two organizations and canonical test subjects.
+        migratorJdbcTemplate().update("delete from rti.enrollment_changes where organization_id in (?, ?)", organization, other);
         migratorJdbcTemplate().update("delete from rti.enrollments where organization_id in (?, ?)", organization, other);
         migratorJdbcTemplate().update("delete from rti.user_invitations where organization_id in (?, ?)", organization, other);
         migratorJdbcTemplate().update("delete from rti.programs where organization_id in (?, ?)", organization, other);
@@ -424,6 +425,100 @@ class EnrollmentInvitationIntegrationTests extends PostgreSqlIntegrationTestSupp
         assertPending(enrollment);
         assertThat(count("enrollments")).isEqualTo(1);
         verifyNoInteractions(gateway);
+    }
+
+    @Test void revocationInvalidatesTheOldLinkAndReinstatementRequiresAFreshAcceptedInvitation() throws Exception {
+        var first=enroll(EMAIL);
+        change(first,0,"REVOKE").andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("WITHDRAWN")).andExpect(jsonPath("$.invitation.status").value("REVOKED"));
+        accept(first,SUBJECT).andExpect(status().isConflict());
+        retry(first,organization,program).andExpect(status().isConflict());
+        clearInvocations(gateway);
+        var fresh=json.readTree(change(first,1,"REINSTATE").andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("INVITED")).andExpect(jsonPath("$.version").value(2))
+                .andExpect(jsonPath("$.invitation.deliveryStatus").value("SENT")).andReturn().getResponse().getContentAsString());
+        assertThat(invitation(fresh)).isNotEqualTo(invitation(first));
+        assertPending(fresh);
+        verify(gateway,never()).provision(any());
+        verify(gateway).sendInvitation(any());
+        accept(first,SUBJECT).andExpect(status().isConflict());
+        mvc.perform(get("/api/v1/invitations").header("Authorization",token(SUBJECT)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.items[0].programId").value(program.toString()))
+                .andExpect(jsonPath("$.items[1].programId").value(program.toString()));
+        accept(fresh,SUBJECT).andExpect(status().isOk());
+        assertState("enrollments",id(first),"ACTIVE");
+        mvc.perform(get(path(organization,program)+"/"+id(first)+"/history").header("Authorization",consultant))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(4))
+                .andExpect(jsonPath("$.items[0].action").value("ACCEPTED"));
+    }
+
+    @Test void expiredInvitationCanBeRenewedWithoutExtendingOrReactivatingTheOldOne() throws Exception {
+        var first=enroll(EMAIL); expire(first);
+        var fresh=json.readTree(change(first,0,"REINSTATE").andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("INVITED")).andReturn().getResponse().getContentAsString());
+        assertThat(invitation(fresh)).isNotEqualTo(invitation(first));
+        assertState("user_invitations",invitation(first),"EXPIRED");
+        accept(first,SUBJECT).andExpect(status().isConflict());
+        accept(fresh,SUBJECT).andExpect(status().isOk());
+        assertThat(count("enrollments")).isEqualTo(1);
+    }
+
+    @Test void changingOrganizationRoleUpdatesAllUnacceptedInvitationsAndPreventsObsoleteRoleRegrant() throws Exception {
+        var first=enroll(EMAIL);
+        var secondProgram=uuid7(0xa20); insertProgram(secondProgram,organization);
+        var second=json.readTree(create(organization,secondProgram,valid(EMAIL)).andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString());
+        long version=first.path("access").path("version").asLong();
+        mvc.perform(post(path(organization,program)+"/"+id(first)+"/administration").header("Authorization",consultant)
+                .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(Map.of("version",0,"action","CHANGE_ROLE",
+                        "reason","Responsable de personas","confirmed",true,"role","COMPANY_ADMIN","roleVersion",version))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.invitation.role").value("COMPANY_ADMIN"));
+        accept(second,SUBJECT).andExpect(status().isOk()).andExpect(jsonPath("$.role").value("COMPANY_ADMIN"));
+        accept(first,SUBJECT).andExpect(status().isOk()).andExpect(jsonPath("$.role").value("COMPANY_ADMIN"));
+        assertThat(roles(membership(first))).containsExactly("COMPANY_ADMIN");
+        mvc.perform(get(path(organization,secondProgram)+"/"+id(second)+"/history").header("Authorization",consultant))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(3));
+    }
+
+    @Test void withdrawnAcceptedInvitationCannotBeReplayedAndReinstatementDoesNotReactivateGlobalMembership() throws Exception {
+        var first=enroll(EMAIL); accept(first,SUBJECT).andExpect(status().isOk());
+        change(first,1,"WITHDRAW").andExpect(status().isOk());
+        accept(first,SUBJECT).andExpect(status().isConflict());
+        jdbcTemplate.update("update rti.organization_memberships set status='SUSPENDED' where id=?",membership(first));
+        change(first,2,"REINSTATE").andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PARTICIPANT_IDENTITY_DISABLED"));
+        assertState("enrollments",id(first),"WITHDRAWN");
+        assertState("organization_memberships",membership(first),"SUSPENDED");
+    }
+
+    @Test void revocationClearsAnOutstandingDeliveryLeaseWithoutDeletingTheInvitation() throws Exception {
+        var first=enroll(EMAIL);
+        jdbcTemplate.update("update rti.user_invitations set delivery_status='SENDING', delivery_attempt_id=?, delivery_lease_until=now()+interval '5 minutes' where id=?",
+                UUID.randomUUID(),invitation(first));
+        change(first,0,"REVOKE").andExpect(status().isOk()).andExpect(jsonPath("$.invitation.deliveryStatus").value("FAILED"));
+        assertThat(jdbcTemplate.queryForObject("select delivery_attempt_id is null and delivery_lease_until is null from rti.user_invitations where id=?",Boolean.class,invitation(first))).isTrue();
+        assertThat(count("user_invitations")).isEqualTo(1);
+    }
+
+    @Test void administrationAndHistoryCannotCrossTenantOrProgramBoundariesAndHistoryIsPaged() throws Exception {
+        var first=enroll(EMAIL);
+        mvc.perform(post(path(other,foreignProgram)+"/"+id(first)+"/administration").header("Authorization",consultant)
+                .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(Map.of("version",0,"action","REVOKE","reason","Incorrecto","confirmed",true))))
+                .andExpect(status().isNotFound());
+        mvc.perform(get(path(organization,foreignProgram)+"/"+id(first)+"/history").header("Authorization",consultant)).andExpect(status().isNotFound());
+        mvc.perform(get(path(other,foreignProgram)+"/"+id(first)+"/history").header("Authorization",consultant)).andExpect(status().isNotFound());
+        change(first,0,"REVOKE").andExpect(status().isOk());
+        mvc.perform(get(path(organization,program)+"/"+id(first)+"/history?size=1").header("Authorization",consultant))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(2)).andExpect(jsonPath("$.totalPages").value(2))
+                .andExpect(jsonPath("$.items[0].action").value("REVOKE")).andExpect(header().string("Cache-Control","no-store"));
+        mvc.perform(get(path(organization,program)+"/"+id(first)+"/history?size=1&page=1").header("Authorization",consultant))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].action").value("INVITED"));
+        mvc.perform(get(path(organization,program)+"/"+id(first)+"/history?size=101").header("Authorization",consultant)).andExpect(status().isBadRequest());
+    }
+
+    private ResultActions change(JsonNode enrollment,long version,String action) throws Exception {
+        return mvc.perform(post(path(organization,program)+"/"+id(enrollment)+"/administration").header("Authorization",consultant)
+                .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(Map.of("version",version,"action",action,"reason","Cambio de prueba","confirmed",true))));
     }
 
     private JsonNode enroll(String email) throws Exception {

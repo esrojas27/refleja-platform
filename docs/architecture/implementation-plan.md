@@ -138,10 +138,19 @@ fuera de VS1. El incremento busca validar un flujo real pequeño, no el diseño 
 
 ## Forma de trabajo
 
+Incremento local del 2026-10-20: [administración de participantes](participant-administration.md).
+Revocación, retiro, suspensión, cambio de rol organizacional confirmado,
+participación completada en solo consulta, reincorporación e historial persistido.
+Probado y aprobado por el usuario para commit local. Push y gates remotos pendientes.
+
+El incremento previo de resultados agregados de encuestas y CSV está publicado
+en `549642d`; también incluye la publicación de la administración de contenido
+`c5ba5dc`. No confundir publicación con validación remota de esta iteración nueva.
+
 Incremento local posterior al ciclo de vida: [edición y administración del
 contenido](program-content-administration.md). Incluye edición, orden, duplicación,
 archivo/restauración y eliminación condicionada, con protección de entregas y
-encuestas. Aprobado por el usuario para commit local; publicación remota pendiente.
+encuestas. Publicado con autorización del usuario.
 
 Ejecutar un ticket por vez: revisar el documento canónico y el repositorio,
 implementar sólo su alcance, verificar, registrar limitaciones y actualizar el

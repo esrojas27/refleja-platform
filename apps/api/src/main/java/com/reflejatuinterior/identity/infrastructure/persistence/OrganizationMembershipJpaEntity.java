@@ -104,4 +104,5 @@ class OrganizationMembershipJpaEntity {
     void acceptInvitation(Instant now) {
         if (status == MembershipStatus.PENDING) { status = MembershipStatus.ACTIVE; joinedAt = now; }
     }
+    void rolesChanged() { updatedAt=Instant.now(); }
 }

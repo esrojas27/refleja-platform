@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { CollaboratorProgramWorkspace } from "@/components/participation/collaborator-program-workspace";
@@ -38,7 +38,7 @@ it("marks activities as active and preserves encoded identifiers", () => {
   expect(screen.getByRole("link", { name: "Resumen" }).getAttribute("href")).toBe("/my-programs/program%2Fa");
 });
 
-it("shows how many assigned activities still require collaborator action", async () => {
+it.each(["ACTIVE", "COMPLETED"] as const)("only counts actionable activities for a %s participation", async enrollmentStatus => {
   const pending: AssignedActivity = {
     id: "activity-a", organizationId: "org-a", programId: "program-a", moduleId: "dimension-a",
     sessionId: "session-a", dimensionName: "Interior", dimensionPosition: 1,
@@ -48,10 +48,15 @@ it("shows how many assigned activities still require collaborator action", async
     reviewComment: null, reviewedAt: null, assignmentVersion: 0, survey: null, completionPercentage: 0,
   };
   vi.mocked(listMyProgramActivities).mockResolvedValue({ items: [pending] });
+  vi.mocked(getMyProgram).mockResolvedValue({ id: "program-a", status: "ACTIVE", enrollmentStatus } as Awaited<ReturnType<typeof getMyProgram>>);
   usePathname.mockReturnValue("/my-programs/program-a/activities");
 
   render(<CollaboratorProgramWorkspace programId="program-a"><p>Trabajo real</p></CollaboratorProgramWorkspace>);
 
-  expect(await screen.findByLabelText("1 actividad pendiente")).toBeTruthy();
+  if (enrollmentStatus === "ACTIVE") expect(await screen.findByLabelText("1 actividad pendiente")).toBeTruthy();
+  else {
+    await waitFor(() => expect(getMyProgram).toHaveBeenCalled());
+    expect(screen.queryByLabelText("1 actividad pendiente")).toBeNull();
+  }
   expect(listMyProgramActivities).toHaveBeenCalledWith("program-a", expect.any(AbortSignal));
 });
