@@ -42,6 +42,19 @@ ese enlace, cambia `enable_ses_delivery` a `true`, revisa un segundo plan y apl�
 para configurar Cognito. La separación en dos pasos evita intentar utilizar una
 identidad todavía no verificada. No se incluyen claves AWS ni contraseñas en Terraform.
 
+Para rotar a un correo **ya verificado** sin eliminar la identidad original,
+conserva `ses_sender_email` y define `ses_delivery_sender_email` con el correo
+nuevo. Terraform consulta esa identidad externa, comprueba su verificación y
+actualiza únicamente `email_configuration` del User Pool. La omisión del nuevo
+campo conserva el comportamiento anterior. No cambies `ses_sender_email` para
+rotar: eso reemplazaría el recurso de identidad administrado. Revisa que el plan
+no destruya recursos ni cambie callbacks, usuarios o el app client. Para revertir
+el remitente de Cognito, deja `ses_delivery_sender_email = null` y revisa/aplica.
+
+La invitación de la API y el correo de credenciales de Cognito son dos envíos
+distintos: la rotación debe actualizar ambos. Para DEV, sigue también el proceso
+de `infra/dev/platform/README.md` (IAM, Parameter Store y recarga de la API).
+
 Mantén `INVITATIONS_ENABLED=false` en `.env` hasta que la identidad esté verificada.
 En el sandbox de SES, cada destinatario de prueba también debe estar verificado.
 El alta de un usuario nuevo genera un correo de credenciales administrado por

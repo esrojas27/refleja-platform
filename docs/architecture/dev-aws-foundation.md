@@ -97,6 +97,12 @@ The Elastic IP and EBS volumes continue to incur charges while EC2 is stopped. A
 
 ## Delivery phases
 
+Email operations checkpoint (2026-10-20): corporate sender rotation is applied to
+the DEV API and Cognito. SES production access is **GRANTED** in `us-east-1`;
+recipients no longer require individual SES verification in that region. Domain
+DKIM remains a DNS follow-up, not a completed authentication setup. Configuration,
+evidence, rollback and limits: [DEV email delivery](dev-email-delivery.md).
+
 1. Completed: create the remote state bucket.
 2. Completed: review and apply the platform Terraform plan manually.
 3. Completed: store runtime secrets under the reserved Parameter Store path.

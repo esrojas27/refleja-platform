@@ -66,13 +66,24 @@ variable "ses_sender_email" {
   }
 }
 
+variable "ses_delivery_sender_email" {
+  description = "Optional already-verified external SES email identity for sender rotation; retains the original managed identity for rollback."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.ses_delivery_sender_email == null || can(regex("^[^\\s<>@]+@[^\\s<>@]+\\.[^\\s<>@]+$", var.ses_delivery_sender_email))
+    error_message = "ses_delivery_sender_email must be null or a valid email address."
+  }
+}
+
 variable "enable_ses_delivery" {
   description = "Configure Cognito to use the verified SES sender. Enable only after AWS reports the identity as verified."
   type        = bool
   default     = false
 
   validation {
-    condition     = !var.enable_ses_delivery || var.ses_sender_email != null
-    error_message = "enable_ses_delivery requires ses_sender_email."
+    condition     = !var.enable_ses_delivery || var.ses_sender_email != null || var.ses_delivery_sender_email != null
+    error_message = "enable_ses_delivery requires ses_sender_email or an already-verified ses_delivery_sender_email."
   }
 }

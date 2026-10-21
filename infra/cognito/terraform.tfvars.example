@@ -13,3 +13,7 @@ logout_urls = [
 # apply a second reviewed plan.
 ses_sender_email    = "replace-with-a-verified-ses-email"
 enable_ses_delivery = false
+
+# Optional rotation to another identity already verified in SES. Keep the original
+# ses_sender_email unchanged to avoid replacing/deleting the managed identity.
+# ses_delivery_sender_email = "marcayconexion@paularojas.com.co"

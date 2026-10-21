@@ -52,4 +52,17 @@ The application reads `INVITATIONS_SES_FROM` from the Parameter Store key expose
 4. Redeploy or restart the API so its environment is rebuilt from Parameter Store, then send a test invitation.
 5. After validation, remove the old personal identity ARN in a later Terraform change.
 
+Also rotate Cognito's `email_configuration`: it sends the separate initial-access
+message, not the API's invitation. Use the already-verified external sender option
+documented in `../../cognito/README.md` to retain the previous identity for rollback.
+
+Updating Parameter Store alone does not change a running container's environment.
+The deployment script rebuilds the runtime environment from that parameter. A
+sender-only operation may instead refresh that single runtime value and recreate
+only the existing API service, with the same image and without a code deployment.
+
+Leaving SES sandbox requires a separate, region-specific production-access review.
+Until `ProductionAccessEnabled` is `true`, recipients still need verification even
+when the sender is verified. Do not describe a `PENDING` review as enabled access.
+
 Keeping both ARNs during the transition provides rollback: changing `invitation_sender_email` back and restarting the API restores the previous sender.

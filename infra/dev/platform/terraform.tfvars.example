@@ -4,7 +4,7 @@ resource_prefix = "rti-dev"
 # Public access is intentional only for DEV product validation.
 allowed_ingress_cidrs = ["0.0.0.0/0"]
 
-instance_type       = "t4g.small"
+instance_type        = "t4g.small"
 root_volume_size_gib = 16
 data_volume_size_gib = 25
 
@@ -14,8 +14,9 @@ cognito_user_pool_arn = "arn:aws:cognito-idp:us-east-1:836528258662:userpool/us-
 # Keep the previous identity alongside the new one during a sender migration.
 ses_identity_arns = [
   "arn:aws:ses:us-east-1:836528258662:identity/esrojas27@gmail.com",
+  "arn:aws:ses:us-east-1:836528258662:identity/marcayconexion@paularojas.com.co",
 ]
-invitation_sender_email = "esrojas27@gmail.com"
+invitation_sender_email = "marcayconexion@paularojas.com.co"
 
 # Temporary external DNS. A future corporate Route 53 zone can replace it.
 route53_zone_id = null

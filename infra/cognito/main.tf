@@ -15,6 +15,23 @@ resource "aws_sesv2_email_identity" "invitation_sender" {
   email_identity = var.ses_sender_email
 }
 
+locals {
+  active_ses_sender_email = var.ses_delivery_sender_email != null ? var.ses_delivery_sender_email : var.ses_sender_email
+}
+
+# Rotate to an already verified identity without replacing/deleting the original.
+data "aws_sesv2_email_identity" "delivery_sender" {
+  count          = var.enable_ses_delivery && var.ses_delivery_sender_email != null ? 1 : 0
+  email_identity = var.ses_delivery_sender_email
+
+  lifecycle {
+    postcondition {
+      condition     = self.verified_for_sending_status
+      error_message = "The external SES delivery sender must already be verified in this region."
+    }
+  }
+}
+
 resource "aws_cognito_user_pool" "development" {
   name = "${var.resource_prefix}-development"
 
@@ -31,11 +48,11 @@ resource "aws_cognito_user_pool" "development" {
   }
 
   dynamic "email_configuration" {
-    for_each = var.enable_ses_delivery ? [var.ses_sender_email] : []
+    for_each = var.enable_ses_delivery ? [local.active_ses_sender_email] : []
     content {
       email_sending_account = "DEVELOPER"
       from_email_address    = email_configuration.value
-      source_arn            = aws_sesv2_email_identity.invitation_sender[0].arn
+      source_arn            = var.ses_delivery_sender_email != null ? data.aws_sesv2_email_identity.delivery_sender[0].arn : aws_sesv2_email_identity.invitation_sender[0].arn
     }
   }
 }
