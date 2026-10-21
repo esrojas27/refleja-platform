@@ -94,7 +94,10 @@ test.describe("@mvp RTI-VS1-013 authenticated vertical slice", () => {
     await page.getByLabel("Apellido", { exact: true }).fill("MVP");
     await page.getByRole("button", { name: "Registrar e invitar" }).click();
     await expect(page.getByText(collaboratorEmail, { exact: true })).toBeVisible({ timeout: 60_000 });
-    await expect(page.getByText(/Inscripción: INVITED · Invitación: PENDING/)).toBeVisible();
+    const enrollment = page.getByRole("listitem").filter({ has: page.getByText(collaboratorEmail, { exact: true }) });
+    await expect(enrollment).toHaveCount(1);
+    await expect(enrollment.getByText("Invitada", { exact: true })).toBeVisible();
+    await expect(enrollment).toContainText("Invitación: PENDING");
 
     await page.goto("/account");
     await page.getByRole("button", { name: "Cerrar sesión" }).click();
