@@ -123,6 +123,7 @@ jobs:
           cp infra/dev/Caddyfile bundle/infra/dev/
           cp infra/postgres/init/01-create-rti-database-roles.sh bundle/infra/postgres/init/
           cp scripts/deploy-dev-on-instance.sh bundle/scripts/
+          cp scripts/dev-database-backup.sh scripts/install-dev-backup.sh bundle/scripts/
           chmod 0755 bundle/scripts/deploy-dev-on-instance.sh bundle/infra/postgres/init/01-create-rti-database-roles.sh
           cat >bundle/dev.env.public <<EOF
           DEV_SITE_ADDRESS=${HOSTNAME}
@@ -130,6 +131,8 @@ jobs:
           DEV_HTTP_PORT=80
           DEV_HTTPS_PORT=443
           POSTGRES_DB=refleja_tu_interior
+          BACKUP_BUCKET=${BACKUP_BUCKET}
+          BACKUP_TOPIC_ARN=arn:aws:sns:${AWS_REGION}:${AWS_ACCOUNT_ID}:rti-dev-backup-alerts
           COGNITO_ISSUER_URI=https://cognito-idp.${AWS_REGION}.amazonaws.com/${COGNITO_USER_POOL_ID}
           COGNITO_JWK_SET_URI=https://cognito-idp.${AWS_REGION}.amazonaws.com/${COGNITO_USER_POOL_ID}/.well-known/jwks.json
           COGNITO_APP_CLIENT_ID=${COGNITO_APP_CLIENT_ID}

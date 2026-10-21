@@ -1,8 +1,9 @@
 # Administración de participantes
 
-Incremento local del 2026-10-20, probado y aprobado por el usuario para commit.
-Push y validación remota pendientes; no modifica Cognito, SES ni infraestructura
-desplegada.
+Incremento del 2026-10-20, probado y aprobado por el usuario, publicado en
+`ffc2415`. La corrección E2E `aa57b0a` pasó CI/contenedores y el despliegue DEV
+`39541492017` terminó exitosamente. Este incremento de participantes no cambia
+configuración Cognito/SES; la rotación del remitente fue una operación posterior.
 
 ## Decisiones aprobadas
 
@@ -129,8 +130,9 @@ Base: `/api/v1/organizations/{org}/programs/{program}/enrollments/{enrollment}`.
 
 La verificación automatizada usa PostgreSQL 18 desechable y proveedores Cognito/SES
 simulados; no envía correos reales ni modifica la base de desarrollo. La validación
-visual fue aprobada por el usuario. El journey automatizado real con Cognito y
-los gates remotos quedan pendientes de una publicación autorizada posterior.
+visual fue aprobada por el usuario. Después de publicar, el journey automatizado
+real con Cognito y los gates remotos pasaron en el run `39541089622`, tras corregir
+la aserción del estado traducido de inscripción (`aa57b0a`).
 
 Durante la validación se identificó una sesión SSO local expirada del perfil
 `rti-dev`, anterior al registro y al envío. Su renovación se realiza mediante

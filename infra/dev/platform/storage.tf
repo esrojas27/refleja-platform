@@ -61,6 +61,23 @@ resource "aws_s3_bucket_lifecycle_configuration" "backups" {
   bucket = aws_s3_bucket.backups.id
 
   rule {
+    id     = "expire-postgres-copies"
+    status = "Enabled"
+    filter { prefix = "backups/postgres/" }
+    expiration { days = 30 }
+    # Versioned buckets first create a delete marker. Remove the retained data
+    # version one day later, rather than paying for another 30 days of copies.
+    noncurrent_version_expiration { noncurrent_days = 1 }
+  }
+
+  rule {
+    id     = "remove-postgres-delete-markers"
+    status = "Enabled"
+    filter { prefix = "backups/postgres/" }
+    expiration { expired_object_delete_marker = true }
+  }
+
+  rule {
     id     = "expire-old-backup-versions"
     status = "Enabled"
 

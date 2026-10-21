@@ -90,6 +90,16 @@ variable "backup_noncurrent_retention_days" {
   default     = 30
 }
 
+variable "backup_alert_email" {
+  description = "Operational contact for backup failures; confirm the SNS subscription email."
+  type        = string
+  default     = "marcayconexion@paularojas.com.co"
+  validation {
+    condition     = can(regex("^[^\\s<>@]+@[^\\s<>@]+\\.[^\\s<>@]+$", var.backup_alert_email))
+    error_message = "backup_alert_email must be a valid email address."
+  }
+}
+
 variable "ssm_parameter_path" {
   description = "Path reserved for runtime configuration and secrets. Values are created outside Terraform."
   type        = string

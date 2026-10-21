@@ -19,6 +19,19 @@ if [[ -L "${current_link}" ]]; then
   previous_release="$(readlink -f "${current_link}")"
 fi
 
+# Serialize dumps, restore drills and deployment/migrations.
+mkdir -p "${runtime_dir}"
+exec 9>"${runtime_dir}/maintenance.lock"
+flock -w 1800 9
+backup_bucket="$(awk -F= '/^BACKUP_BUCKET=/{print $2}' "${release_dir}/dev.env.public")"
+backup_topic="$(awk -F= '/^BACKUP_TOPIC_ARN=/{print $2}' "${release_dir}/dev.env.public")"
+bash "${release_dir}/scripts/install-dev-backup.sh" \
+  "${release_dir}/scripts/dev-database-backup.sh" "${backup_bucket}" "${aws_region}" "${backup_topic}"
+if [[ -n "${previous_release}" ]]; then
+  # Abort BEFORE replacing containers or applying Flyway if the copy fails.
+  RTI_BACKUP_LOCK_HELD=1 /usr/local/sbin/refleja-db-backup backup pre-deploy
+fi
+
 get_parameter() {
   aws ssm get-parameter \
     --region "${aws_region}" \

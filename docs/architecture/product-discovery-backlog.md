@@ -14,6 +14,14 @@ El siguiente backlog extiende esa base sin alterar el comportamiento aceptado.
 
 ## Necesidades registradas
 
+### Preparación de primera empresa y dirección de marca
+
+Checkpoint del 2026-10-20: piloto previsto de hasta 30 personas. Incorporados como
+prioridad backups/restauración, dominio/subdominio propio para sustituir nip.io,
+DKIM, prueba de carga, validación de permisos/datos, privacidad y operación estable.
+El dominio está pendiente de elección y acceso DNS; no se compró ni configuró.
+Estado, criterios y orden de trabajo en [preparación del piloto](pilot-readiness.md).
+
 ### Resultados de las encuestas de actividad
 
 Implementado localmente el 2026-10-19, con commit y push autorizados: consulta
@@ -207,7 +215,9 @@ participación, reincorporación e historial. Los roles conservan alcance de
 organización y el cambio exige confirmación; completar con pendientes conserva
 solo consulta y progreso real. Se restringe acceso en backend sin borrar trabajo
 ni deshabilitar Cognito globalmente. [Reglas y validación](participant-administration.md).
-Probado y aprobado por el usuario para commit local. Push y gates remotos pendientes.
+Publicado en `ffc2415`. La corrección E2E `aa57b0a` pasó CI y contenedores, y el
+deploy `39541492017` terminó exitosamente con comprobaciones públicas HTTPS.
+Continúan pendientes los criterios operativos del piloto.
 
 Los resultados agregados de encuestas por pregunta/dimensión/sesión/actividad y
 su exportación CSV ya están publicados; su alcance se detalla en

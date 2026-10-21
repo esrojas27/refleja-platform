@@ -53,11 +53,33 @@ data "aws_iam_policy_document" "application" {
     effect = "Allow"
     actions = [
       "s3:AbortMultipartUpload",
-      "s3:DeleteObject",
       "s3:GetObject",
       "s3:PutObject"
     ]
-    resources = ["${aws_s3_bucket.backups.arn}/*"]
+    resources = ["${aws_s3_bucket.backups.arn}/backups/postgres/*"]
+  }
+
+  statement {
+    sid       = "ReadDeploymentBundles"
+    actions   = ["s3:GetObject"]
+    resources = ["${aws_s3_bucket.backups.arn}/deployments/*"]
+  }
+
+  statement {
+    sid       = "NotifyBackupFailure"
+    actions   = ["sns:Publish"]
+    resources = [aws_sns_topic.backup_alerts.arn]
+  }
+
+  statement {
+    sid       = "RecordBackupSuccess"
+    actions   = ["cloudwatch:PutMetricData"]
+    resources = ["*"]
+    condition {
+      test     = "StringEquals"
+      variable = "cloudwatch:namespace"
+      values   = ["Refleja/Backup"]
+    }
   }
 
   statement {

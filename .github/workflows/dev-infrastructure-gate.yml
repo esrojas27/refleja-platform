@@ -6,12 +6,14 @@ on:
       - ".github/workflows/dev-infrastructure-gate.yml"
       - "infra/dev/bootstrap-state/**"
       - "infra/dev/platform/**"
+      - "scripts/*backup*"
   push:
     branches: [master]
     paths:
       - ".github/workflows/dev-infrastructure-gate.yml"
       - "infra/dev/bootstrap-state/**"
       - "infra/dev/platform/**"
+      - "scripts/*backup*"
   workflow_dispatch:
 
 concurrency:
@@ -47,3 +49,13 @@ jobs:
       - name: Validate configuration
         working-directory: ${{ matrix.root }}
         run: terraform validate -no-color
+      - name: Check backup scripts
+        if: matrix.root == 'infra/dev/platform'
+        run: |
+          bash -n scripts/dev-database-backup.sh
+          bash -n scripts/install-dev-backup.sh
+          docker run --rm -v "$PWD/scripts:/scripts:ro" koalaman/shellcheck:v0.10.0 \
+            --severity=warning /scripts/dev-database-backup.sh /scripts/install-dev-backup.sh /scripts/test-dev-backup.sh
+      - name: Restore synthetic backup and reject failed copies
+        if: matrix.root == 'infra/dev/platform'
+        run: sudo --preserve-env=GITHUB_ACTIONS bash scripts/test-dev-backup.sh

@@ -39,7 +39,9 @@ Only run `terraform apply dev-platform.tfplan` after the plan has been reviewed.
 - Use the `session_manager_command` output for administration. Port 22 is never exposed.
 - The data EBS volume is mounted at `/srv/refleja`; Docker data, PostgreSQL volumes, and deployment files persist there.
 - Store secret runtime values under `/refleja-tu-interior/dev` as SecureString parameters. Never place secret values in Terraform variables or state. The non-secret invitation sender is managed as a regular String parameter by this stack.
-- The S3 backup bucket is prepared here; the scheduled PostgreSQL dump and restore drill are added with deployment automation.
+- PostgreSQL copies expire after 30 days (plus one day for noncurrent data versions).
+  Backup alerts require confirming the SNS subscription. Deployment installs the
+  timer and takes a pre-migration copy; see [backup/restore runbook](../../../docs/architecture/dev-backup-restore.md).
 - The Elastic IP is billed while allocated, including when the instance is stopped. It is retained to keep DNS stable without an ALB.
 
 ## Rotate the invitation sender

@@ -138,10 +138,17 @@ fuera de VS1. El incremento busca validar un flujo real pequeño, no el diseño 
 
 ## Forma de trabajo
 
+Antes de ampliar el producto para la primera empresa (máximo 30 personas), seguir
+el [checkpoint y preparación del piloto](pilot-readiness.md): respaldos probados,
+URL de marca, DKIM, capacidad y validación operativa. Dominio nuevo por definir;
+no se autoriza compra, DNS ni infraestructura adicional desde este registro.
+
 Incremento local del 2026-10-20: [administración de participantes](participant-administration.md).
 Revocación, retiro, suspensión, cambio de rol organizacional confirmado,
 participación completada en solo consulta, reincorporación e historial persistido.
-Probado y aprobado por el usuario para commit local. Push y gates remotos pendientes.
+Publicado en `ffc2415`. CI y contenedores exitosos con `aa57b0a`; deploy
+`39541492017` exitoso con comprobaciones públicas HTTPS. La preparación operativa
+de la primera empresa continúa según el checkpoint del piloto.
 
 El incremento previo de resultados agregados de encuestas y CSV está publicado
 en `549642d`; también incluye la publicación de la administración de contenido
