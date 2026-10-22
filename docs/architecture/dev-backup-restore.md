@@ -1,8 +1,10 @@
 # Copias y restauración de DEV
 
 Implementado y probado el 2026-10-20 (America/Bogota; evidencias AWS del 21 UTC).
-Alcance: PostgreSQL del piloto, sin agregar otra instancia permanente. El código
-de integración con despliegue/CI está pendiente de commit y publicación.
+Alcance: PostgreSQL del piloto, sin agregar otra instancia permanente. Integración
+con despliegue/CI publicada en `2c2e730`; [gate de infraestructura](https://github.com/esrojas27/refleja-platform/actions/runs/39544894084)
+y [despliegue DEV](https://github.com/esrojas27/refleja-platform/actions/runs/39545268208)
+exitosos, comprobados el 2026-10-21.
 
 ## Qué queda protegido
 
@@ -41,7 +43,7 @@ El deployment preparado genera además una copia **antes** de reemplazar servici
 o ejecutar migraciones. Si falla, aborta el despliegue. Un lock compartido evita
 solapar backup, ensayo de restauración y deployment. No hay restauración automática
 sobre DEV en caso de fallo de despliegue: volver a una imagen no revierte migraciones.
-Esta integración se activará al publicar el cambio; el timer ya está instalado.
+Esta integración ya está publicada; el timer también está instalado.
 
 - Fallo de backup o ensayo: publicación inmediata al tópico `rti-dev-backup-alerts`.
 - Ausencia de éxito: alarma CloudWatch `rti-dev-backup-missing`, tres períodos
@@ -123,7 +125,8 @@ la aplicación. No se ha hecho una conmutación destructiva ni certificado un RT
 - Bash/ShellCheck y Terraform validate correctos. Comandos PowerShell List/Status
   probados. CI incorpora prueba con datos sintéticos y AWS simulado para restaurar,
   rechazar claves ajenas/checksum incorrecto/subida fallida y comprobar limpieza.
-  La ejecución de esa nueva prueba en GitHub queda pendiente de publicar el código.
+  La nueva prueba de restauración sintética también pasó en GitHub en el gate
+  `39544894084`, publicado con `2c2e730`.
 
 Fuentes: [pg_dump](https://www.postgresql.org/docs/18/app-pgdump.html),
 [roles sin contraseñas](https://www.postgresql.org/docs/18/app-pg-dumpall.html),

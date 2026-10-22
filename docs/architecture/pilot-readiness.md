@@ -37,8 +37,9 @@ el producto ni a tener alta disponibilidad o capacidad concurrente certificada.
 
 Backup V1 autorizado e instalado tras este checkpoint: copia automática a S3,
 retención corriente de 30 días y ensayo aislado exitoso con las 20 tablas, sin
-modificar DEV. Falta confirmar la suscripción de alertas por correo y publicar
-la integración pre-deploy/CI. Detalles, límites y comandos en
+modificar DEV. Actualización 2026-10-21: integración pre-deploy/CI publicada en
+`2c2e730`, gate `39544894084` y deploy `39545268208` exitosos. Todavía falta
+confirmar la suscripción de alertas por correo. Detalles, límites y comandos en
 [Backup y restauración](dev-backup-restore.md). El ensayo no certifica el tiempo
 de recuperación completo de la infraestructura ni protege escrituras posteriores
 a la última copia. Vigilar volumen/retención dentro del presupuesto.
@@ -95,8 +96,12 @@ automáticamente DKIM del remitente `marcayconexion@paularojas.com.co`.
 
 La instancia única t4g.small, con 2 GiB de RAM, comparte web, API y PostgreSQL.
 No hay réplica ni failover multi-AZ. Treinta cuentas registradas no certifican
-treinta usuarios activos simultáneamente: eso se debe comprobar con carga realista.
-No se cambió el tamaño ni se ejecutó carga contra usuarios reales en esta revisión.
+treinta usuarios activos simultáneamente. Actualización 2026-10-21: el ensayo
+sintético de 5/15/30 usuarios pasó sin ampliar la instancia: 12.129 solicitudes,
+cero errores, p95 de 111 ms en la etapa de 30 usuarios. Se verificaron 195 entregas
+y 195 encuestas. No fue carga contra usuarios reales ni 30 navegadores completos;
+no certifica operación continua ni capacidad superior. Ver
+[resultados y límites del ensayo](pilot-load-results-2026-10-21.md).
 
 El horario es lunes–viernes 08:00–20:00, America/Bogota. Ajustarlo al piloto con
 presupuesto explícito si los participantes trabajan fuera de ese horario. Un
@@ -124,7 +129,9 @@ No se cambió durante la revisión de preparación.
 
 ## Siguiente paso propuesto
 
-Confirmar el correo de alertas y publicar backup/restauración. En paralelo, el usuario define si usará
-subdominio actual o dominio independiente y obtiene el control DNS necesario.
-Después: migración de URL + DKIM, preparación de datos y ensayo completo/carga.
+Confirmar el correo de alertas. Backup/restauración ya está publicado. El usuario
+eligió comprar un dominio independiente y dejó su definición para después;
+no hay compra ni cambio DNS autorizado. Continuar con migración de URL + DKIM,
+preparación de datos y ensayo completo. Procedimiento de la prueba de carga:
+[concurrencia del piloto](dev-pilot-load-test.md).
 No se aplicarán cambios de dominio sin esa elección y la autorización posterior.
