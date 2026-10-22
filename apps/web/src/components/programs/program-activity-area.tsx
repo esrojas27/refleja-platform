@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { CheckCircle2, ClipboardCheck } from "lucide-react";
 import { fetchCurrentIdentity, IdentityRequestError } from "@/lib/auth/authenticated-api";
 import { listEnrollments, ParticipationRequestError, type Enrollment } from "@/lib/participation/participation-api";
@@ -310,38 +310,51 @@ function ReviewQueue({ organizationId, programId, activities, onReviewed }: {
   organizationId: string; programId: string; activities: ProgramActivity[];
   onReviewed: (activityId: string, assignee: ActivityAssignee) => void;
 }) {
+  const target = useSyncExternalStore(subscribeReviewHash, () => window.location.hash, () => "");
+  const selectedAssignment = /^#review-[0-9a-f-]{36}$/i.test(target) ? target.slice(8) : "";
   const queue = useMemo(() => activities.flatMap(activity => activity.assignees
     .filter(assignee => assignee.status === "SUBMITTED"
       && (assignee.surveyStatus === "NOT_REQUIRED" || assignee.surveyStatus === "COMPLETED"))
-    .map(assignee => ({ activity, assignee }))), [activities]);
+    .map(assignee => ({ activity, assignee })))
+    .sort((a, b) => Number(b.assignee.assignmentId === selectedAssignment) - Number(a.assignee.assignmentId === selectedAssignment)), [activities, selectedAssignment]);
   const waitingForSurvey = useMemo(() => activities.flatMap(activity => activity.assignees)
     .filter(assignee => assignee.status === "SUBMITTED" && assignee.surveyStatus === "PENDING").length, [activities]);
+  const selectedWaiting = activities.flatMap(activity => activity.assignees
+    .filter(assignee => assignee.assignmentId === selectedAssignment && assignee.status === "SUBMITTED" && assignee.surveyStatus === "PENDING")
+    .map(assignee => ({ activity, assignee })))[0];
   const [open, setOpen] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  const expanded = open || queue.some(item => item.assignee.assignmentId === selectedAssignment);
+  const reviewSection = useRef<HTMLElement>(null);
+  useEffect(() => { if (selectedAssignment) reviewSection.current?.scrollIntoView?.({ block: "start" }); }, [selectedAssignment]);
 
   function complete(item: ReviewItem, saved: ActivityAssignee) {
     setLeaving(true);
     window.setTimeout(() => {
       onReviewed(item.activity.id, saved);
-      if (queue.length === 1) setOpen(false);
+      setOpen(queue.length > 1);
       setLeaving(false);
     }, 220);
   }
 
-  return <section aria-labelledby="review-queue-title" className="rounded-3xl border border-primary/15 bg-accent/25 p-5 sm:p-7">
+  return <section ref={reviewSection} aria-labelledby="review-queue-title" className="scroll-mt-28 rounded-3xl border border-primary/15 bg-accent/25 p-5 sm:p-7">
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div><p className="rti-kicker">Bandeja de revisión</p>
         <h2 id="review-queue-title" className="mt-2 text-xl font-semibold">Revisar actividades</h2>
       </div>
-      {queue.length > 0 && !open && <button type="button" className="rti-button-primary"
+      {queue.length > 0 && !expanded && <button type="button" className="rti-button-primary"
         onClick={() => setOpen(true)}>Revisar actividades ({queue.length})</button>}
     </div>
+    {selectedWaiting && <p className="mt-4 rounded-2xl border border-border bg-background/70 p-4 text-sm">
+      Recibimos la entrega de {[selectedWaiting.assignee.firstName, selectedWaiting.assignee.lastName].filter(Boolean).join(" ") || selectedWaiting.assignee.email}
+      {` para «${selectedWaiting.activity.title}». Podrás revisarla cuando complete la encuesta.`}
+    </p>}
     {queue.length === 0 ? <div className="mt-5 flex items-center gap-3 rounded-2xl border border-border/70 bg-background/70 px-4 py-4 text-sm text-muted-foreground">
       <CheckCircle2 aria-hidden="true" className="size-5 shrink-0 text-primary" />
       <p>{waitingForSurvey > 0
         ? `No hay actividades listas para revisar. ${waitingForSurvey} ${waitingForSurvey === 1 ? "entrega espera" : "entregas esperan"} que se complete la encuesta.`
         : "No hay actividades pendientes por revisar."}</p>
-    </div> : !open ? <p className="mt-4 text-sm text-muted-foreground">
+    </div> : !expanded ? <p className="mt-4 text-sm text-muted-foreground">
       Tienes {queue.length} {queue.length === 1 ? "respuesta pendiente" : "respuestas pendientes"}. Revísalas una por una.
     </p> : <div className="mt-5 overflow-hidden">
       <p aria-live="polite" className="mb-3 text-sm font-medium text-muted-foreground">
@@ -351,6 +364,11 @@ function ReviewQueue({ organizationId, programId, activities, onReviewed }: {
         programId={programId} leaving={leaving} onReviewed={saved => complete(queue[0], saved)} />
     </div>}
   </section>;
+}
+
+function subscribeReviewHash(notify: () => void) {
+  window.addEventListener("hashchange", notify);
+  return () => window.removeEventListener("hashchange", notify);
 }
 
 function ReviewCard({ organizationId, programId, item, leaving, onReviewed }: {

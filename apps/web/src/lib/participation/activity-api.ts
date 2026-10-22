@@ -93,6 +93,7 @@ async function request<T>(path: string, method: "GET" | "POST", expected: number
       ? body.requestId : undefined;
     throw new ActivityRequestError(response.status, fields, requestId, typeof body?.code === "string" ? body.code : undefined);
   }
+  if (method === "POST" && typeof window !== "undefined") window.dispatchEvent(new Event("rti:notifications-changed"));
   return response.json() as Promise<T>;
 }
 

@@ -47,7 +47,30 @@ beforeEach(() => {
   vi.mocked(createProgramActivity).mockResolvedValue({ ...activity, id: "activity-new", position: 2 });
   vi.mocked(reviewActivityAssignment).mockResolvedValue({ ...activity.assignees[0], status: "COMPLETED" });
 });
-afterEach(() => { cleanup(); vi.resetAllMocks(); });
+afterEach(() => { cleanup(); vi.resetAllMocks(); window.history.replaceState({}, "", "/"); });
+
+it("opens the notified delivery first and continues reviewing the remaining queue", async () => {
+  const assignmentId = "01900000-0000-7000-8000-000000000001";
+  window.history.replaceState({}, "", `/#review-${assignmentId}`);
+  const notified = { ...activity.assignees[0], assignmentId, responseText: "Entrega desde el aviso" };
+  vi.mocked(listProgramActivities).mockResolvedValue({ items: [{ ...activity, assignees: [activity.assignees[0], notified] }] });
+  vi.mocked(reviewActivityAssignment).mockResolvedValue({ ...notified, status: "COMPLETED" });
+  render(<ProgramActivityArea organizationId="org-a" programId="program-a" />);
+  expect(await screen.findByText("Entrega desde el aviso")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Aprobar actividad" }));
+  expect(await screen.findByText("Mi avance")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Aprobar actividad" })).toBeTruthy();
+});
+
+it("explains why a notified delivery still needs its survey before review", async () => {
+  const assignmentId = "01900000-0000-7000-8000-000000000001";
+  window.history.replaceState({}, "", `/#review-${assignmentId}`);
+  vi.mocked(listProgramActivities).mockResolvedValue({ items: [{ ...activity,
+    assignees: [{ ...activity.assignees[0], assignmentId, surveyStatus: "PENDING" }] }] });
+  render(<ProgramActivityArea organizationId="org-a" programId="program-a" />);
+  expect(await screen.findByText(/Recibimos la entrega de Ana Prueba/)).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Aprobar actividad" })).toBeNull();
+});
 
 it("renders real sessions, assignments and existing activities", async () => {
   render(<ProgramActivityArea organizationId="org-a" programId="program-a" />);

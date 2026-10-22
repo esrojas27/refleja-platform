@@ -121,6 +121,12 @@ próxima a vencer o vencida. Este trabajo requiere definir ventanas de aviso, zo
 horaria, destinatarios, canales, reintentos e idempotencia. No forma parte del
 primer incremento de metadatos de YouTube.
 
+Incremento de notificaciones internas: campana y bandeja con asignaciones,
+entregas recibidas, cambios solicitados, aprobaciones y encuestas pendientes.
+El canal acordado es exclusivamente dentro de la aplicación; no se agregan
+correos por actividades. Los recordatorios por fecha siguen pendientes.
+Contrato y validación: [notificaciones internas](in-app-notifications.md).
+
 ### Evaluaciones de inicio y cierre
 
 El consultor de Refleja crea evaluaciones para el inicio y el final de un programa.

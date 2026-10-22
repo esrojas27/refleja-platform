@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import com.reflejatuinterior.participation.application.ActivityAssignments;
+import com.reflejatuinterior.participation.application.Notifications;
+import com.reflejatuinterior.participation.application.Notifications.Kind;
 import com.reflejatuinterior.participation.domain.ActivityReviewDecision;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Propagation;
@@ -14,8 +16,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(propagation = Propagation.MANDATORY)
 class JpaActivityAssignments implements ActivityAssignments {
     private final ActivityAssignmentJpaRepository repository;
+    private final Notifications notifications;
 
-    JpaActivityAssignments(ActivityAssignmentJpaRepository repository) { this.repository = repository; }
+    JpaActivityAssignments(ActivityAssignmentJpaRepository repository, Notifications notifications) {
+        this.repository = repository; this.notifications = notifications;
+    }
 
     @Override
     public List<Data> create(UUID organizationId, UUID programId, UUID activityId,
@@ -24,7 +29,9 @@ class JpaActivityAssignments implements ActivityAssignments {
                 .map(enrollmentId -> new ActivityAssignmentJpaEntity(
                         organizationId, programId, activityId, enrollmentId))
                 .toList();
-        return repository.saveAllAndFlush(entities).stream().map(JpaActivityAssignments::data).toList();
+        var saved = repository.saveAllAndFlush(entities);
+        saved.forEach(entity -> notifications.record(organizationId,entity.id(),Kind.ACTIVITY_ASSIGNED));
+        return saved.stream().map(JpaActivityAssignments::data).toList();
     }
 
     @Override
@@ -45,7 +52,10 @@ class JpaActivityAssignments implements ActivityAssignments {
             UUID enrollmentId, String responseText) {
         return repository.lockOwned(organizationId, programId, activityId, enrollmentId).map(entity -> {
             entity.submit(responseText);
-            return data(repository.saveAndFlush(entity));
+            var saved=repository.saveAndFlush(entity);
+            notifications.record(organizationId,saved.id(),Kind.SUBMISSION_RECEIVED);
+            notifications.record(organizationId,saved.id(),Kind.SURVEY_PENDING);
+            return data(saved);
         });
     }
 
@@ -54,7 +64,10 @@ class JpaActivityAssignments implements ActivityAssignments {
             UUID assignmentId, ActivityReviewDecision decision, String comment, UUID reviewerId) {
         return repository.lockForReview(organizationId, programId, activityId, assignmentId).map(entity -> {
             entity.review(decision, comment, reviewerId);
-            return data(repository.saveAndFlush(entity));
+            var saved=repository.saveAndFlush(entity);
+            notifications.record(organizationId,saved.id(),decision==ActivityReviewDecision.APPROVE
+                    ? Kind.ACTIVITY_APPROVED : Kind.CHANGES_REQUESTED);
+            return data(saved);
         });
     }
 

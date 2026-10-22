@@ -18,6 +18,7 @@ import { activityErrorMessage, listMyProgramActivities, submitMyActivity,
 import { useCollaboratorActivities } from "@/components/participation/collaborator-activities-state";
 import { ActivityStatusBadges, CollaboratorProgressOverview } from "@/components/participation/progress-overview";
 import { ActivitySurveyForm } from "@/components/participation/activity-survey-form";
+import { ActivityLinkTarget } from "@/components/participation/activity-link-target";
 import { programStateMessage, programStatusLabels } from "@/lib/programs/program-lifecycle";
 
 const button = "rti-button-secondary";
@@ -184,6 +185,7 @@ function AssignedActivityList({ programId, section, programStatus, enrollmentSta
     <h2 id="assigned-activities-title" className="text-xl font-semibold">Actividades asignadas</h2>
     {!preparing && message && <p role="status" className="mt-3 rounded-2xl bg-muted/60 px-4 py-3 text-sm">{message}</p>}
     {!preparing && activities && activities.length > 0 && <div className="mt-4 space-y-4">
+      <ActivityLinkTarget key={programId} />
       {groupAssignedActivities(activities).map(dimension => {
         const dimensionTotal = dimension.sessions.reduce((total, session) => total + session.activities.length, 0);
         return <details key={dimension.id} className="group/dimension overflow-hidden rounded-2xl border border-border/70 bg-background/65">

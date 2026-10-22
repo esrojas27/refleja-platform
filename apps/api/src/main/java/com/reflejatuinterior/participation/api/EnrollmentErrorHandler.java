@@ -29,8 +29,13 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice(assignableTypes = {EnrollmentController.class, InvitationController.class, MyProgramController.class,
-        ActivityController.class, ActivityEvaluationController.class, DiscProfileController.class, ContentAdministrationController.class, SurveyResultsController.class, EnrollmentAdministrationController.class})
+        ActivityController.class, ActivityEvaluationController.class, DiscProfileController.class, ContentAdministrationController.class, SurveyResultsController.class, EnrollmentAdministrationController.class, NotificationController.class})
 class EnrollmentErrorHandler {
+    @ExceptionHandler(com.reflejatuinterior.participation.application.NotificationService.Missing.class)
+    ResponseEntity<ErrorResponse> notificationMissing(HttpServletRequest request) { return error(request,404,"NOTIFICATION_NOT_FOUND",List.of()); }
+
+    @ExceptionHandler(com.reflejatuinterior.participation.application.NotificationService.InvalidCursor.class)
+    ResponseEntity<ErrorResponse> invalidCursor(HttpServletRequest request) { return error(request,400,"VALIDATION_ERROR",List.of()); }
     @ExceptionHandler(com.reflejatuinterior.participation.application.EnrollmentAdministrationConflict.class)
     ResponseEntity<ErrorResponse> administrationConflict(com.reflejatuinterior.participation.application.EnrollmentAdministrationConflict exception,HttpServletRequest request) {
         return error(request,409,exception.code(),List.of());
@@ -49,7 +54,8 @@ class EnrollmentErrorHandler {
         return error(request, 409, exception.code(), List.of());
     }
 
-    @ExceptionHandler({OrganizationAccess.Denied.class, CollaboratorInvitations.Denied.class, CollaboratorAccess.Denied.class})
+    @ExceptionHandler({OrganizationAccess.Denied.class, CollaboratorInvitations.Denied.class, CollaboratorAccess.Denied.class,
+            com.reflejatuinterior.identity.NotificationAccess.Denied.class})
     ResponseEntity<ErrorResponse> denied(HttpServletRequest request) { return error(request, 403, "FORBIDDEN", List.of()); }
 
     @ExceptionHandler({EnrollmentNotFound.class, CollaboratorInvitations.Unavailable.class,

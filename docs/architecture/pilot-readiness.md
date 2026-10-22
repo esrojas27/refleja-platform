@@ -120,7 +120,10 @@ No se cambió durante la revisión de preparación.
   ya implementadas. Si la primera empresa las exige, pasan al alcance previo.
 - Visibilidad funcional final y reportes para Líder/RRHH: los roles/invitaciones
   existen, pero no se deben ampliar permisos implícitamente.
-- Recordatorios/notificaciones de actividades próximas a vencer y vencidas.
+- Recordatorios de actividades próximas a vencer y vencidas. La bandeja de
+  [notificaciones internas](in-app-notifications.md) cubre asignaciones, entregas,
+  revisión y encuestas pendientes, sin correos; los avisos por fecha quedan para
+  otro incremento.
 - Evidencias/archivos adjuntos si el programa piloto los necesita; confirmar el
   alcance de las actividades, sin asumir que la respuesta textual basta.
 - Versionado/gestión avanzada de plantillas y nuevas correcciones de contenido

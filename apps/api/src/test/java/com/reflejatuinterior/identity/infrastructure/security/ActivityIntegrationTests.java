@@ -31,6 +31,7 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
     @Autowired JwtEncoder encoder;
     @Autowired ObjectMapper json;
     @Autowired OrganizationTenantContext tenantContext;
+    @Autowired com.reflejatuinterior.participation.application.Notifications notifications;
 
     @BeforeEach void setup() {
         insertOrganization(organization);
@@ -834,6 +835,148 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
         var answers = java.util.stream.IntStream.range(0, 4).mapToObj(i -> java.util.Map.of("questionId", survey.path("questions").get(i).path("id").asText(), "values", values.get(i))).toList();
         mvc.perform(post(surveyResponsePath(activity)).header("Authorization", token(actor))
                 .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(java.util.Map.of("answers", answers)))).andExpect(status().isOk());
+    }
+
+    @Test void notificationsArePrivatePersistentAndReadIdempotently() throws Exception {
+        createAdminActivity(true, 1);
+        var own = inbox(collaborator);
+        assertThat(own.path("unreadCount").asLong()).isEqualTo(1);
+        var id = own.path("items").get(0).path("id").asText();
+        assertThat(own.path("items").get(0).path("kind").asText()).isEqualTo("ACTIVITY_ASSIGNED");
+        assertThat(inbox(consultant).path("items").size()).isZero();
+        mvc.perform(post("/api/v1/me/notifications/"+id+"/read").header("Authorization",token(otherCollaborator)))
+                .andExpect(status().isNotFound());
+        for(int i=0;i<2;i++) mvc.perform(post("/api/v1/me/notifications/"+id+"/read").header("Authorization",token(collaborator)))
+                .andExpect(status().isNoContent()).andExpect(header().string("Cache-Control","no-store"));
+        assertThat(inbox(collaborator).path("unreadCount").asLong()).isZero();
+        assertThat(inbox(collaborator).path("items").get(0).path("readAt").isNull()).isFalse();
+        assertThat(inbox(otherCollaborator).path("unreadCount").asLong()).isEqualTo(1);
+        mvc.perform(get("/api/v1/me/notifications")).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/v1/me/notifications/"+id+"/read")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/me/notifications?beforeId="+id).header("Authorization",token(collaborator)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test void notificationDeliveryFollowsAssignmentsSubmissionsAndReviewsWithoutDuplicates() throws Exception {
+        var activity=createAdminActivity(true,1);
+        var assignment=jdbcTemplate.queryForObject("select id from rti.activity_assignments where activity_id=? and enrollment_id=?",UUID.class,activity,enrollment);
+        notifications.record(organization,assignment,com.reflejatuinterior.participation.application.Notifications.Kind.ACTIVITY_ASSIGNED);
+        assertThat(inbox(collaborator).path("items").size()).isEqualTo(1);
+        submitNotificationActivity(activity);
+        var received=inbox(consultant);
+        assertThat(received.path("unreadCount").asLong()).isEqualTo(1);
+        assertThat(received.path("items").get(0).path("kind").asText()).isEqualTo("SUBMISSION_RECEIVED");
+          assertThat(received.path("items").get(0).path("participantName").asText()).isEqualTo(collaborator+"@example.test");
+        assertThat(received.toString()).doesNotContain("responseText","reviewComment");
+        mvc.perform(post(reviewPath(activity,assignment)).header("Authorization",token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"decision\":\"REQUEST_CHANGES\",\"comment\":\"Ajusta la respuesta\"}"))
+                .andExpect(status().isOk());
+        assertThat(inbox(consultant).path("items").size()).isZero();
+        assertThat(inbox(collaborator).toString()).contains("CHANGES_REQUESTED");
+        submitNotificationActivity(activity);
+        assertThat(inbox(consultant).path("items").size()).isEqualTo(1);
+        assertThat(inbox(consultant).path("items").get(0).path("id").asText())
+                .isNotEqualTo(received.path("items").get(0).path("id").asText());
+        mvc.perform(post(reviewPath(activity,assignment)).header("Authorization",token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"decision\":\"APPROVE\"}"))
+                .andExpect(status().isOk());
+        assertThat(inbox(collaborator).toString()).contains("ACTIVITY_APPROVED");
+        assertThat(inbox(otherCollaborator).toString()).doesNotContain("ACTIVITY_APPROVED","CHANGES_REQUESTED");
+    }
+
+    @Test void surveyReminderDisappearsWhenSurveyIsCompleted() throws Exception {
+        var activity=createAdminActivity(true,1);
+        var survey=createAdminSurvey(activity);
+        submitNotificationActivity(activity);
+        assertThat(inbox(collaborator).toString()).contains("SURVEY_PENDING");
+        var question=survey.path("questions").get(0).path("id").asText();
+        mvc.perform(post(surveyResponsePath(activity)).header("Authorization",token(collaborator))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"answers\":[{\"questionId\":\""+question+"\",\"values\":[\"Aprendizaje\"]}]}"))
+                .andExpect(status().isOk());
+        assertThat(inbox(collaborator).toString()).doesNotContain("SURVEY_PENDING");
+    }
+
+    @Test void notificationsRespectDraftClosedArchivedAndSuspendedStates() throws Exception {
+        jdbcTemplate.update("update rti.programs set status='DRAFT' where id=?",program);
+        var activity=createAdminActivity(true,1);
+        assertThat(inbox(collaborator).path("items").size()).isZero();
+        jdbcTemplate.update("update rti.programs set status='ACTIVE' where id=?",program);
+        var notification=inbox(collaborator).path("items").get(0).path("id").asText();
+        jdbcTemplate.update("update rti.enrollments set status='SUSPENDED',suspended_from_status='ACTIVE' where id=?",enrollment);
+        assertThat(inbox(collaborator).path("unreadCount").asLong()).isZero();
+        mvc.perform(post("/api/v1/me/notifications/"+notification+"/read").header("Authorization",token(collaborator)))
+                .andExpect(status().isNotFound());
+        jdbcTemplate.update("update rti.enrollments set status='ACTIVE',suspended_from_status=NULL where id=?",enrollment);
+        assertThat(inbox(collaborator).path("unreadCount").asLong()).isEqualTo(1);
+        jdbcTemplate.update("update rti.program_activities set archived=true where id=?",activity);
+        assertThat(inbox(collaborator).path("items").size()).isZero();
+        jdbcTemplate.update("update rti.program_activities set archived=false where id=?",activity);
+        jdbcTemplate.update("update rti.programs set status='COMPLETED' where id=?",program);
+        assertThat(inbox(collaborator).path("items").size()).isZero();
+    }
+
+    @Test void notificationAccessIsRecheckedAfterMembershipRoleAndProfileChanges() throws Exception {
+        var activity=createAdminActivity(true,1);
+        submitNotificationActivity(activity);
+        assertThat(inbox(consultant).path("items").size()).isEqualTo(1);
+        jdbcTemplate.update("update rti.membership_roles set role='COMPANY_ADMIN' where membership_id=?",consultantMembership);
+        assertThat(inbox(consultant).path("items").size()).isZero();
+        jdbcTemplate.update("update rti.organization_memberships set profile_status='PENDING' where id=?",collaboratorMembership);
+        assertThat(inbox(collaborator).path("items").size()).isZero();
+        jdbcTemplate.update("update rti.organization_memberships set profile_status='COMPLETE',status='REVOKED' where id=?",collaboratorMembership);
+        assertThat(inbox(collaborator).path("items").size()).isZero();
+        jdbcTemplate.update("update rti.users set status='DEACTIVATED' where id=?",collaborator);
+        mvc.perform(get("/api/v1/me/notifications").header("Authorization",token(collaborator))).andExpect(status().isForbidden());
+    }
+
+    @Test void notificationTableAndInboxAreTenantIsolated() throws Exception {
+        createAdminActivity(true,1);
+        var otherOrg=uuid7(0xdfe);
+        insertOrganization(otherOrg);
+        tenantContext.activate(otherOrg);
+        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.activity_notifications",Long.class)).isZero();
+        tenantContext.activate(organization);
+        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.activity_notifications",Long.class)).isEqualTo(2);
+        var alien=uuid7(0xdfa); var alienMembership=uuid7(0xdfb);
+        insertUser(alien); insertMembership(alienMembership,otherOrg,alien);
+        jdbcTemplate.update("insert into rti.membership_roles values (?,'CONSULTANT')",alienMembership);
+        assertThat(inbox(alien).path("items").size()).isZero();
+    }
+
+    @Test void notificationKeysetPaginationPreservesEqualTimestampItemsAndExactUnreadCount() throws Exception {
+        createAdminActivity(true,1);
+        var first=inbox(collaborator).path("items").get(0);
+        var assignment=UUID.fromString(first.path("assignmentId").asText());
+        for(int i=1;i<25;i++) jdbcTemplate.update("""
+                insert into rti.activity_notifications(organization_id,program_id,assignment_id,recipient_membership_id,kind,source_version)
+                values(?,?,?,?,'ACTIVITY_ASSIGNED',?)
+                """,organization,program,assignment,collaboratorMembership,i);
+        var page=inbox(collaborator);
+        assertThat(page.path("items").size()).isEqualTo(20);
+        assertThat(page.path("unreadCount").asLong()).isEqualTo(25);
+        assertThat(page.path("hasMore").asBoolean()).isTrue();
+        var last=page.path("items").get(19);
+        var second=mvc.perform(get("/api/v1/me/notifications").param("before",last.path("createdAt").asText())
+                .param("beforeId",last.path("id").asText()).header("Authorization",token(collaborator)))
+                .andExpect(status().isOk()).andReturn().getResponse();
+        var tail=json.readTree(second.getContentAsString());
+        assertThat(tail.path("items").size()).isEqualTo(5);
+        assertThat(tail.path("hasMore").asBoolean()).isFalse();
+        var ids=new java.util.HashSet<String>();
+        page.path("items").forEach(n -> ids.add(n.path("id").asText()));
+        tail.path("items").forEach(n -> assertThat(ids.add(n.path("id").asText())).isTrue());
+    }
+
+    private tools.jackson.databind.JsonNode inbox(UUID user) throws Exception {
+        var result=mvc.perform(get("/api/v1/me/notifications").header("Authorization",token(user)))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store"))
+                .andReturn().getResponse();
+        return json.readTree(result.getContentAsString());
+    }
+    private void submitNotificationActivity(UUID activity) throws Exception {
+        mvc.perform(post(collaboratorPath()+"/"+activity+"/submission").header("Authorization",token(collaborator))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"Respuesta privada\"}"))
+                .andExpect(status().isOk());
     }
 
     private UUID createAdminActivity(boolean assigned, int position) throws Exception {

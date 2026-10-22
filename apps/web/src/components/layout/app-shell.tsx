@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 
 import { Brand } from "@/components/layout/brand";
+import { NotificationCenter } from "@/components/layout/notification-center";
 import { fetchCurrentIdentity } from "@/lib/auth/authenticated-api";
 
 const accountNavigationItem = { href: "/account", label: "Cuenta", icon: CircleUserRound };
@@ -13,15 +14,17 @@ const invitationsNavigationItem = { href: "/invitations", label: "Invitaciones",
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [showMyPrograms, setShowMyPrograms] = useState(false);
+  const [userId, setUserId] = useState<string>();
 
   useEffect(() => {
     const controller = new AbortController();
     fetchCurrentIdentity(undefined, controller.signal).then(identity => {
       if (!controller.signal.aborted) {
+        setUserId(identity.user.id);
         setShowMyPrograms(identity.organizations.some(organization => organization.roles.includes("COLLABORATOR")));
       }
     }).catch(() => {
-      if (!controller.signal.aborted) setShowMyPrograms(false);
+      if (!controller.signal.aborted) { setShowMyPrograms(false); setUserId(undefined); }
     });
     return () => controller.abort();
   }, []);
@@ -54,6 +57,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <span>{label}</span>
               </Link>
             ))}
+            {userId && <NotificationCenter key={userId} />}
           </nav>
         </div>
       </header>
