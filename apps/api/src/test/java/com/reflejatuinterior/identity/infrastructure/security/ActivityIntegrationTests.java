@@ -31,6 +31,7 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
     @Autowired JwtEncoder encoder;
     @Autowired ObjectMapper json;
     @Autowired OrganizationTenantContext tenantContext;
+    @Autowired jakarta.persistence.EntityManager entityManager;
     @Autowired com.reflejatuinterior.participation.application.Notifications notifications;
 
     @BeforeEach void setup() {
@@ -816,6 +817,87 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
         return mvc.perform(post(participantPath(id)+"/administration").header("Authorization",token(consultant)).contentType(MediaType.APPLICATION_JSON).content(participantBody(version,action)));
     }
 
+    @Test void programReportsIncludeUnassignedPeopleAndIndividualSurveyScopeNeverLeaksOthers() throws Exception {
+        var activity = createAdminActivity(true, 1); var survey = createResultsSurvey(activity);
+        sendResults(collaborator, activity, survey, "4", "5", "Respuesta propia", java.util.List.of("Inspirado(a)"));
+        sendResults(otherCollaborator, activity, survey, "2", "1", "Respuesta ajena", java.util.List.of("Retado(a)"));
+        mvc.perform(get(reportPath()).header("Authorization", token(consultant))).andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store")).andExpect(jsonPath("$.summary.assigned").value(2))
+                .andExpect(jsonPath("$.summary.progressPercentage").value(100.0)).andExpect(jsonPath("$.summary.approvalPercentage").value(0.0))
+                .andExpect(jsonPath("$.surveys.summary.agreementAverage").value(3.0));
+        var individual = mvc.perform(get(reportPath()).param("enrollmentId", enrollment.toString()).header("Authorization", token(consultant)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.participants.length()").value(1))
+                .andExpect(jsonPath("$.work.length()").value(1)).andExpect(jsonPath("$.summary.assigned").value(1))
+                .andExpect(jsonPath("$.surveys.summary.agreementAverage").value(4.0))
+                .andExpect(jsonPath("$.surveys.surveys[0].responses.length()").value(1)).andReturn().getResponse().getContentAsString();
+        assertThat(individual).contains("Respuesta propia").doesNotContain("Respuesta ajena", "Entrega privada para revisión", "responseText", "reviewComment", "disc");
+        assertThat(individual).doesNotContain(otherCollaborator + "@example.test");
+        var bytes = mvc.perform(get(reportPath() + "/export").param("format", "xlsx").param("enrollmentId", enrollment.toString())
+                .header("Authorization", token(consultant))).andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(content().contentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .andReturn().getResponse().getContentAsByteArray();
+        try (var book = new org.apache.poi.xssf.usermodel.XSSFWorkbook(new java.io.ByteArrayInputStream(bytes))) {
+            assertThat(book.getNumberOfSheets()).isEqualTo(4);
+            var texts = new StringBuilder();
+            for (var sheet : book) for (var row : sheet) for (var cell : row) texts.append(cell.toString());
+            assertThat(texts.toString()).contains("Respuesta propia").doesNotContain("Respuesta ajena", "Entrega privada para revisión");
+        }
+        var csv = mvc.perform(get(reportPath() + "/export").param("format", "csv").param("enrollmentId", enrollment.toString())
+                .header("Authorization", token(consultant))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(csv).contains("Respuesta propia").doesNotContain("Respuesta ajena");
+    }
+
+    @Test void reportsShowNoAssignmentsHonestlyAndKeepWithdrawnParticipantsAfterClosure() throws Exception {
+        mvc.perform(get(reportPath()).header("Authorization", token(consultant))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.participants.length()").value(2)).andExpect(jsonPath("$.summary.assigned").value(0))
+                .andExpect(jsonPath("$.summary.progressPercentage").isEmpty()).andExpect(jsonPath("$.summary.onTimePercentage").isEmpty());
+        createAdminActivity(true, 1);
+        changeParticipant(enrollment, 0, "WITHDRAW").andExpect(status().isOk());
+        mvc.perform(post(consultantPath().replace("/activities", "/status")).header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"COMPLETED\",\"version\":0}")).andExpect(status().isOk());
+        mvc.perform(get(reportPath()).header("Authorization", token(consultant))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.enrollmentCounts.WITHDRAWN").value(1)).andExpect(jsonPath("$.summary.assigned").value(2))
+                .andExpect(jsonPath("$.programStatus").value("COMPLETED"));
+    }
+
+    @Test void reportProgressUsesHalfForPendingSurveyAndTimezoneAtDeadline() throws Exception {
+        var activity = createAdminActivity(true, 1); var survey = createResultsSurvey(activity);
+        mvc.perform(post(collaboratorPath() + "/" + activity + "/submission").header("Authorization", token(collaborator))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"Mi entrega\"}")).andExpect(status().isOk());
+        mvc.perform(get(reportPath()).param("enrollmentId", enrollment.toString()).header("Authorization", token(consultant)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.summary.progressPercentage").value(50.0))
+                .andExpect(jsonPath("$.summary.surveysCompleted").value(0));
+        mvc.perform(post(surveyResponsePath(activity)).header("Authorization", token(collaborator))
+                .contentType(MediaType.APPLICATION_JSON).content(surveyResponseBody(survey))).andExpect(status().isOk());
+        jdbcTemplate.update("update rti.activity_assignments set submitted_at='2026-10-09T04:59:00Z' where activity_id=? and enrollment_id=?", activity, enrollment);
+        jdbcTemplate.update("update rti.activity_evaluation_responses set completed_at='2026-10-09T04:59:00Z' where activity_id=? and enrollment_id=?", activity, enrollment);
+        entityManager.clear();
+        mvc.perform(get(reportPath()).param("enrollmentId", enrollment.toString()).header("Authorization", token(consultant)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.timeZone").value("America/Bogota"))
+                .andExpect(jsonPath("$.work[0].onTime").value(true)).andExpect(jsonPath("$.summary.progressPercentage").value(100.0));
+        jdbcTemplate.update("update rti.activity_assignments set submitted_at='2026-10-09T05:00:00Z' where activity_id=? and enrollment_id=?", activity, enrollment);
+        entityManager.clear();
+        mvc.perform(get(reportPath()).param("enrollmentId", enrollment.toString()).header("Authorization", token(consultant)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.work[0].onTime").value(false));
+    }
+
+    @Test void reportsAndBothExportsRequireConsultantAndScopedIdentifiers() throws Exception {
+        for (String suffix : java.util.List.of("", "/export?format=csv", "/export?format=xlsx")) {
+            mvc.perform(get(reportPath() + suffix)).andExpect(status().isUnauthorized());
+            mvc.perform(get(reportPath() + suffix).header("Authorization", token(collaborator))).andExpect(status().isForbidden());
+            mvc.perform(get(reportPath().replace(organization.toString(), uuid7(0xfef).toString()) + suffix)
+                    .header("Authorization", token(consultant))).andExpect(status().isNotFound());
+            mvc.perform(get(reportPath() + suffix).param("enrollmentId", uuid7(0xfee).toString()).header("Authorization", token(consultant)))
+                    .andExpect(status().isNotFound());
+        }
+        jdbcTemplate.update("insert into rti.membership_roles values (?, 'LEADER'), (?, 'COMPANY_ADMIN')", collaboratorMembership, collaboratorMembership);
+        mvc.perform(get(reportPath()).header("Authorization", token(collaborator))).andExpect(status().isForbidden());
+        mvc.perform(get(reportPath()).param("enrollmentId", "invalid").header("Authorization", token(consultant))).andExpect(status().isBadRequest());
+        mvc.perform(get(reportPath() + "/export").param("format", "pdf").header("Authorization", token(consultant))).andExpect(status().isBadRequest());
+    }
+
+    private String reportPath() { return consultantPath().replace("/activities", "/reports"); }
     private String resultsPath() { return consultantPath().replace("/activities", "/survey-results"); }
     private tools.jackson.databind.JsonNode createResultsSurvey(UUID activity) throws Exception {
         var response = mvc.perform(post(evaluationPath(activity)).header("Authorization", token(consultant))

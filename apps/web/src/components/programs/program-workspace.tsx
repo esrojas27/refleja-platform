@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BarChart3, BookOpenText, BrainCircuit, CheckSquare2, ChevronLeft, ListTree, UsersRound, ChartNoAxesCombined } from "lucide-react";
+import { BarChart3, BookOpenText, BrainCircuit, CheckSquare2, ChevronLeft, ListTree, UsersRound, ChartNoAxesCombined, FileChartColumn } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { fetchCurrentIdentity } from "@/lib/auth/authenticated-api";
@@ -70,6 +70,11 @@ export function ProgramWorkspace({
       active: current => current === `${programPath}/progress`,
     },
     ...(permissions.organizationId === organizationId && permissions.results ? [{
+      href: `${programPath}/reports`,
+      label: "Reportes",
+      icon: FileChartColumn,
+      active: (current: string) => current === `${programPath}/reports`,
+    }, {
       href: `${programPath}/survey-results`,
       label: "Resultados de encuestas",
       icon: ChartNoAxesCombined,

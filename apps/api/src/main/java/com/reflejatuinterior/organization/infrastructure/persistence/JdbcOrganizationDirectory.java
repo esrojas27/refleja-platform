@@ -30,4 +30,10 @@ class JdbcOrganizationDirectory implements OrganizationDirectory {
                         rs.getObject("id", UUID.class), rs.getString("name"), rs.getString("status")),
                 organizationIds.toArray());
     }
+
+    @Override public java.util.Optional<ReportInfo> reportInfo(UUID organizationId) {
+        return jdbcTemplate.query("select name, default_time_zone from rti.organizations where id = ?",
+                (rs, row) -> new ReportInfo(rs.getString("name"), rs.getString("default_time_zone")), organizationId)
+                .stream().findFirst();
+    }
 }

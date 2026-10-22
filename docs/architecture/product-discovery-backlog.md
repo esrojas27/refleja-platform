@@ -32,6 +32,14 @@ La interpretación de denominadores, límites y pruebas manuales están en
 [resultados de encuestas](activity-survey-results.md). No reemplaza las futuras
 evaluaciones inicial/final ni amplía permisos de Líder/RRHH.
 
+### Reportes del programa y exportaciones
+
+Implementado el 2026-10-22, con commit y push autorizados por el usuario:
+reportes general e individual para consultores, participación, avance, aprobación
+y cumplimiento de fechas, integración de las encuestas y exportación CSV/Excel.
+Definiciones, privacidad y pruebas en [reportes y exportaciones](program-reports-exports.md).
+PDF corporativo y evaluaciones inicial/final permanecen pendientes.
+
 ### Edición y administración del contenido
 
 Incremento implementado el 2026-10-19 y aprobado por el usuario para commit:

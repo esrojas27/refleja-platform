@@ -43,6 +43,16 @@ public class SurveyResultsService {
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public SurveyResults load(String subject, UUID org, UUID program, SurveyResults.Scope scope, boolean exporting, String requestId) {
+        return loadScoped(subject, org, program, scope, null, exporting, requestId);
+    }
+
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public SurveyResults loadForReport(String subject, UUID org, UUID program, UUID enrollmentId, boolean exporting, String requestId) {
+        return loadScoped(subject, org, program, new SurveyResults.Scope(null, null, null), enrollmentId, exporting, requestId);
+    }
+
+    private SurveyResults loadScoped(String subject, UUID org, UUID program, SurveyResults.Scope scope,
+            UUID enrollmentId, boolean exporting, String requestId) {
         OrganizationAccess.Context actor;
         try { actor = access.resolve(subject, org); }
         catch (OrganizationAccess.Unavailable e) { denied(org, program, requestId); throw new ProgramActivities.Missing(); }
@@ -58,13 +68,15 @@ public class SurveyResultsService {
         var selected = definitions.stream().filter(a -> matches(a, scope)).toList();
         if ((scope.dimensionId() != null || scope.sessionId() != null || scope.activityId() != null) && selected.isEmpty())
             throw new ProgramActivities.Missing();
-        var assigned = assignments.listByActivities(org, program, selected.stream().map(ProgramActivities.Activity::id).toList());
+        if (enrollmentId != null) enrollments.find(org, program, enrollmentId).orElseThrow(EnrollmentNotFound::new);
+        var assigned = assignments.listByActivities(org, program, selected.stream().map(ProgramActivities.Activity::id).toList())
+                .stream().filter(a -> enrollmentId == null || a.enrollmentId().equals(enrollmentId)).toList();
         var stored = responses.listByAssignments(org, program, assigned.stream().map(ActivityAssignments.Data::id).toList());
         var names = new LinkedHashMap<UUID, CollaboratorInvitations.Participant>();
         // Resolve each respondent once, through the identity-owned public port.
-        for (var enrollmentId : stored.stream().map(ActivityEvaluationResponses.Response::enrollmentId).distinct().toList()) {
-            var enrollment = enrollments.find(org, program, enrollmentId).orElseThrow(EnrollmentNotFound::new);
-            names.put(enrollmentId, people.participant(org, enrollment.membershipId()));
+        for (var respondentId : stored.stream().map(ActivityEvaluationResponses.Response::enrollmentId).distinct().toList()) {
+            var enrollment = enrollments.find(org, program, respondentId).orElseThrow(EnrollmentNotFound::new);
+            names.put(respondentId, people.participant(org, enrollment.membershipId()));
         }
         var output = new ArrayList<SurveyResults.Survey>();
         for (var activity : selected) {

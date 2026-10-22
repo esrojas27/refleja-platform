@@ -37,6 +37,11 @@
     </dependencyManagement>
 
     <dependencies>
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.5.1</version>
+        </dependency>
         <!-- AWS modules are not managed by the approved Boot/Modulith BOMs. -->
         <dependency>
             <groupId>software.amazon.awssdk</groupId><artifactId>cognitoidentityprovider</artifactId><version>${aws-sdk.version}</version>

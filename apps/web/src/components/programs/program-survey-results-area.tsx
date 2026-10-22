@@ -133,6 +133,25 @@ function ResultsContent({ organizationId, programId }: { organizationId: string;
   </section>;
 }
 const number = (value: number | null) => value === null ? "—" : value.toLocaleString("es-CO", { maximumFractionDigits: 2 });
+export function SurveyReportDetails({ report }: { report: SurveyResults }) {
+  const [level, setLevel] = useState<"dimensions" | "sessions" | "activities">("dimensions");
+  return <div className="mt-5 space-y-5">
+    <p className="text-sm leading-6 text-muted-foreground">Comparación descriptiva de encuestas por actividad, no una evaluación inicial/final. Acuerdo y probabilidad se mantienen separados; las preguntas pueden medir aspectos distintos.</p>
+    <Summary summary={report.summary} />
+    {report.surveys.length === 0 ? <p className="text-sm">Aún no hay encuestas configuradas.</p> : <>
+      <label className="block text-sm font-medium">Comparar encuestas por
+        <select className="rti-field mt-2 w-full sm:max-w-xs" value={level} onChange={e => setLevel(e.target.value as typeof level)}>
+          <option value="dimensions">Dimensión</option><option value="sessions">Sesión</option><option value="activities">Actividad</option>
+        </select></label>
+      <ul className="grid gap-3 sm:grid-cols-2">{report[level].map(c => <li key={c.id} className="min-w-0 rounded-xl border border-border p-4">
+        <p className="break-words font-semibold">{c.name}</p><p className="mt-1 break-words text-xs text-muted-foreground">{c.context}</p>
+        <p className="mt-3 text-sm">{c.summary.responseCount}/{c.summary.assignedCount} encuestas respondidas</p>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">Acuerdo: {number(c.summary.agreementAverage)}/5 (n={c.summary.agreementAnswers}) · Probabilidad: {number(c.summary.likelihoodAverage)}/5 (n={c.summary.likelihoodAnswers})</p>
+      </li>)}</ul>
+      {report.surveys.map(s => <SurveyCard key={s.id} survey={s} expanded={false} />)}
+    </>}
+  </div>;
+}
 function Summary({ summary, compact = false }: { summary: SurveySummary; compact?: boolean }) {
   return <div className={`grid gap-3 ${compact ? "grid-cols-2" : "sm:grid-cols-2 xl:grid-cols-4"}`}>
     {[["Encuestas respondidas", `${summary.responseCount} / ${summary.assignedCount}`, summary.responseRate === null ? "Sin encuestas asignadas" : `${number(summary.responseRate)}% de las asignadas`],
