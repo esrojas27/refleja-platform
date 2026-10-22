@@ -33,7 +33,7 @@ it("renders actual scoped collaborators and makes no mail delivery claim", async
   expect(screen.getByText(/no confirma recepción/)).toBeTruthy();
   expect(screen.getByText("Rol invitado: Colaborador")).toBeTruthy();
   const enrolledPerson = screen.getByText("participant@example.test").closest("li");
-  expect(enrolledPerson?.textContent).toContain("Inscripción: Invitada · Invitación: PENDING");
+  expect(enrolledPerson?.textContent).toContain("Inscripción: Invitada · Invitación: Pendiente");
   expect(enrolledPerson?.textContent).not.toContain("Inscripción: INVITED");
   expect(screen.getByRole("form", { name: "Invitar persona" })).toBeTruthy();
   expect(listEnrollments).toHaveBeenCalledWith("org-a", "program-a", 0, expect.any(AbortSignal));

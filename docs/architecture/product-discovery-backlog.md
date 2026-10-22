@@ -109,10 +109,16 @@ dimensiones: copian exactamente el contenido validado del programa fuente.
 
 ### Video de YouTube en actividades
 
-Una actividad podrá incluir opcionalmente un enlace de YouTube. En una iteración
-posterior se mostrará el video embebido. El primer incremento ya valida y conserva
-únicamente URLs HTTPS aprobadas y las presenta como enlace externo; no acepta HTML
-ni código de inserción enviado por el cliente.
+Una actividad incluye opcionalmente un enlace de YouTube. El video se muestra
+embebido en contenido y actividades del consultor y en actividades del colaborador,
+con carga diferida, pantalla completa y enlace externo alternativo. Se validan
+únicamente URLs HTTPS aprobadas y se extrae el identificador del video para
+construir un iframe en `www.youtube-nocookie.com`; no se acepta HTML ni se propagan
+parámetros arbitrarios del enlace. No hay reproducción automática.
+
+El reproductor usa el [modo de privacidad mejorada de YouTube](https://support.google.com/youtube/answer/171780?hl=es).
+La disponibilidad de cada video y el permiso de inserción dependen de su propietario.
+Validación del incremento: [video, estados y acceso desde portada](video-status-home-polish.md).
 
 ### Fechas límite y notificaciones
 

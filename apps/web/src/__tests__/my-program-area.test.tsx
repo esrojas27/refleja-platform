@@ -121,6 +121,7 @@ it("shows assigned work only in the activities section", async () => {
   expect(screen.getByText("Autoconocimiento", { exact: true }).closest("details")?.open).toBe(false);
   await openAssignedActivity();
   expect(screen.getByRole("link", { name: "Ver video en YouTube" }).getAttribute("href")).toBe("https://youtu.be/dQw4w9WgXcQ");
+  expect(screen.getByTitle("Video de la actividad: Reflexión inicial").tagName).toBe("IFRAME");
   expect(screen.queryByRole("heading", { name: "Progreso del programa" })).toBeNull();
   expect(listMyProgramActivities).toHaveBeenCalledWith("program-a", expect.any(AbortSignal));
 });

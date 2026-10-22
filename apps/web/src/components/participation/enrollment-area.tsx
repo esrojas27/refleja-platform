@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { fetchCurrentIdentity, IdentityRequestError, type CurrentIdentity } from "@/lib/auth/authenticated-api";
 import { createEnrollment, listEnrollments, retryInvitationDelivery, deliveryMessage, participationErrorMessage,
-  inviteeRoleLabel, ParticipationRequestError, type Enrollment, type EnrollmentInput, type InviteeRole,
+  inviteeRoleLabel, invitationStatusLabels, ParticipationRequestError, type Enrollment, type EnrollmentInput, type InviteeRole,
   type PageResult } from "@/lib/participation/participation-api";
 import { useProgramState } from "@/components/programs/program-state-context";
 import { EnrollmentAdministration,roleLabel } from "@/components/participation/enrollment-administration";
@@ -70,7 +70,7 @@ function EnrollmentContent({ organizationId, programId }: { organizationId: stri
           <p className="break-all text-sm text-muted-foreground">{enrollment.participant.email}</p>
           {enrollment.invitation && <p className="text-sm text-muted-foreground">Rol invitado: {inviteeRoleLabel(enrollment.invitation.role)}</p>}
           {enrollment.access&&<p className="text-sm text-muted-foreground">Roles actuales: {enrollment.access.roles.map(roleLabel).join(", ")||"Sin rol"}</p>}
-          <p className="text-sm text-muted-foreground">Inscripción: <span className="inline-block rounded-full border border-border bg-muted/70 px-2.5 py-1 text-xs font-semibold">{enrollmentStatusLabels[enrollment.status]}</span>{enrollment.invitation ? ` · Invitación: ${enrollment.invitation.status}` : ""}</p>
+          <p className="text-sm text-muted-foreground">Inscripción: <span className="inline-block rounded-full border border-border bg-muted/70 px-2.5 py-1 text-xs font-semibold">{enrollmentStatusLabels[enrollment.status]}</span>{enrollment.invitation ? ` · Invitación: ${invitationStatusLabels[enrollment.invitation.status]}` : ""}</p>
           {enrollment.invitation && <p className="text-sm text-muted-foreground">Vence: {enrollment.invitation.expiresAt}</p>}
           <DeliveryAction enrollment={enrollment} onSaved={saved => refresh(page, saved)} />
           <EnrollmentAdministration enrollment={enrollment} onSaved={saved=>refresh(page,saved)} />

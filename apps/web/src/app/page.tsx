@@ -1,6 +1,6 @@
 import { ArrowRight, Building2, ClipboardCheck, UsersRound } from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
+import { HomeAccountLink, HomeSessionProvider } from "@/components/auth/home-session";
 
 import { Brand } from "@/components/layout/brand";
 
@@ -24,12 +24,12 @@ const journey = [
 
 export default function Home() {
   return (
-    <div className="min-h-dvh">
-      <header className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 py-5 sm:px-8 lg:px-12">
+    <HomeSessionProvider><div className="min-h-dvh">
+      <header className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-3 px-5 py-5 sm:px-8 lg:px-12">
         <Brand />
-        <Link href="/login" className="rti-button-secondary">
+        <HomeAccountLink className="rti-button-secondary text-center">
           Iniciar sesión
-        </Link>
+        </HomeAccountLink>
       </header>
 
       <main>
@@ -43,10 +43,10 @@ export default function Home() {
               Un lugar para diseñar programas de desarrollo, acompañar a cada persona y hacer visible su camino de transformación.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link href="/login" className="rti-button-primary gap-2">
+              <HomeAccountLink className="rti-button-primary gap-2">
                 Entrar a la plataforma
                 <ArrowRight aria-hidden="true" className="size-4" />
-              </Link>
+              </HomeAccountLink>
               <a href="#recorrido" className="rti-button-secondary">
                 Conocer el recorrido
               </a>
@@ -112,6 +112,6 @@ export default function Home() {
         <p>Refleja Tu Interior</p>
         <p>Producto en evolución, construido a partir de experiencias reales.</p>
       </footer>
-    </div>
+    </div></HomeSessionProvider>
   );
 }

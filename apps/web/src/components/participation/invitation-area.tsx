@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { acceptInvitation, listInvitations, participationErrorMessage, ParticipationRequestError,
-  inviteeRoleLabel, type Invitation, type PageResult } from "@/lib/participation/participation-api";
+  inviteeRoleLabel, invitationStatusLabels, type Invitation, type PageResult } from "@/lib/participation/participation-api";
 
 const button = "rti-button-secondary";
 
@@ -34,7 +34,7 @@ export function InvitationArea() {
   }, [page, attempt, router]);
   function refresh(nextPage = page, accepted = false) {
     setResult(undefined); setPending(true); setNeedsLogin(false); setMessage("Consultando invitaciones…");
-    if (accepted) setNotice("Invitación aceptada. La inscripción está ACTIVE. Puedes volver a Cuenta y comprobar tu sesión.");
+    if (accepted) setNotice("Invitación aceptada. Tu inscripción está activa. Puedes volver a Cuenta y comprobar tu sesión.");
     setPage(nextPage); setAttempt(value => value + 1);
   }
   return <section className="rti-surface mx-auto w-full max-w-5xl p-6 sm:p-8 lg:p-10">
@@ -48,11 +48,11 @@ export function InvitationArea() {
     </p>}
     {result && <>
       <ul className="mt-6 grid gap-4 sm:grid-cols-2">{result.items.map(invitation => <li key={invitation.id} className="space-y-3 break-words rounded-2xl border border-border/70 bg-background/70 p-5">
-        <p className="rti-kicker">{invitation.status}</p>
+        <p className="rti-kicker">{invitationStatusLabels[invitation.status]}</p>
         <h2 className="text-lg font-semibold">{invitation.programName}</h2>
         <p className="text-sm text-muted-foreground">Organización: {invitation.organizationName}</p>
         <p className="text-sm text-muted-foreground">Rol: {inviteeRoleLabel(invitation.role)}</p>
-        <p className="text-sm text-muted-foreground">Estado: {invitation.status}</p>
+        <p className="text-sm text-muted-foreground">Estado: {invitationStatusLabels[invitation.status]}</p>
         <p className="text-sm text-muted-foreground">Vence: {invitation.expiresAt}</p>
         <InvitationAcceptance invitation={invitation} onAccepted={() => refresh(page, true)} />
       </li>)}</ul>

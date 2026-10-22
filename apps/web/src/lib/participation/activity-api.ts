@@ -123,25 +123,7 @@ export const reviewActivityAssignment = (organizationId: string, programId: stri
     `${programActivitiesPath(organizationId, programId)}/${encodeURIComponent(activityId)}`
       + `/assignments/${encodeURIComponent(assignmentId)}/review`, "POST", 200, input, signal);
 
-export function isYoutubeVideoUrl(value: string) {
-  if (!value) return true;
-  if (value.length > 2048) return false;
-  try {
-    const url = new URL(value);
-    if (url.protocol !== "https:" || url.username || url.password || url.port) return false;
-    const id = /^[A-Za-z0-9_-]{11}$/;
-    const segments = url.pathname.split("/").filter(Boolean);
-    if (["youtu.be", "www.youtu.be"].includes(url.hostname)) return segments.length === 1 && id.test(segments[0]);
-    if (["youtube.com", "www.youtube.com", "m.youtube.com"].includes(url.hostname)) {
-      if (url.pathname === "/watch") return id.test(url.searchParams.get("v") ?? "");
-      return segments.length === 2 && ["shorts", "embed", "live"].includes(segments[0]) && id.test(segments[1]);
-    }
-    return ["youtube-nocookie.com", "www.youtube-nocookie.com"].includes(url.hostname)
-      && segments.length === 2 && segments[0] === "embed" && id.test(segments[1]);
-  } catch {
-    return false;
-  }
-}
+export { isYoutubeVideoUrl } from "./youtube";
 
 export function activityErrorMessage(error: unknown) {
   const status = error instanceof ActivityRequestError ? error.status : 0;

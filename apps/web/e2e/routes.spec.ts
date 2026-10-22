@@ -8,6 +8,7 @@ test("home page renders responsively", async ({ page }) => {
     page.getByRole("heading", { level: 1, name: "Refleja Tu Interior" }),
   ).toBeVisible();
   await expect(page.getByText("Una experiencia compartida")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Iniciar sesión", exact: true })).toHaveAttribute("href", "/login");
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,

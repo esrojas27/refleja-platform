@@ -31,7 +31,7 @@ describe("Create organization", () => {
     fireEvent.click(screen.getByRole("button", { name: "Crear organización" }));
     expect(await screen.findByText("Organización creada.")).toBeDefined();
     expect(screen.getByText("Empresa Real")).toBeDefined();
-    expect(screen.getByText("ACTIVE")).toBeDefined();
+    expect(screen.getByText("Activa")).toBeDefined();
     expect(create).toHaveBeenCalledWith({ name: "Empresa Real", defaultTimeZone: "Europe/Madrid" }, expect.any(AbortSignal));
     expect(screen.queryByRole("button", { name: "Crear organización" })).toBeNull();
   });

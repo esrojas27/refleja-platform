@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ActivityVideo } from "@/components/participation/activity-video";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { CheckCircle2, ClipboardCheck } from "lucide-react";
 import { fetchCurrentIdentity, IdentityRequestError } from "@/lib/auth/authenticated-api";
@@ -109,8 +110,7 @@ function ActivityContent({ organizationId, programId }: { organizationId: string
             <p className="rti-kicker">{sessionNames.get(activity.sessionId) ?? "Sesión"} · Actividad {activity.position}</p>
             <h3 className="mt-2 text-lg font-semibold">{activity.title}</h3>
             <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{activity.instructions}</p>
-            {activity.youtubeUrl && <a href={activity.youtubeUrl} target="_blank" rel="noopener noreferrer"
-              className="rti-link mt-3 inline-block text-sm">Ver video en YouTube</a>}
+            {activity.youtubeUrl && <ActivityVideo url={activity.youtubeUrl} title={activity.title} />}
             <p className="mt-3 text-sm font-medium">Fecha límite: {activity.dueDate}</p>
             <div className="mt-4 flex flex-wrap gap-2" aria-label={`Estado de asignaciones de ${activity.title}`}>
               {assignmentSummary(activity).map(item => <span key={item.label}

@@ -4,6 +4,9 @@ export type PageResult<T> = { items: T[]; page: number; size: number; totalEleme
 export type InviteeRole = "COLLABORATOR" | "LEADER" | "COMPANY_ADMIN";
 export type EnrollmentInput = { email: string; firstName: string; lastName: string; role: InviteeRole };
 export type InvitationStatus = "PENDING" | "ACCEPTED" | "EXPIRED" | "REVOKED";
+export const invitationStatusLabels: Record<InvitationStatus, string> = {
+  PENDING: "Pendiente", ACCEPTED: "Aceptada", EXPIRED: "Vencida", REVOKED: "Revocada",
+};
 export type EnrollmentStatus = "PENDING_APPROVAL" | "INVITED" | "ACTIVE" | "SUSPENDED" | "COMPLETED" | "WITHDRAWN";
 export type Enrollment = {
   id: string; organizationId: string; programId: string; status: EnrollmentStatus;

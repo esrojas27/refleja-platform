@@ -2,6 +2,7 @@
 
 import { BarChart3, ChevronDown, Plus } from "lucide-react";
 import Link from "next/link";
+import { ActivityVideo } from "@/components/participation/activity-video";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import { fetchCurrentIdentity, IdentityRequestError } from "@/lib/auth/authenticated-api";
@@ -205,8 +206,7 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
                         {canEdit && <ContentTools {...toolsContext} kind="activities" item={activity} parentArchived={dimension.archived || session.archived}
                           {...usage([activity])} {...bounds(activity, allSessionActivities)}
                           onEdit={() => setDialog({ kind: "activity", dimensionName: dimension.name, session, initial: activity })} />}
-                        {activity.youtubeUrl && <a href={activity.youtubeUrl} target="_blank" rel="noopener noreferrer"
-                          className="rti-link mt-3 inline-block text-sm">Ver video en YouTube</a>}
+                        {activity.youtubeUrl && <ActivityVideo url={activity.youtubeUrl} title={activity.title} />}
                         {evaluation ? <div className="mt-4 rounded-xl border border-primary/20 bg-accent/35 p-3">
                           <div className="flex items-center gap-2"><BarChart3 aria-hidden="true" className="size-4 text-primary" />
                             <p className="text-sm font-semibold">{evaluation.title}</p></div>

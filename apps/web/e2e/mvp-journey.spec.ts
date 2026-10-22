@@ -97,7 +97,7 @@ test.describe("@mvp RTI-VS1-013 authenticated vertical slice", () => {
     const enrollment = page.getByRole("listitem").filter({ has: page.getByText(collaboratorEmail, { exact: true }) });
     await expect(enrollment).toHaveCount(1);
     await expect(enrollment.getByText("Invitada", { exact: true })).toBeVisible();
-    await expect(enrollment).toContainText("Invitación: PENDING");
+    await expect(enrollment).toContainText("Invitación: Pendiente");
 
     await page.goto("/account");
     await page.getByRole("button", { name: "Cerrar sesión" }).click();

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ActivityVideo } from "@/components/participation/activity-video";
 import { ChevronDown, Flag } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -299,8 +300,7 @@ function AssignedActivityCard({ programId, activity, onSubmitted, readOnly }: {
 
   return <div>
     <p className="whitespace-pre-wrap text-sm text-muted-foreground">{activity.instructions}</p>
-    {activity.youtubeUrl && <a href={activity.youtubeUrl} target="_blank" rel="noopener noreferrer"
-      className="rti-link mt-3 inline-block text-sm">Ver video en YouTube</a>}
+    {activity.youtubeUrl && <ActivityVideo url={activity.youtubeUrl} title={activity.title} />}
     <p className="mt-3 text-sm font-medium">Fecha límite: {activity.dueDate}</p>
     <div className="mt-4 rounded-xl border border-border/70 bg-muted/35 p-3">
       <div className="flex items-center justify-between gap-3 text-sm"><span className="font-medium">Avance de la actividad</span>

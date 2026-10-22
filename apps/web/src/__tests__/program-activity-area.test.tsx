@@ -80,6 +80,7 @@ it("renders real sessions, assignments and existing activities", async () => {
   expect(screen.getByRole("button", { name: "Revisar actividades (1)" })).toBeTruthy();
   expect(screen.queryByRole("form", { name: "Crear actividad" })).toBeNull();
   expect(screen.getByRole("link", { name: "Ver video en YouTube" }).getAttribute("href")).toBe("https://youtu.be/dQw4w9WgXcQ");
+  expect(screen.getByTitle("Video de la actividad: Reflexión inicial").tagName).toBe("IFRAME");
   expect(listEnrollments).toHaveBeenCalledWith("org-a", "program-a", 0, expect.any(AbortSignal), 100);
 });
 

@@ -84,7 +84,7 @@ export function CreateOrganizationForm() {
       {created ? (
         <dl className="mt-5 grid gap-x-8 gap-y-2 break-words rounded-2xl border border-border/70 bg-background/70 p-5 sm:grid-cols-[auto_1fr]">
           <dt className="font-medium">Organización</dt><dd>{created.name}</dd>
-          <dt className="font-medium">Estado</dt><dd>{created.status}</dd>
+          <dt className="font-medium">Estado</dt><dd>{created.status === "ACTIVE" ? "Activa" : "Estado no disponible"}</dd>
           <dt className="font-medium">Zona horaria</dt><dd>{created.defaultTimeZone}</dd>
           <dt className="font-medium">Versión</dt><dd>{created.version}</dd>
         </dl>

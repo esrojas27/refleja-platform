@@ -78,6 +78,14 @@ it("renders the ordered real dimension and session structure", async () => {
   expect(listProgramDimensions).toHaveBeenCalledWith("org-a", "program-a", expect.any(AbortSignal), true);
 });
 
+it("embeds the activity video inside the consultant content accordion", async () => {
+  vi.mocked(listProgramActivities).mockResolvedValue({ items: [{ ...activity, youtubeUrl: "https://youtu.be/dQw4w9WgXcQ" }] });
+  render(<ProgramContentArea organizationId="org-a" programId="program-a" />);
+  fireEvent.click(await screen.findByRole("button", { name: /Fundamentos/, expanded: false }));
+  fireEvent.click(screen.getByRole("button", { name: /Sesión inicial/, expanded: false }));
+  expect(screen.getByTitle("Video de la actividad: Reflexión inicial").tagName).toBe("IFRAME");
+});
+
 it("appends dimensions using the next visible position", async () => {
   render(<ProgramContentArea organizationId="org-a" programId="program-a" />);
   fireEvent.click(await screen.findByRole("button", { name: "Crear dimensión" }));
