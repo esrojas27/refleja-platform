@@ -8,6 +8,11 @@ contrato compatible de creación bajo `/modules`.
 
 - Solo el consultor autorizado de la organización puede administrar contenido.
   Líder, RRHH y colaborador no reciben estas operaciones.
+- Al crear o editar una encuesta, las flechas **Subir/Bajar pregunta** cambian su
+  orden conservando enunciado y tipo de respuesta. La numeración se recalcula de
+  1 a N y se persiste al guardar, con la versión de encuesta al editar. El
+  colaborador recibe ese mismo orden. Desde la primera entrega queda bloqueado,
+  igual que el resto de cambios de la encuesta; para otra versión se duplica.
 - Borrador/Programado/Activo admiten preparación y corrección. Finalizado/Cancelado
   siguen siendo solo consulta; no se introduce reapertura.
 - Dimensiones: editar nombre y descripción. Sesiones: editar nombre, objetivo y

@@ -484,6 +484,42 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CONTENT_VERSION_CONFLICT"));
     }
 
+    @Test void reordersSurveyQuestionsBeforeDeliveryAndKeepsThatOrderForConsultantAndCollaborator() throws Exception {
+        var activity=createAdminActivity(true,1);
+        var original="""
+                {"title":"Encuesta ordenada","instructions":null,"questions":[
+                  {"prompt":"Nivel de acuerdo","type":"AGREEMENT_SCALE","position":1},
+                  {"prompt":"Reflexión final","type":"OPEN_TEXT","position":2}
+                ]}
+                """;
+        mvc.perform(post(evaluationPath(activity)).header("Authorization",token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(original)).andExpect(status().isCreated());
+        var reordered="""
+                {"title":"Encuesta ordenada","instructions":null,"version":0,"questions":[
+                  {"prompt":"Reflexión final","type":"OPEN_TEXT","position":1},
+                  {"prompt":"Nivel de acuerdo","type":"AGREEMENT_SCALE","position":2}
+                ]}
+                """;
+        mvc.perform(put(adminPath("activities",activity)+"/survey").header("Authorization",token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(reordered)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.version").value(1)).andExpect(jsonPath("$.questions[0].prompt").value("Reflexión final"))
+                .andExpect(jsonPath("$.questions[0].position").value(1)).andExpect(jsonPath("$.questions[1].prompt").value("Nivel de acuerdo"))
+                .andExpect(jsonPath("$.questions[1].position").value(2));
+        mvc.perform(get(agendaBase()+"/evaluations").header("Authorization",token(consultant))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].questions[0].prompt").value("Reflexión final"));
+        mvc.perform(post(collaboratorPath()+"/"+activity+"/submission").header("Authorization",token(collaborator))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"Actividad realizada\"}")).andExpect(status().isOk());
+        mvc.perform(get(collaboratorPath()).header("Authorization",token(collaborator))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].survey.questions[0].prompt").value("Reflexión final"))
+                .andExpect(jsonPath("$.items[0].survey.questions[1].prompt").value("Nivel de acuerdo"));
+        mvc.perform(put(adminPath("activities",activity)+"/survey").header("Authorization",token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(original.replaceFirst("\\{","{\"version\":1,")))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CONTENT_HAS_SUBMISSIONS"));
+        mvc.perform(get(agendaBase()+"/evaluations").header("Authorization",token(consultant))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].version").value(1))
+                .andExpect(jsonPath("$.items[0].questions[0].prompt").value("Reflexión final"));
+    }
+
     @Test void duplicateCopiesDefinitionAndSurveyButNotSubmissionsAndUsesSessionAgenda() throws Exception {
         var activity = createAdminActivity(true, 1);
         var survey = createAdminSurvey(activity);

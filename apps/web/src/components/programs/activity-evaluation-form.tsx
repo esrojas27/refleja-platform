@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { editSurvey } from "@/lib/programs/content-administration-api";
 import { ProgramContentRequestError, programContentErrorMessage } from "@/lib/programs/program-content-api";
@@ -33,10 +33,12 @@ export function ActivityEvaluationForm({ organizationId, programId, activityId, 
   const [pending, setPending] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [message, setMessage] = useState("");
+  const [orderNotice, setOrderNotice] = useState("");
   useEffect(() => () => request.current?.abort(), []);
 
   function addQuestion() {
     if (questions.length >= 20) return;
+    setOrderNotice("");
     const key = nextKey.current++;
     setQuestions(current => [...current, { key, prompt: "", type: "OPEN_TEXT" }]);
     window.setTimeout(() => document.getElementById(`evaluation-question-${key}-prompt`)?.focus(), 0);
@@ -46,8 +48,30 @@ export function ActivityEvaluationForm({ organizationId, programId, activityId, 
     setInvalid(current => current.filter(field => field !== `question-${key}` && field !== "questions"));
   }
   function removeQuestion(key: number) {
+    setOrderNotice("");
     setQuestions(current => current.filter(question => question.key !== key));
     setInvalid(current => current.filter(field => field !== `question-${key}`));
+  }
+  function moveQuestion(key: number, direction: "up" | "down") {
+    if (pending || blocked || submitting.current) return;
+    const index = questions.findIndex(question => question.key === key);
+    const destination = index + (direction === "up" ? -1 : 1);
+    if (index < 0 || destination < 0 || destination >= questions.length) return;
+    setQuestions(current => {
+      const position = current.findIndex(question => question.key === key);
+      const target = position + (direction === "up" ? -1 : 1);
+      if (position < 0 || target < 0 || target >= current.length) return current;
+      const reordered = [...current];
+      [reordered[position], reordered[target]] = [reordered[target], reordered[position]];
+      return reordered;
+    });
+    setOrderNotice(`Pregunta ${index + 1} movida a la posición ${destination + 1}. Guarda la encuesta para aplicar el nuevo orden.`);
+    window.setTimeout(() => {
+      const control = document.getElementById(`evaluation-question-${key}-${direction}`) as HTMLButtonElement | null;
+      const fallback = document.getElementById(`evaluation-question-${key}-${direction === "up" ? "down" : "up"}`) as HTMLButtonElement | null;
+      if (control && !control.disabled) control.focus();
+      else if (fallback && !fallback.disabled) fallback.focus();
+    }, 0);
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -115,17 +139,29 @@ export function ActivityEvaluationForm({ organizationId, programId, activityId, 
 
     <section aria-labelledby="evaluation-questions-title" className="space-y-4">
       <div><h3 id="evaluation-questions-title" className="text-lg font-semibold">Preguntas</h3>
-        <p className="mt-1 text-sm text-muted-foreground">Puedes agregar hasta 20 preguntas.</p></div>
+        <p className="mt-1 text-sm text-muted-foreground">Puedes agregar hasta 20 preguntas. Usa las flechas para cambiar su orden y guarda la encuesta para aplicar los cambios.</p></div>
+      <p aria-live="polite" aria-atomic="true" className="text-sm text-muted-foreground">{orderNotice}</p>
       {invalid.includes("questions") && <p className="text-sm text-destructive">Agrega al menos una pregunta válida.</p>}
       <ol className="space-y-5">{questions.map((question, index) => {
         const fieldInvalid = invalid.includes(`question-${question.key}`);
         return <li key={question.key} className="rounded-2xl border border-border/70 bg-background/70 p-4 sm:p-5">
-          <div className="flex items-start justify-between gap-3"><p className="rti-kicker">Pregunta {index + 1}</p>
+          <div className="flex flex-wrap items-center justify-between gap-3"><p className="rti-kicker">Pregunta {index + 1}</p>
+            <div className="flex items-center gap-1">
+              <button id={`evaluation-question-${question.key}-up`} type="button" aria-label={`Subir pregunta ${index + 1}`} title="Subir pregunta"
+                className="inline-flex size-11 items-center justify-center rounded-full border border-border text-muted-foreground hover:bg-secondary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={() => moveQuestion(question.key, "up")} disabled={pending || blocked || index === 0}>
+                <ArrowUp aria-hidden="true" className="size-4" />
+              </button>
+              <button id={`evaluation-question-${question.key}-down`} type="button" aria-label={`Bajar pregunta ${index + 1}`} title="Bajar pregunta"
+                className="inline-flex size-11 items-center justify-center rounded-full border border-border text-muted-foreground hover:bg-secondary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={() => moveQuestion(question.key, "down")} disabled={pending || blocked || index === questions.length - 1}>
+                <ArrowDown aria-hidden="true" className="size-4" />
+              </button>
             {questions.length > 1 && <button type="button" aria-label={`Eliminar pregunta ${index + 1}`}
-              className="inline-flex size-9 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground"
+              className="inline-flex size-11 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
               onClick={() => removeQuestion(question.key)} disabled={pending || blocked}>
               <Trash2 aria-hidden="true" className="size-4" />
-            </button>}</div>
+            </button>}</div></div>
           <div className="mt-4 grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(13rem,0.55fr)]">
             <div><label htmlFor={`evaluation-question-${question.key}-prompt`} className="block text-sm font-medium">Enunciado</label>
               <textarea id={`evaluation-question-${question.key}-prompt`} className="rti-field min-h-24 resize-y"
