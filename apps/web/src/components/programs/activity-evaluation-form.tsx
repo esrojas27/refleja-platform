@@ -6,13 +6,14 @@ import { editSurvey } from "@/lib/programs/content-administration-api";
 import { ProgramContentRequestError, programContentErrorMessage } from "@/lib/programs/program-content-api";
 import {
   AGREEMENT_OPTIONS, createActivityEvaluation, EMOTION_OPTIONS, evaluationErrorMessage,
-  EvaluationRequestError, LIKELIHOOD_OPTIONS, type ActivityEvaluation, type EvaluationQuestionType,
+  EvaluationRequestError, LIKELIHOOD_OPTIONS, NUMERIC_SCALE_OPTIONS, type ActivityEvaluation, type EvaluationQuestionType,
 } from "@/lib/participation/evaluation-api";
 
 type DraftQuestion = { key: number; prompt: string; type: EvaluationQuestionType };
 const TYPE_LABELS: Record<EvaluationQuestionType, string> = {
   AGREEMENT_SCALE: "Escala · Nivel de acuerdo",
   LIKELIHOOD_SCALE: "Escala · Probabilidad",
+  NUMERIC_SCALE: "Escala numérica · 1–5",
   OPEN_TEXT: "Respuesta abierta",
   EMOTION_MULTI_SELECT: "Emociones · Máximo 2",
 };
@@ -188,6 +189,11 @@ export function ActivityEvaluationForm({ organizationId, programId, activityId, 
 }
 
 export function QuestionPreview({ type }: { type: EvaluationQuestionType }) {
+  if (type === "NUMERIC_SCALE") return <div className="mt-4 rounded-xl border border-dashed border-border bg-muted/35 p-3">
+    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vista para el colaborador</p>
+    <div className="mt-3 grid grid-cols-5 gap-2">{NUMERIC_SCALE_OPTIONS.map(value => <span key={value}
+      className="rounded-xl border border-border bg-card px-2 py-3 text-center text-lg font-semibold text-primary">{value}</span>)}</div>
+  </div>;
   if (type === "OPEN_TEXT") return <div className="mt-4 rounded-xl border border-dashed border-border bg-muted/35 p-3">
     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vista para el colaborador</p>
     <textarea className="rti-field mt-2 min-h-20" disabled placeholder="El colaborador escribirá aquí su respuesta" />

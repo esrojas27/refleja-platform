@@ -154,7 +154,7 @@ public class SurveyResultsService {
         var counts = values.stream().flatMap(a -> a.values().stream())
                 .collect(java.util.stream.Collectors.groupingBy(Function.identity(), java.util.stream.Collectors.counting()));
         List<String> options = switch (q.type()) {
-            case AGREEMENT_SCALE, LIKELIHOOD_SCALE -> List.of("1", "2", "3", "4", "5");
+            case AGREEMENT_SCALE, LIKELIHOOD_SCALE, NUMERIC_SCALE -> List.of("1", "2", "3", "4", "5");
             case EMOTION_MULTI_SELECT -> EMOTIONS; case OPEN_TEXT -> List.of();
         };
         var distribution = options.stream().map(value -> new SurveyResults.OptionCount(value, label(q.type(), value),
@@ -162,7 +162,8 @@ public class SurveyResultsService {
                 .sorted(q.type() == EvaluationQuestionType.EMOTION_MULTI_SELECT
                         ? Comparator.comparingInt(SurveyResults.OptionCount::count).reversed()
                         : (a, b) -> 0).toList();
-        boolean scale = q.type() == EvaluationQuestionType.AGREEMENT_SCALE || q.type() == EvaluationQuestionType.LIKELIHOOD_SCALE;
+        boolean scale = q.type() == EvaluationQuestionType.AGREEMENT_SCALE || q.type() == EvaluationQuestionType.LIKELIHOOD_SCALE
+                || q.type() == EvaluationQuestionType.NUMERIC_SCALE;
         return new SurveyResults.Question(q.id(), q.prompt(), q.type(), q.position(), values.size(),
                 scale ? average(values.stream().flatMap(a -> a.values().stream()).map(Integer::parseInt).toList()) : null, distribution);
     }

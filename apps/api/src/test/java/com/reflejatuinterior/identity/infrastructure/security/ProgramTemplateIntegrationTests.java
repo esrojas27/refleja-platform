@@ -85,6 +85,7 @@ class ProgramTemplateIntegrationTests extends PostgreSqlIntegrationTestSupport {
 
     @Test
     void createsAnImmutableTemplateAndMaterializesTheCompleteContentWithoutParticipants() throws Exception {
+        jdbcTemplate.update("update rti.activity_evaluation_questions set question_type='NUMERIC_SCALE',prompt='Nivel del 1 al 5' where id=?",question);
         mvc.perform(get(programPath(sourceProgram) + "/template-readiness").header("Authorization", bearer))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.eligible").value(true))
                 .andExpect(jsonPath("$.dimensionCount").value(1)).andExpect(jsonPath("$.sessionCount").value(1))
@@ -122,6 +123,7 @@ class ProgramTemplateIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 clonedProgram)).isEqualTo(1);
         assertThat(jdbcTemplate.queryForObject("select count(*) from rti.activity_evaluations where program_id=?", Long.class,
                 clonedProgram)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("select question_type from rti.activity_evaluation_questions where program_id=?",String.class,clonedProgram)).isEqualTo("NUMERIC_SCALE");
         assertThat(jdbcTemplate.queryForObject("select scheduled_date from rti.program_sessions where program_id=?",
                 java.time.LocalDate.class, clonedProgram)).isNull();
         assertThat(jdbcTemplate.queryForObject("select due_date from rti.program_activities where program_id=?",

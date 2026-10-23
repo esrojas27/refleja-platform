@@ -1,7 +1,7 @@
 import { fetchAuthSession } from "aws-amplify/auth";
 import { programActivitiesPath } from "@/lib/participation/activity-api";
 
-export type EvaluationQuestionType = "AGREEMENT_SCALE" | "LIKELIHOOD_SCALE" | "OPEN_TEXT" | "EMOTION_MULTI_SELECT";
+export type EvaluationQuestionType = "AGREEMENT_SCALE" | "LIKELIHOOD_SCALE" | "NUMERIC_SCALE" | "OPEN_TEXT" | "EMOTION_MULTI_SELECT";
 export type EvaluationQuestion = { id: string; prompt: string; type: EvaluationQuestionType; position: number; version: number };
 export type ActivityEvaluation = {
   id: string; organizationId: string; programId: string; activityId: string; title: string;
@@ -71,4 +71,5 @@ export const AGREEMENT_OPTIONS = [
   "Totalmente en desacuerdo", "En desacuerdo", "Ni de acuerdo ni en desacuerdo", "De acuerdo", "Totalmente de acuerdo",
 ];
 export const LIKELIHOOD_OPTIONS = ["Muy improbable", "Improbable", "No estoy seguro(a)", "Probable", "Muy probable"];
+export const NUMERIC_SCALE_OPTIONS = ["1", "2", "3", "4", "5"];
 export const EMOTION_OPTIONS = ["Inspirado(a)", "Motivado(a)", "Reflexivo(a)", "Sorprendido(a)", "Retado(a)", "Confundido(a)", "Indiferente"];

@@ -2,7 +2,7 @@
 
 import { CheckCircle2 } from "lucide-react";
 import { useRef, useState, type FormEvent } from "react";
-import { AGREEMENT_OPTIONS, EMOTION_OPTIONS, LIKELIHOOD_OPTIONS } from "@/lib/participation/evaluation-api";
+import { AGREEMENT_OPTIONS, EMOTION_OPTIONS, LIKELIHOOD_OPTIONS, NUMERIC_SCALE_OPTIONS } from "@/lib/participation/evaluation-api";
 import { activityErrorMessage, submitMyActivitySurvey, type ActivitySurvey,
   type ActivitySurveySubmission } from "@/lib/participation/activity-api";
 
@@ -67,7 +67,8 @@ export function ActivitySurveyForm({ programId, activityId, survey, onCompleted 
       const selected = answers[question.id] ?? [];
       const fieldInvalid = invalid.includes(question.id);
       const options = question.type === "AGREEMENT_SCALE" ? AGREEMENT_OPTIONS
-        : question.type === "LIKELIHOOD_SCALE" ? LIKELIHOOD_OPTIONS : [];
+        : question.type === "LIKELIHOOD_SCALE" ? LIKELIHOOD_OPTIONS : question.type === "NUMERIC_SCALE" ? NUMERIC_SCALE_OPTIONS : [];
+      const numeric = question.type === "NUMERIC_SCALE";
       return <li key={question.id} className="rounded-xl border border-border/70 bg-card p-4">
         <fieldset aria-invalid={fieldInvalid || undefined}>
           <legend className="font-medium"><span className="mr-2 text-primary">{index + 1}.</span>{question.prompt}</legend>
@@ -83,23 +84,23 @@ export function ActivitySurveyForm({ programId, activityId, survey, onCompleted 
                   disabled={pending || (!selected.includes(option) && selected.length >= 2)}
                   onChange={() => toggleEmotion(question.id, option)} />{option}
               </label>)}</div> : <div id={`survey-question-${question.id}`} tabIndex={-1} className="mt-3">
-                <ol className="hidden space-y-1.5 rounded-xl bg-muted/55 px-4 py-3 text-sm sm:block">
+                {!numeric && <ol className="hidden space-y-1.5 rounded-xl bg-muted/55 px-4 py-3 text-sm sm:block">
                   {options.map((option, optionIndex) => <li key={option} className="flex gap-2">
                     <span className="font-semibold text-primary">{optionIndex + 1}.</span>
                     <span>{option}</span>
                   </li>)}
-                </ol>
-                <div className="grid gap-2 sm:mt-3 sm:grid-cols-5 sm:gap-3">{options.map((option, optionIndex) => {
+                </ol>}
+                <div className={`grid gap-2 sm:grid-cols-5 sm:gap-3 ${numeric ? "grid-cols-5" : "sm:mt-3"}`}>{options.map((option, optionIndex) => {
                   const value = String(optionIndex + 1);
                   const active = selected[0] === value;
-                  return <label key={option} className={`cursor-pointer rounded-xl border p-3 text-center text-xs transition ${active
+                  return <label key={option} className={`cursor-pointer rounded-xl border px-2 py-3 text-center text-xs transition focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 ${active
                     ? "border-primary bg-primary text-primary-foreground"
                     : "border-border bg-background hover:border-primary/60 hover:bg-accent/40"}`}>
                     <input type="radio" className="sr-only" name={`survey-${question.id}`} value={value}
                       checked={active} disabled={pending}
                       onChange={() => setAnswer(question.id, [value])} />
                     <span className="block text-lg font-semibold">{value}</span>
-                    <span className="sm:hidden">{option}</span>
+                    {!numeric && <span className="sm:hidden">{option}</span>}
                   </label>;
                 })}</div>
               </div>}

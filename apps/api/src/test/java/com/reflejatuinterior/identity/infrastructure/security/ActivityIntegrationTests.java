@@ -612,6 +612,69 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 .andExpect(jsonPath("$.items[1].assignees[0].submittedAt").doesNotExist());
     }
 
+    @Test void numericScaleSupportsEditingDuplicationStrictAnswersAndNumericResultsAndExports() throws Exception {
+        var activity=createAdminActivity(true,1);
+        var definition="""
+                {"title":"Encuesta numérica","instructions":null,"questions":[
+                  {"prompt":"Nivel genérico","type":"NUMERIC_SCALE","position":1},
+                  {"prompt":"Acuerdo","type":"AGREEMENT_SCALE","position":2},
+                  {"prompt":"Probabilidad","type":"LIKELIHOOD_SCALE","position":3}
+                ]}
+                """;
+        mvc.perform(post(evaluationPath(activity)).header("Authorization",token(consultant)).contentType(MediaType.APPLICATION_JSON).content(definition))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.questions[0].type").value("NUMERIC_SCALE"));
+        var edited=mvc.perform(put(adminPath("activities",activity)+"/survey").header("Authorization",token(consultant)).contentType(MediaType.APPLICATION_JSON)
+                .content(definition.replaceFirst("\\{","{\"version\":0,"))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.version").value(1)).andReturn().getResponse();
+        var questions=json.readTree(edited.getContentAsString()).path("questions");
+        mvc.perform(get(resultsPath()).param("activityId",activity.toString()).header("Authorization",token(consultant))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.surveys[0].questions[0].average").isEmpty())
+                .andExpect(jsonPath("$.surveys[0].questions[0].distribution.length()").value(5))
+                .andExpect(jsonPath("$.surveys[0].questions[0].distribution[0].count").value(0));
+        var copyResponse=mvc.perform(post(adminPath("activities",activity)+"/duplicate").header("Authorization",token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0}")).andExpect(status().isCreated()).andReturn().getResponse();
+        var copy=UUID.fromString(json.readTree(copyResponse.getContentAsString()).path("id").asText());
+        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.activity_evaluation_questions q join rti.activity_evaluations e on e.id=q.evaluation_id where e.activity_id=? and q.question_type='NUMERIC_SCALE'",Long.class,copy)).isEqualTo(1);
+        for(var person:java.util.List.of(collaborator,otherCollaborator))
+            mvc.perform(post(collaboratorPath()+"/"+activity+"/submission").header("Authorization",token(person))
+                    .contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"Actividad terminada\"}")).andExpect(status().isOk());
+        var invalid=java.util.List.of(java.util.List.of("0"),java.util.List.of("6"),java.util.List.of("4.5"),java.util.List.of("texto"),
+                java.util.List.of(""),java.util.List.of("1","2"),java.util.List.<String>of());
+        for(var values:invalid) mvc.perform(post(surveyResponsePath(activity)).header("Authorization",token(collaborator))
+                .contentType(MediaType.APPLICATION_JSON).content(numericSurveyAnswers(questions,values))).andExpect(status().isBadRequest());
+        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.activity_evaluation_responses where organization_id=?",Long.class,organization)).isZero();
+        mvc.perform(post(surveyResponsePath(activity)).header("Authorization",token(collaborator)).contentType(MediaType.APPLICATION_JSON)
+                .content(numericSurveyAnswers(questions,java.util.List.of("1")))).andExpect(status().isOk());
+        mvc.perform(post(surveyResponsePath(activity)).header("Authorization",token(otherCollaborator)).contentType(MediaType.APPLICATION_JSON)
+                .content(numericSurveyAnswers(questions,java.util.List.of("5")))).andExpect(status().isOk());
+        mvc.perform(get(resultsPath()).param("activityId",activity.toString()).header("Authorization",token(consultant))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.summary.agreementAverage").value(5.0)).andExpect(jsonPath("$.summary.agreementAnswers").value(2))
+                .andExpect(jsonPath("$.summary.likelihoodAverage").value(1.0)).andExpect(jsonPath("$.summary.likelihoodAnswers").value(2))
+                .andExpect(jsonPath("$.surveys[0].questions[0].average").value(3.0))
+                .andExpect(jsonPath("$.surveys[0].questions[0].distribution[0].label").value("1"))
+                .andExpect(jsonPath("$.surveys[0].questions[0].distribution[0].count").value(1))
+                .andExpect(jsonPath("$.surveys[0].questions[0].distribution[0].percentage").value(50.0))
+                .andExpect(jsonPath("$.surveys[0].questions[0].distribution[4].label").value("5"))
+                .andExpect(jsonPath("$.surveys[0].questions[0].distribution[4].count").value(1));
+        var csv=mvc.perform(get(resultsPath()+"/export").param("activityId",activity.toString()).header("Authorization",token(consultant)))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        var numericRows=csv.lines().filter(row->row.contains("\"NUMERIC_SCALE\"")).toList();
+        assertThat(numericRows).hasSize(8).anyMatch(row->row.contains("\"1\",\"1\""))
+                .noneMatch(row->row.contains("Totalmente")||row.contains("improbable"));
+        var excel=mvc.perform(get(reportPath()+"/export").param("format","xlsx").header("Authorization",token(consultant)))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
+        try(var workbook=new org.apache.poi.xssf.usermodel.XSSFWorkbook(new java.io.ByteArrayInputStream(excel))) {
+            var text=new StringBuilder(); for(var sheet:workbook) for(var row:sheet) for(var cell:row) text.append(cell.toString());
+            assertThat(text.toString()).contains("NUMERIC_SCALE","Nivel genérico");
+        }
+    }
+    private String numericSurveyAnswers(tools.jackson.databind.JsonNode questions,java.util.List<String> values) {
+        return json.writeValueAsString(java.util.Map.of("answers",java.util.List.of(
+                java.util.Map.of("questionId",questions.get(0).path("id").asText(),"values",values),
+                java.util.Map.of("questionId",questions.get(1).path("id").asText(),"values",java.util.List.of("5")),
+                java.util.Map.of("questionId",questions.get(2).path("id").asText(),"values",java.util.List.of("1")))));
+    }
+
     @Test void surveyResultsAggregateScalesSeparatelyAndCompareTheFullHierarchy() throws Exception {
         var first = createAdminActivity(true, 1);
         var firstSurvey = createResultsSurvey(first);

@@ -10,6 +10,7 @@ Fecha: 2026-09-20
 - Tipos disponibles:
   - `AGREEMENT_SCALE`: escala de 1 a 5, desde “Totalmente en desacuerdo” hasta “Totalmente de acuerdo”.
   - `LIKELIHOOD_SCALE`: escala de 1 a 5, desde “Muy improbable” hasta “Muy probable”.
+  - `NUMERIC_SCALE`: escala numérica genérica, solo 1, 2, 3, 4 y 5, sin etiquetas asociadas; selección única obligatoria.
   - `OPEN_TEXT`: respuesta abierta.
   - `EMOTION_MULTI_SELECT`: emociones estandarizadas con máximo dos selecciones.
 - Las definiciones quedan aisladas por organización mediante RLS.
@@ -19,6 +20,11 @@ Fecha: 2026-09-20
 - Si el colaborador abandona el flujo, la encuesta permanece pendiente y vuelve a mostrarse al recargar.
 - Una entrega con encuesta pendiente no ingresa a la bandeja de revisión del consultor.
 - Las respuestas quedan persistidas por asignación, pregunta y organización, con RLS y auditoría.
+- La escala numérica tiene distribución y media por pregunta en resultados y
+  exportaciones. No se mezcla con las medias globales de acuerdo o probabilidad,
+  porque su significado lo define cada enunciado. Se conserva al duplicar
+  actividades y crear programas desde plantillas. `V20261023020000` amplía la
+  restricción de tipos sin modificar preguntas ni respuestas existentes.
 
 ## Contrato inicial
 

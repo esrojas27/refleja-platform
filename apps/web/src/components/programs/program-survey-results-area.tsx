@@ -194,7 +194,7 @@ function Question({ question, respondents }: { question: SurveyQuestionResult; r
     {open ? <Respondents key={question.id} people={respondents.filter(p => p.answers.some(a => a.questionId === question.id))}
       render={person => <p className="whitespace-pre-wrap break-words text-sm">{person.answers.find(a => a.questionId === question.id)?.values[0]}</p>} />
       : <ol className="mt-4 space-y-3">{question.distribution.map(option => <li key={option.value}>
-        <div className="flex items-start justify-between gap-3 text-sm"><span className="min-w-0 break-words">{!emotion && `${option.value}. `}{option.label}</span>
+        <div className="flex items-start justify-between gap-3 text-sm"><span className="min-w-0 break-words">{!emotion && question.type !== "NUMERIC_SCALE" && `${option.value}. `}{option.label}</span>
           <span className="shrink-0 tabular-nums">{option.count} · {number(option.percentage)}%</span></div>
         <progress className="mt-1 h-2 w-full accent-primary" max={100} value={option.percentage} aria-label={`${option.label}: ${option.count} respuestas`} />
       </li>)}</ol>}

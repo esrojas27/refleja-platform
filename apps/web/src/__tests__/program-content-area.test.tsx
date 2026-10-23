@@ -112,7 +112,7 @@ it("appends sessions inside their module using the next visible position", async
     { name: "Segunda sesión", objective: "Practicar lo aprendido", position: 4 }, expect.any(AbortSignal)));
 });
 
-it("creates a visual post-activity evaluation with the four supported question types", async () => {
+it("creates a visual survey with the original four question types", async () => {
   render(<ProgramContentArea organizationId="org-a" programId="program-a" />);
   fireEvent.click(await screen.findByRole("button", { name: /Fundamentos/, expanded: false }));
   fireEvent.click(screen.getByRole("button", { name: /Sesión inicial/, expanded: false }));

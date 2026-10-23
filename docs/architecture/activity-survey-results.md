@@ -47,6 +47,11 @@ sus respuestas de 1 a 5. La media de dimensión/sesión/actividad reúne las res
 del mismo tipo de escala; `n` es el número de respuestas de escala, no el número de
 participantes únicos. Los resultados se redondean a dos decimales.
 
+La escala numérica genérica (`NUMERIC_SCALE`) presenta solo 1–5 y tiene
+distribución y media por pregunta. No se agrega a las medias de acuerdo ni
+probabilidad, ni se mezclan sus enunciados en una media global sin significado
+común. Las respuestas/exportaciones conservan el valor numérico sin etiquetas.
+
 Las preguntas pueden tener significados distintos: estas medias son descriptivas,
 no una calificación, un diagnóstico psicométrico ni una comparación pre/post.
 El consultor dispone del desglose por pregunta para interpretar cada resultado.
@@ -99,9 +104,11 @@ librerías de gráficos, migraciones ni un sistema de BI.
    ya tenga respuestas; entrar a Resultados de encuestas desde el menú lateral.
 2. Confirmar asignadas, respondidas y pendientes. No confundir encuestas enviadas
    con actividades aprobadas ni con personas únicas.
-3. En un programa de prueba activo, configurar una encuesta con los cuatro tipos
+3. En un programa de prueba activo, configurar una encuesta con los cinco tipos
    antes de la primera entrega. Responder como dos colaboradores: acuerdo 1 y 5
    debe mostrar media 3; probabilidad 2 y 4 debe mostrar otra media 3, n=2 cada una.
+   La escala numérica debe mostrar solo 1–5 y su propia media por pregunta, sin
+   afectar los agregados de acuerdo/probabilidad.
 4. Elegir la misma emoción con ambos y otra adicional con uno: la primera tendrá
    2/2=100% y la otra 1/2=50%. Revisar las opciones con cero selecciones.
 5. Dejar una tercera encuesta/asignación pendiente y verificar que no entra como

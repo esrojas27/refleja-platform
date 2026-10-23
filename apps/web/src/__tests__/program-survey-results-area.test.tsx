@@ -49,6 +49,24 @@ it("renders real summaries, distributions, emotions and escaped open responses",
   expect(screen.getByText("4 · De acuerdo")).toBeTruthy();
 });
 
+it("shows numeric scale distribution and answers as bare numbers with a per-question average", async () => {
+  const numeric = { ...report, summary: { ...summary, agreementAverage: null, agreementAnswers: 0 },
+    surveys: [{ ...report.surveys[0], questions: [{ id: "q1", prompt: "Nivel alcanzado", type: "NUMERIC_SCALE" as const,
+      position: 1, responseCount: 1, average: 4,
+      distribution: ["1","2","3","4","5"].map(value=>({value,label:value,count:value==="4"?1:0,percentage:value==="4"?100:0})) }] }] };
+  vi.mocked(getSurveyResults).mockResolvedValue(numeric);
+  render(<ProgramSurveyResultsArea organizationId="org-a" programId="p" />);
+  fireEvent.click(await screen.findByText("Reflexión", { selector: "span" }));
+  const article=screen.getByRole("article",{name:"Pregunta 1: Nivel alcanzado"});
+  expect(within(article).getByText(/Media 4 \/ 5/)).toBeTruthy();
+  expect(within(article).getByRole("progressbar",{name:"4: 1 respuestas"})).toBeTruthy();
+  expect(within(article).getByText("4")).toBeTruthy();
+  expect(within(article).queryByText("4. 4")).toBeNull();
+  expect(within(article).queryByText(/De acuerdo|probable/)).toBeNull();
+  fireEvent.click(screen.getByText("Respuestas por participante (1)"));
+  expect(screen.queryByText("4 · De acuerdo")).toBeNull();
+});
+
 it("changes hierarchical filters and clears the child selection when the parent changes", async () => {
   render(<ProgramSurveyResultsArea organizationId="org-a" programId="p" />);
   fireEvent.change(await screen.findByLabelText("Dimensión"), { target: { value: "d" } });
