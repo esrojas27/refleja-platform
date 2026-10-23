@@ -82,11 +82,11 @@ public class ProgramTemplateService {
             dimensions = snapshot.dimensions().stream().map(dimension -> new ProgramBlueprints.DimensionDraft(
                     dimension.name(), dimension.description(), dimension.position(), dimension.sessions().stream()
                             .map(session -> new ProgramBlueprints.SessionDraft(session.name(), session.description(),
-                                    session.objective(), startDate.plusDays(session.scheduledDayOffset()),
+                                    session.objective(), null,
                                     session.position(), session.activities().stream()
                                             .map(activity -> new ProgramBlueprints.ActivityDraft(activity.reference(),
                                                     activity.title(), activity.instructions(), activity.youtubeUrl(),
-                                                    startDate.plusDays(activity.dueDayOffset()), activity.position()))
+                                                    null, activity.position()))
                                             .toList()))
                             .toList())).toList();
         } catch (DateTimeException exception) {
@@ -140,7 +140,7 @@ public class ProgramTemplateService {
                     if (source.startDate() != null) {
                         activities.add(new ProgramTemplateSnapshot.Activity(activity.id().toString(),
                                 activity.title(), activity.instructions(), activity.youtubeUrl(),
-                                ChronoUnit.DAYS.between(source.startDate(), activity.dueDate()), activity.position(),
+                                0, activity.position(),
                                 new ProgramTemplateSnapshot.Survey(survey.title(), survey.instructions(),
                                         survey.questions().stream().map(question -> new ProgramTemplateSnapshot.Question(
                                                 question.prompt(), question.type(), question.position())).toList())));
@@ -148,7 +148,7 @@ public class ProgramTemplateService {
                 }
                 if (source.startDate() != null) {
                     sessions.add(new ProgramTemplateSnapshot.Session(session.name(), session.description(),
-                            session.objective(), ChronoUnit.DAYS.between(source.startDate(), session.scheduledDate()),
+                            session.objective(), 0,
                             session.position(), activities));
                 }
             }

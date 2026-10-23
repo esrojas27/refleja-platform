@@ -13,13 +13,13 @@ export type ActivityAssignee = {
   assignmentId: string; enrollmentId: string; email: string; firstName: string | null; lastName: string | null;
   status: ActivityAssignmentStatus; responseText: string | null; submittedAt: string | null;
   reviewComment: string | null; reviewedAt: string | null; surveyStatus: ActivitySurveyStatus | "NOT_REQUIRED";
-  completionPercentage: number; version: number;
+  completionPercentage: number; version: number; dueDate?: string | null;
 };
 export type ActivityAssignmentStatus = "ASSIGNED" | "SUBMITTED" | "CHANGES_REQUESTED" | "COMPLETED";
 export type ProgramActivity = {
   id: string; organizationId: string; programId: string; moduleId: string; sessionId: string;
   dimensionName: string; dimensionPosition: number; sessionName: string; sessionPosition: number;
-  title: string; instructions: string; youtubeUrl: string | null; dueDate: string; position: number; version: number;
+  title: string; instructions: string; youtubeUrl: string | null; dueDate: string | null; position: number; version: number;
   assignees: ActivityAssignee[]; archived?: boolean;
 };
 export type AssignedActivity = Omit<ProgramActivity, "assignees"> & {
@@ -28,8 +28,8 @@ export type AssignedActivity = Omit<ProgramActivity, "assignees"> & {
   assignmentVersion: number; survey: ActivitySurvey | null; completionPercentage: number;
 };
 export type ActivityInput = {
-  sessionId: string; title: string; instructions: string; youtubeUrl: string | null; dueDate: string;
-  position: number; assignToAll: boolean; enrollmentIds: string[];
+  sessionId: string; title: string; instructions: string; youtubeUrl: string | null; dueDate?: string;
+  position: number;
 };
 export type ActivityReviewInput = { decision: "APPROVE" | "REQUEST_CHANGES"; comment: string | null };
 export type ActivitySurveyAnswerInput = { questionId: string; values: string[] };
@@ -82,7 +82,7 @@ async function request<T>(path: string, method: "GET" | "POST", expected: number
   });
   if (response.status !== expected) {
     const body = await response.json().catch(() => null);
-    const allowed = ["sessionId", "title", "instructions", "youtubeUrl", "dueDate", "position", "enrollmentIds",
+    const allowed = ["sessionId", "title", "instructions", "youtubeUrl", "dueDate", "position",
       "responseText", "decision", "comment"];
     allowed.push("answers");
     const fields = body?.code === "VALIDATION_ERROR" && Array.isArray(body.errors)
@@ -134,7 +134,7 @@ export function activityErrorMessage(error: unknown) {
     : status === 401 ? "Tu sesión no está disponible. Inicia sesión de nuevo."
     : status === 403 ? "No tienes permiso para gestionar estas actividades."
     : status === 404 ? "El programa, la sesión o la inscripción ya no está disponible."
-    : status === 400 ? "Revisa los datos de la actividad y sus destinatarios."
+    : status === 400 ? "Revisa los datos de la actividad."
     : status === 409 ? "La actividad cambió. Actualiza el listado antes de intentarlo de nuevo."
     : "No se pudo completar la operación. Inténtalo de nuevo.";
   return message + (error instanceof ActivityRequestError && error.requestId ? ` Referencia: ${error.requestId}` : "");

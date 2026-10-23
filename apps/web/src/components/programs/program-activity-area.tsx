@@ -5,7 +5,6 @@ import { ActivityVideo } from "@/components/participation/activity-video";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { CheckCircle2, ClipboardCheck } from "lucide-react";
 import { fetchCurrentIdentity, IdentityRequestError } from "@/lib/auth/authenticated-api";
-import { listEnrollments, ParticipationRequestError, type Enrollment } from "@/lib/participation/participation-api";
 import { ActivityRequestError, activityErrorMessage, createProgramActivity, listProgramActivities,
   isYoutubeVideoUrl, reviewActivityAssignment, type ActivityAssignee, type ActivityInput, type ProgramActivity }
   from "@/lib/participation/activity-api";
@@ -26,7 +25,6 @@ function ActivityContent({ organizationId, programId }: { organizationId: string
   const canEdit = state?.canEdit ?? true;
   const canExecute = state?.canExecute ?? true;
   const [dimensions, setDimensions] = useState<ProgramDimension[]>();
-  const [enrollments, setEnrollments] = useState<Enrollment[]>();
   const [activities, setActivities] = useState<ProgramActivity[]>();
   const [attempt, setAttempt] = useState(0);
   const [pending, setPending] = useState(true);
@@ -42,20 +40,18 @@ function ActivityContent({ organizationId, programId }: { organizationId: string
         if (identity.activeOrganizationId !== organizationId || !identity.roles.includes("CONSULTANT")) {
           setMessage("Sólo un consultor autorizado puede gestionar actividades."); return;
         }
-        const [structure, enrollmentPage, activityList] = await Promise.all([
+        const [structure, activityList] = await Promise.all([
           listProgramDimensions(organizationId, programId, controller.signal),
-          listEnrollments(organizationId, programId, 0, controller.signal, 100),
           listProgramActivities(organizationId, programId, controller.signal, true),
         ]);
         if (controller.signal.aborted) return;
         setDimensions(structure.items);
-        setEnrollments(enrollmentPage.items.filter(enrollment => enrollment.status === "ACTIVE"));
         setActivities(activityList.items);
         setMessage("");
       } catch (error) {
         if (controller.signal.aborted) return;
         const normalized = error instanceof IdentityRequestError || error instanceof ProgramContentRequestError
-          || error instanceof ParticipationRequestError ? new ActivityRequestError(error.status) : error;
+          ? new ActivityRequestError(error.status) : error;
         setMessage(activityErrorMessage(normalized));
       } finally { if (!controller.signal.aborted) setPending(false); }
     }
@@ -70,9 +66,9 @@ function ActivityContent({ organizationId, programId }: { organizationId: string
   const visibleActivities = activities?.filter(activity => !activity.archived && sessionNames.has(activity.sessionId));
 
   function refresh(saved?: ProgramActivity) {
-    setDimensions(undefined); setEnrollments(undefined); setActivities(undefined);
+    setDimensions(undefined); setActivities(undefined);
     setPending(true); setMessage("Actualizando actividades…");
-    if (saved) setNotice(saved.assignees.length === 0 ? "Actividad creada sin asignaciones."
+    if (saved) setNotice(saved.assignees.length === 0 ? "Actividad creada. Se asignará al agendar participantes en su sesión."
       : `Actividad creada y asignada a ${saved.assignees.length} colaborador${saved.assignees.length === 1 ? "" : "es"}.`);
     setAttempt(value => value + 1);
   }
@@ -92,12 +88,12 @@ function ActivityContent({ organizationId, programId }: { organizationId: string
           Crea actividades, consulta su alcance y revisa las respuestas pendientes.
         </p>
       </div>
-      {canEdit && dimensions && enrollments && activities && <button type="button" className="rti-button-primary shrink-0"
-        onClick={() => setCreateOpen(true)}>{enrollments.length ? "Crear y asignar" : "Crear actividad"}</button>}
+      {canEdit && dimensions && activities && <button type="button" className="rti-button-primary shrink-0"
+        onClick={() => setCreateOpen(true)}>Crear actividad</button>}
     </div>
     {notice && <p role="status" className="mt-5 rounded-2xl border border-accent bg-accent/60 px-4 py-3 text-sm">{notice}</p>}
     {message && <p role="status" className="mt-5 rounded-2xl bg-muted/60 px-4 py-3 text-sm">{message}</p>}
-    {dimensions && enrollments && activities && <div className="mt-7 space-y-8">
+    {dimensions && activities && <div className="mt-7 space-y-8">
       {canExecute ? <ReviewQueue organizationId={organizationId} programId={programId} activities={visibleActivities ?? []}
         onReviewed={reviewed} /> : <p className="rounded-2xl border border-border bg-muted/50 p-4 text-sm">
           La revisión de entregas está disponible mientras el programa está activo.
@@ -111,7 +107,7 @@ function ActivityContent({ organizationId, programId }: { organizationId: string
             <h3 className="mt-2 text-lg font-semibold">{activity.title}</h3>
             <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{activity.instructions}</p>
             {activity.youtubeUrl && <ActivityVideo url={activity.youtubeUrl} title={activity.title} />}
-            <p className="mt-3 text-sm font-medium">Fecha límite: {activity.dueDate}</p>
+            <p className="mt-3 text-sm font-medium">Vencimiento individual: 3 días calendario después de cada sesión.</p>
             <div className="mt-4 flex flex-wrap gap-2" aria-label={`Estado de asignaciones de ${activity.title}`}>
               {assignmentSummary(activity).map(item => <span key={item.label}
                 className="rounded-full border border-border/70 bg-card px-3 py-1 text-xs font-semibold text-muted-foreground">
@@ -124,7 +120,8 @@ function ActivityContent({ organizationId, programId }: { organizationId: string
                 className="border-t border-border pt-4 text-sm first:border-t-0 first:pt-0">
                 <p className="break-words font-semibold">{[person.firstName, person.lastName].filter(Boolean).join(" ") || person.email}</p>
                 <p className="mt-1 break-all text-muted-foreground">{person.email}</p>
-                <div className="mt-2"><ActivityStatusBadges status={person.status} dueDate={activity.dueDate}
+                <p className="mt-2 text-xs">{person.dueDate ? `Fecha límite: ${person.dueDate}` : "Sesión sin agendar"}</p>
+                <div className="mt-2"><ActivityStatusBadges status={person.status} dueDate={person.dueDate ?? null}
                   surveyStatus={person.surveyStatus === "NOT_REQUIRED" ? undefined : person.surveyStatus} /></div>
                 <p className="mt-3 whitespace-pre-wrap break-words">{person.responseText ?? "Sin entrega."}</p>
                 {person.reviewComment && <p className="mt-2 whitespace-pre-wrap break-words text-muted-foreground">Comentario del consultor: {person.reviewComment}</p>}
@@ -134,10 +131,10 @@ function ActivityContent({ organizationId, programId }: { organizationId: string
           </li>)}</ol>}
       </section>
     </div>}
-    {createOpen && dimensions && enrollments && activities && <ProgramModal titleId="create-activity-title"
+    {createOpen && dimensions && activities && <ProgramModal titleId="create-activity-title"
       closeLabel="Cerrar creación de actividad" onClose={() => setCreateOpen(false)}>
       <ActivityForm organizationId={organizationId} programId={programId} sessions={sessions}
-        enrollments={enrollments} activities={activities} onSaved={saved => { setCreateOpen(false); refresh(saved); }} />
+        activities={activities} onSaved={saved => { setCreateOpen(false); refresh(saved); }} />
     </ProgramModal>}
     <button className="rti-button-secondary mt-6" disabled={pending} onClick={() => refresh()}>Actualizar actividades</button>
     <nav aria-label="Navegación de actividades" className="mt-8 flex flex-wrap gap-4 border-t border-border/70 pt-6 text-sm">
@@ -147,15 +144,13 @@ function ActivityContent({ organizationId, programId }: { organizationId: string
   </section>;
 }
 
-export function ActivityForm({ organizationId, programId, sessions, enrollments, activities, onSaved, initial }: {
-  organizationId: string; programId: string; sessions: SessionOption[]; enrollments: Enrollment[];
+export function ActivityForm({ organizationId, programId, sessions, activities, onSaved, initial }: {
+  organizationId: string; programId: string; sessions: SessionOption[];
   activities: ProgramActivity[]; onSaved: (saved: ProgramActivity) => void; initial?: ProgramActivity;
 }) {
   const [input, setInput] = useState({ sessionId: initial?.sessionId ?? sessions[0]?.id ?? "", title: initial?.title ?? "",
-    instructions: initial?.instructions ?? "", youtubeUrl: initial?.youtubeUrl ?? "", dueDate: initial?.dueDate ?? "" });
+    instructions: initial?.instructions ?? "", youtubeUrl: initial?.youtubeUrl ?? "" });
   const instructionsLocked = initial?.assignees.some(person => person.submittedAt != null) ?? false;
-  const [selected, setSelected] = useState<string[]>([]);
-  const [assignToAll, setAssignToAll] = useState(true);
   const [pending, setPending] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [message, setMessage] = useState("");
@@ -164,12 +159,6 @@ export function ActivityForm({ organizationId, programId, sessions, enrollments,
   const request = useRef<AbortController | null>(null);
   useEffect(() => () => request.current?.abort(), []);
 
-  function toggle(enrollmentId: string) {
-    setInvalidFields(current => current.filter(field => field !== "enrollmentIds"));
-    setSelected(current => current.includes(enrollmentId)
-      ? current.filter(id => id !== enrollmentId) : [...current, enrollmentId]);
-  }
-
   function clearInvalid(field: string) {
     setInvalidFields(current => current.filter(candidate => candidate !== field));
   }
@@ -177,7 +166,7 @@ export function ActivityForm({ organizationId, programId, sessions, enrollments,
   function focusFirstInvalid(fields: string[]) {
     const ids: Record<string, string> = {
       sessionId: "activity-session", title: "activity-title", instructions: "activity-instructions",
-      youtubeUrl: "activity-youtube-url", dueDate: "activity-due-date", enrollmentIds: "activity-assign-to-all",
+      youtubeUrl: "activity-youtube-url",
     };
     window.setTimeout(() => document.getElementById(ids[fields[0]])?.focus(), 0);
   }
@@ -189,15 +178,12 @@ export function ActivityForm({ organizationId, programId, sessions, enrollments,
       .map(activity => activity.position)) + 1;
     const clean: ActivityInput = { sessionId: input.sessionId, title: input.title.trim(),
       instructions: input.instructions.trim(), youtubeUrl: input.youtubeUrl.trim() || null,
-      dueDate: input.dueDate, position, assignToAll,
-      enrollmentIds: assignToAll ? [] : selected };
+      position };
     const invalid = [
       ...(!clean.sessionId ? ["sessionId"] : []),
       ...(!clean.title || clean.title.length > 255 ? ["title"] : []),
       ...(!clean.instructions || clean.instructions.length > 10000 ? ["instructions"] : []),
       ...(clean.youtubeUrl !== null && !isYoutubeVideoUrl(clean.youtubeUrl) ? ["youtubeUrl"] : []),
-      ...(!/^\d{4}-\d{2}-\d{2}$/.test(clean.dueDate) ? ["dueDate"] : []),
-      ...(!initial && !assignToAll && !selected.length ? ["enrollmentIds"] : []),
     ];
     if (invalid.length) {
       setInvalidFields(invalid);
@@ -206,13 +192,13 @@ export function ActivityForm({ organizationId, programId, sessions, enrollments,
       return;
     }
     submitting.current = true; setPending(true);
-    setMessage(initial ? "Guardando actividad…" : enrollments.length ? "Creando y asignando actividad…" : "Creando actividad…");
+    setMessage(initial ? "Guardando actividad…" : "Creando actividad…");
     const controller = new AbortController(); request.current = controller;
     try {
       let saved: ProgramActivity;
       if (initial) {
         await editActivity(organizationId, programId, initial.id, { ...clean, version: initial.version }, controller.signal);
-        saved = { ...initial, title: clean.title, instructions: clean.instructions, youtubeUrl: clean.youtubeUrl, dueDate: clean.dueDate };
+        saved = { ...initial, title: clean.title, instructions: clean.instructions, youtubeUrl: clean.youtubeUrl };
       } else saved = await createProgramActivity(organizationId, programId, clean, controller.signal);
       if (!controller.signal.aborted) { setBlocked(true);
         setMessage(initial ? "Actividad actualizada." : saved.assignees.length ? "Actividad creada y asignada." : "Actividad creada sin asignaciones.");
@@ -232,11 +218,11 @@ export function ActivityForm({ organizationId, programId, sessions, enrollments,
   const unavailable = sessions.length === 0;
   return <form aria-label={initial ? "Editar actividad" : "Crear actividad"} onSubmit={submit} noValidate className="space-y-5">
     <div><p className="rti-kicker">Nueva actividad</p><h2 id="create-activity-title" className="mt-2 text-xl font-semibold">
-      {initial ? "Editar actividad" : enrollments.length ? "Crear y asignar" : "Crear actividad"}</h2></div>
+      {initial ? "Editar actividad" : "Crear actividad"}</h2></div>
     {message && <p role="status" className="rounded-xl bg-muted/60 px-3 py-2 text-sm">{message}</p>}
     {sessions.length === 0 && <p className="text-sm text-muted-foreground">Crea primero una sesión en Contenido.</p>}
-    {!initial && enrollments.length === 0 && <p className="rounded-xl border border-border/70 bg-muted/60 px-3 py-3 text-sm text-muted-foreground">
-      Puedes preparar esta actividad sin participantes. Quedará como contenido del programa y no será visible para colaboradores hasta que tenga asignaciones.
+    {!initial && <p className="rounded-xl border border-border/70 bg-muted/60 px-3 py-3 text-sm text-muted-foreground">
+      Puedes preparar esta actividad sin participantes. La asignación se gestiona desde la agenda de su sesión.
     </p>}
     <div><label htmlFor="activity-session" className="block text-sm font-medium">Sesión</label>
       <select id="activity-session" className="rti-field" value={input.sessionId}
@@ -271,35 +257,10 @@ export function ActivityForm({ organizationId, programId, sessions, enrollments,
         disabled={pending || blocked || unavailable} />
       {invalidFields.includes("youtubeUrl")
         ? <p id="activity-youtube-url-error" className="mt-1 text-sm text-destructive">Usa un enlace HTTPS válido de YouTube.</p>
-        : <p className="mt-2 text-xs text-muted-foreground">Se mostrará como enlace. El video embebido llegará en una iteración posterior.</p>}</div>
-    <div><label htmlFor="activity-due-date" className="block text-sm font-medium">Fecha límite</label>
-      <input id="activity-due-date" type="date" className="rti-field" required value={input.dueDate}
-        aria-invalid={invalidFields.includes("dueDate") || undefined}
-        aria-describedby={invalidFields.includes("dueDate") ? "activity-due-date-error" : undefined}
-        onChange={event => { clearInvalid("dueDate"); setInput({ ...input, dueDate: event.target.value }); }}
-        disabled={pending || blocked || unavailable} />
-      {invalidFields.includes("dueDate") && <p id="activity-due-date-error" className="mt-1 text-sm text-destructive">Selecciona la fecha límite.</p>}</div>
-    {!initial && enrollments.length > 0 && <fieldset disabled={pending || blocked || unavailable} className="space-y-3">
-      <legend className="text-sm font-medium">Destinatarios</legend>
-      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-primary/25 bg-accent/35 px-3 py-3 text-sm">
-        <input id="activity-assign-to-all" type="checkbox" className="mt-1 size-4 accent-primary" checked={assignToAll}
-          aria-invalid={invalidFields.includes("enrollmentIds") || undefined}
-          aria-describedby={invalidFields.includes("enrollmentIds") ? "activity-enrollments-error" : undefined}
-          onChange={event => { clearInvalid("enrollmentIds"); setAssignToAll(event.target.checked); }} />
-        <span><span className="block font-medium">Asignar a todos los colaboradores activos</span>
-          <span className="text-muted-foreground">Incluye a todas las inscripciones activas del programa.</span></span>
-      </label>
-      {!assignToAll && enrollments.map(enrollment => <label key={enrollment.id}
-        className="flex cursor-pointer items-start gap-3 rounded-xl border border-border/70 px-3 py-3 text-sm">
-        <input type="checkbox" className="mt-1 size-4 accent-primary" checked={selected.includes(enrollment.id)}
-          onChange={() => toggle(enrollment.id)} />
-        <span><span className="block font-medium">{[enrollment.participant.firstName, enrollment.participant.lastName]
-          .filter(Boolean).join(" ") || enrollment.participant.email}</span><span className="text-muted-foreground">{enrollment.participant.email}</span></span>
-      </label>)}
-      {invalidFields.includes("enrollmentIds") && <p id="activity-enrollments-error" className="text-sm text-destructive">Selecciona al menos un colaborador o activa la asignación para todos.</p>}
-    </fieldset>}
+        : <p className="mt-2 text-xs text-muted-foreground">El video se mostrará dentro de la actividad, con un enlace alternativo a YouTube.</p>}</div>
+    <p className="rounded-xl bg-muted/50 p-3 text-sm">Los destinatarios se definen en Agendar participantes de la sesión. Esta actividad se asignará automáticamente a quienes ya tengan fecha y a quienes se agenden después. El vencimiento será tres días calendario después de su sesión.</p>
     <button className="rti-button-primary" disabled={pending || blocked || unavailable}>
-      {pending ? "Guardando…" : initial ? "Guardar cambios" : enrollments.length ? "Crear y asignar actividad" : "Crear actividad"}
+      {pending ? "Guardando…" : initial ? "Guardar cambios" : "Crear actividad"}
     </button>
   </form>;
 }
@@ -407,7 +368,7 @@ function ReviewCard({ organizationId, programId, item, leaving, onReviewed }: {
     </div>
     <div className="flex flex-wrap items-center justify-between gap-2">
       <div><p className="font-medium">{name}</p><p className="text-muted-foreground">{assignee.email}</p></div>
-      <ActivityStatusBadges status={assignee.status} dueDate={activity.dueDate} />
+      <ActivityStatusBadges status={assignee.status} dueDate={assignee.dueDate ?? null} />
     </div>
     {assignee.responseText && <div className="mt-3"><p className="font-medium">Respuesta</p>
       <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{assignee.responseText}</p></div>}

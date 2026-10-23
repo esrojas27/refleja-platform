@@ -34,7 +34,7 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
     @Autowired jakarta.persistence.EntityManager entityManager;
     @Autowired com.reflejatuinterior.participation.application.Notifications notifications;
 
-    @BeforeEach void setup() {
+    @BeforeEach void setup(org.junit.jupiter.api.TestInfo test) {
         insertOrganization(organization);
         insertUser(consultant); insertUser(collaborator); insertUser(otherCollaborator);
         insertMembership(consultantMembership, organization, consultant);
@@ -65,11 +65,19 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
                        (?, ?, ?, ?, 'ACTIVE', now(), now(), 0)
                 """, enrollment, organization, program, collaboratorMembership,
                 otherEnrollment, organization, program, otherMembership);
+        var testName=test.getTestMethod().orElseThrow().getName();
+        boolean unscheduled=testName.startsWith("sessionAgenda")||java.util.Set.of("deletesUnassignedSubtreeIncludingItsSurvey",
+                "consultantCreatesProgramContentBeforeAnyParticipantIsScheduled","duplicateUsesOnlyScheduledCollaboratorsAndDoesNotExposeOtherOrganizations").contains(testName);
+        if(!unscheduled) {
+            jdbcTemplate.update("INSERT INTO rti.session_schedules(organization_id,program_id,session_id,enrollment_id,scheduled_date) VALUES(?,?,?,?,'2026-10-05')",organization,program,session,enrollment);
+            if(!testName.equals("consultantCreatesAndAssignsOnlyToScheduledCollaborators"))
+                jdbcTemplate.update("INSERT INTO rti.session_schedules(organization_id,program_id,session_id,enrollment_id,scheduled_date) VALUES(?,?,?,?,'2026-10-05')",organization,program,session,otherEnrollment);
+        }
     }
 
-    @Test void consultantCreatesAndAssignsWhileOnlyTheSelectedCollaboratorCanView() throws Exception {
+    @Test void consultantCreatesAndAssignsOnlyToScheduledCollaborators() throws Exception {
         var createdResponse = mvc.perform(post(consultantPath()).header("Authorization", token(consultant))
-                .contentType(MediaType.APPLICATION_JSON).content(body(enrollment)))
+                .contentType(MediaType.APPLICATION_JSON).content(body()))
                 .andExpect(status().isCreated()).andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.title").value("Reflexión inicial"))
                 .andExpect(jsonPath("$.instructions").value("Describe tu punto de partida."))
@@ -99,28 +107,20 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
         assertThat(jdbcTemplate.queryForObject("select count(*) from rti.activity_assignments where activity_id=?", Long.class, activityId)).isEqualTo(1);
     }
 
-    @Test void creationIsAtomicAndRequiresAConsultantActiveEnrollmentAndValidInput() throws Exception {
-        jdbcTemplate.update("update rti.enrollments set status='INVITED' where id=?", enrollment);
-        mvc.perform(post(consultantPath()).header("Authorization", token(consultant))
-                .contentType(MediaType.APPLICATION_JSON).content(body(enrollment)))
-                .andExpect(status().isNotFound());
-        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.program_activities", Long.class)).isZero();
-
+    @Test void creationIsAtomicAndRequiresAConsultantAndValidInput() throws Exception {
         mvc.perform(post(consultantPath()).header("Authorization", token(collaborator))
-                .contentType(MediaType.APPLICATION_JSON).content(body(otherEnrollment)))
+                .contentType(MediaType.APPLICATION_JSON).content(body()))
                 .andExpect(status().isForbidden());
         mvc.perform(post(consultantPath()).header("Authorization", token(consultant))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"sessionId\":\"" + session + "\",\"title\":\" \",\"instructions\":\"\","
-                        + "\"dueDate\":\"2026-10-08\",\"position\":0,\"enrollmentIds\":[]}"))
+                        + "\"position\":0}"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
         mvc.perform(post(consultantPath()).header("Authorization", token(consultant))
-                .contentType(MediaType.APPLICATION_JSON).content(body(otherEnrollment, otherEnrollment)))
-                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("enrollmentIds"));
-        mvc.perform(post(consultantPath()).header("Authorization", token(consultant))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(body(otherEnrollment).replace("https://youtu.be/dQw4w9WgXcQ", "https://example.com/video")))
+                .content(body().replace("https://youtu.be/dQw4w9WgXcQ", "https://example.com/video")))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("youtubeUrl"));
+        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.program_activities", Long.class)).isZero();
     }
 
     @Test void consultantAssignsEveryoneAndReviewsCollaboratorSubmissions() throws Exception {
@@ -169,7 +169,7 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 .andExpect(jsonPath("$.items[0].responseText").value("Reflexión con ejemplo."));
     }
 
-    @Test void consultantCreatesProgramContentBeforeAnyParticipantIsActive() throws Exception {
+    @Test void consultantCreatesProgramContentBeforeAnyParticipantIsScheduled() throws Exception {
         jdbcTemplate.update("update rti.enrollments set status='INVITED' where program_id=?", program);
 
         var created = mvc.perform(post(consultantPath()).header("Authorization", token(consultant))
@@ -259,7 +259,7 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
     @Test void draftHidesAssignedContentAndRefusesCollaboratorWrites() throws Exception {
         jdbcTemplate.update("update rti.programs set status='DRAFT' where id=? and organization_id=?", program, organization);
         var created = mvc.perform(post(consultantPath()).header("Authorization", token(consultant))
-                .contentType(MediaType.APPLICATION_JSON).content(body(enrollment))).andExpect(status().isCreated())
+                .contentType(MediaType.APPLICATION_JSON).content(body())).andExpect(status().isCreated())
                 .andReturn().getResponse();
         var id = UUID.fromString(json.readTree(created.getContentAsString()).path("id").asText());
         mvc.perform(get(collaboratorPath()).header("Authorization", token(collaborator)))
@@ -282,7 +282,7 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
     @org.junit.jupiter.params.provider.ValueSource(strings = {"COMPLETED", "CANCELLED"})
     void closedProgramsPreservePendingWorkAndRefuseAllProgramMutations(String terminal) throws Exception {
         var created = mvc.perform(post(consultantPath()).header("Authorization", token(consultant))
-                .contentType(MediaType.APPLICATION_JSON).content(body(enrollment))).andExpect(status().isCreated())
+                .contentType(MediaType.APPLICATION_JSON).content(body())).andExpect(status().isCreated())
                 .andReturn().getResponse();
         var tree = json.readTree(created.getContentAsString());
         var id = UUID.fromString(tree.path("id").asText());
@@ -335,7 +335,7 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
         mvc.perform(get(collaboratorPath())).andExpect(status().isUnauthorized());
         mvc.perform(post(consultantPath()).header("Authorization", token(consultant))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(body(otherEnrollment).replace(session.toString(), uuid7(0xdff).toString())))
+                .content(body().replace(session.toString(), uuid7(0xdff).toString())))
                 .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("PROGRAM_NOT_FOUND"));
     }
 
@@ -484,17 +484,17 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CONTENT_VERSION_CONFLICT"));
     }
 
-    @Test void duplicateCopiesDefinitionAndSurveyButNotSubmissionsAndDefaultsToNoAssignments() throws Exception {
+    @Test void duplicateCopiesDefinitionAndSurveyButNotSubmissionsAndUsesSessionAgenda() throws Exception {
         var activity = createAdminActivity(true, 1);
         var survey = createAdminSurvey(activity);
         mvc.perform(post(collaboratorPath() + "/" + activity + "/submission").header("Authorization", token(collaborator))
                 .contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"No copiar\"}")).andExpect(status().isOk());
         var response = mvc.perform(post(adminPath("activities", activity) + "/duplicate").header("Authorization", token(consultant))
-                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0,\"assignToAll\":false,\"enrollmentIds\":[]}"))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0}"))
                 .andExpect(status().isCreated()).andReturn().getResponse();
         var copy = UUID.fromString(json.readTree(response.getContentAsString()).path("id").asText());
         assertThat(copy).isNotEqualTo(activity);
-        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.activity_assignments where activity_id=?", Long.class, copy)).isZero();
+        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.activity_assignments where activity_id=? and status='ASSIGNED' and response_text is null and submitted_at is null", Long.class, copy)).isEqualTo(2);
         var copiedSurvey = jdbcTemplate.queryForObject("select id from rti.activity_evaluations where activity_id=?", UUID.class, copy);
         assertThat(copiedSurvey.toString()).isNotEqualTo(survey.path("id").asText());
         var copiedQuestion = jdbcTemplate.queryForObject("select id from rti.activity_evaluation_questions where evaluation_id=?", UUID.class, copiedSurvey);
@@ -504,10 +504,12 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 .andExpect(jsonPath("$.items[1].position").value(2));
     }
 
-    @Test void duplicateCanAssignSelectedCollaboratorsAndDoesNotExposeOtherOrganizations() throws Exception {
+    @Test void duplicateUsesOnlyScheduledCollaboratorsAndDoesNotExposeOtherOrganizations() throws Exception {
         var activity = createAdminActivity(false, 1);
+        agendaDates();
+        setAgenda(agendaToday().plusDays(1),null,"",enrollment).andExpect(status().isOk());
         mvc.perform(post(adminPath("activities", activity) + "/duplicate").header("Authorization", token(consultant))
-                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0,\"assignToAll\":false,\"enrollmentIds\":[\"" + enrollment + "\"]}"))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0}"))
                 .andExpect(status().isCreated());
         mvc.perform(post(adminPath("activities", activity) + "/delete").header("Authorization", token(collaborator))
                 .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0}")).andExpect(status().isForbidden());
@@ -519,7 +521,7 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 .header("Authorization", token(consultant)).contentType(MediaType.APPLICATION_JSON).content(editBody(0, "Ajeno")))
                 .andExpect(status().isNotFound());
         mvc.perform(get(collaboratorPath()).header("Authorization", token(collaborator)))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(1));
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(2));
         mvc.perform(get(collaboratorPath()).header("Authorization", token(otherCollaborator)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.items").isEmpty());
     }
@@ -532,7 +534,7 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 .andExpect(status().isOk());
         for (String action : java.util.List.of("delete", "archive", "move", "duplicate")) {
             mvc.perform(post(adminPath("activities", activity) + "/" + action).header("Authorization", token(consultant))
-                    .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0,\"archived\":true,\"direction\":\"UP\",\"assignToAll\":false,\"enrollmentIds\":[]}"))
+                    .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0,\"archived\":true,\"direction\":\"UP\"}"))
                     .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PROGRAM_READ_ONLY"));
         }
         mvc.perform(put(adminPath("activities", activity)).header("Authorization", token(consultant))
@@ -566,7 +568,7 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 .contentType(MediaType.APPLICATION_JSON).content(adminSurveyBody()))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CONTENT_HAS_SUBMISSIONS"));
         mvc.perform(post(adminPath("activities", activity) + "/duplicate").header("Authorization", token(consultant))
-                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0,\"assignToAll\":true,\"enrollmentIds\":[]}"))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0}"))
                 .andExpect(status().isCreated());
         mvc.perform(get(consultantPath()).header("Authorization", token(consultant)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.items[1].assignees.length()").value(2))
@@ -588,6 +590,10 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 insert into rti.program_sessions (id,organization_id,program_id,module_id,name,scheduled_date,position,created_at,updated_at,version)
                 values (?,?,?,?,'Segunda sesión','2026-10-02',1,now(),now(),0)
                 """, otherSession, organization, program, otherDimension);
+        jdbcTemplate.update("""
+                INSERT INTO rti.session_schedules(organization_id,program_id,session_id,enrollment_id,scheduled_date)
+                VALUES(?,?,?,?,'2026-10-05'),(?,?,?,?,'2026-10-05')
+                """,organization,program,otherSession,enrollment,organization,program,otherSession,otherEnrollment);
         var response = mvc.perform(post(consultantPath()).header("Authorization", token(consultant))
                 .contentType(MediaType.APPLICATION_JSON).content(allBody().replace(session.toString(), otherSession.toString())))
                 .andExpect(status().isCreated()).andReturn().getResponse();
@@ -1062,11 +1068,10 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
     }
 
     private UUID createAdminActivity(boolean assigned, int position) throws Exception {
-        if (!assigned) jdbcTemplate.update("update rti.enrollments set status='INVITED' where program_id=?", program);
+        if (!assigned) assertThat(jdbcTemplate.queryForObject("select count(*) from rti.session_schedules where program_id=?",Long.class,program)).isZero();
         var response = mvc.perform(post(consultantPath()).header("Authorization", token(consultant))
                 .contentType(MediaType.APPLICATION_JSON).content(allBody().replace("\"position\":1", "\"position\":" + position)))
                 .andExpect(status().isCreated()).andReturn().getResponse();
-        if (!assigned) jdbcTemplate.update("update rti.enrollments set status='ACTIVE' where program_id=?", program);
         return UUID.fromString(json.readTree(response.getContentAsString()).path("id").asText());
     }
     private tools.jackson.databind.JsonNode createAdminSurvey(UUID activity) throws Exception {
@@ -1101,18 +1106,188 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
     private String reviewPath(UUID activityId, UUID assignmentId) {
         return consultantPath() + "/" + activityId + "/assignments/" + assignmentId + "/review";
     }
-    private String body(UUID... enrollmentIds) {
-        var ids = java.util.Arrays.stream(enrollmentIds).map(id -> "\"" + id + "\"")
-                .collect(java.util.stream.Collectors.joining(","));
+    @Test void sessionAgendaAssignsExistingActivitiesToTheSubgroupAndDoesNotDuplicateWorkOrNotices() throws Exception {
+        agendaDates(); var first=createAdminActivity(true,1); var second=createAdminActivity(true,2);
+        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.activity_assignments where program_id=?",Long.class,program)).isZero();
+        var date=agendaToday().plusDays(2);
+        setAgenda(date,null,"",enrollment).andExpect(status().isOk());
+        mvc.perform(get(collaboratorPath()).header("Authorization",token(collaborator))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(2)).andExpect(jsonPath("$.items[0].dueDate").value(date.plusDays(3).toString()));
+        mvc.perform(get(collaboratorPath()).header("Authorization",token(otherCollaborator))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.items").isEmpty());
+        mvc.perform(post(collaboratorPath()+"/"+first+"/submission").header("Authorization",token(collaborator))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"No sobrescribir\"}")).andExpect(status().isOk());
+        var before=jdbcTemplate.queryForList("select id,status,response_text,version,due_date from rti.activity_assignments where program_id=? order by id",program);
+        long notices=jdbcTemplate.queryForObject("select count(*) from rti.activity_notifications where organization_id=?",Long.class,organization);
+        setAgenda(date,0L,"",enrollment).andExpect(status().isOk());
+        assertThat(jdbcTemplate.queryForList("select id,status,response_text,version,due_date from rti.activity_assignments where program_id=? order by id",program)).isEqualTo(before);
+        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.activity_notifications where organization_id=?",Long.class,organization)).isEqualTo(notices);
+        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.session_schedule_history where program_id=?",Long.class,program)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.activity_assignments where activity_id=?",Long.class,second)).isEqualTo(1);
+    }
+
+    @Test void sessionAgendaSameDateRepairsMissingAssignmentsAndLateActivitiesFollowTheAgenda() throws Exception {
+        agendaDates(); createAdminActivity(true,1); var date=agendaToday().plusDays(2);
+        jdbcTemplate.update("insert into rti.session_schedules(organization_id,program_id,session_id,enrollment_id,scheduled_date) values(?,?,?,?,?)",organization,program,session,enrollment,date);
+        setAgenda(date,0L,"",enrollment).andExpect(status().isOk());
+        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.session_schedule_history where program_id=?",Long.class,program)).isZero();
+        var late=createAdminActivity(true,2);
+        mvc.perform(get(collaboratorPath()).header("Authorization",token(collaborator))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(2)).andExpect(jsonPath("$.items[1].id").value(late.toString()))
+                .andExpect(jsonPath("$.items[1].dueDate").value(date.plusDays(3).toString()));
+        mvc.perform(get(collaboratorPath()).header("Authorization",token(otherCollaborator))).andExpect(status().isOk()).andExpect(jsonPath("$.items").isEmpty());
+        var copyResult=mvc.perform(post(adminPath("activities",late)+"/duplicate").header("Authorization",token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0}"))
+                .andExpect(status().isCreated()).andReturn().getResponse();
+        var copy=UUID.fromString(json.readTree(copyResult.getContentAsString()).path("id").asText());
+        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.activity_assignments where activity_id=? and enrollment_id=? and due_date=?",Long.class,copy,enrollment,date.plusDays(3))).isEqualTo(1);
+    }
+
+    @Test void sessionAgendaAssignsInvitedPeopleWithoutBypassingAcceptanceAndSkipsSuspendedPeopleForNewContent() throws Exception {
+        agendaDates(); var activity=createAdminActivity(true,1);
+        jdbcTemplate.update("update rti.enrollments set status='INVITED' where id=?",enrollment);entityManager.clear();
+        setAgenda(agendaToday().plusDays(2),null,"",enrollment).andExpect(status().isOk());
+        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.activity_assignments where activity_id=? and enrollment_id=?",Long.class,activity,enrollment)).isEqualTo(1);
+        mvc.perform(get(collaboratorPath()).header("Authorization",token(collaborator))).andExpect(status().isNotFound());
+        jdbcTemplate.update("update rti.enrollments set status='ACTIVE' where id=?",enrollment);entityManager.clear();
+        mvc.perform(get(collaboratorPath()).header("Authorization",token(collaborator))).andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(1));
+        jdbcTemplate.update("update rti.enrollments set status='SUSPENDED',suspended_from_status='ACTIVE' where id=?",enrollment);entityManager.clear();
+        var late=createAdminActivity(true,2);
+        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.activity_assignments where activity_id=?",Long.class,late)).isZero();
+        mvc.perform(get(collaboratorPath()).header("Authorization",token(collaborator))).andExpect(status().isNotFound());
+    }
+
+    @Test void sessionAgendaDoesNotAssignOtherSessionsOrArchivedActivitiesAndRestorationFollowsAgenda() throws Exception {
+        agendaDates(); var first=createAdminActivity(true,1); var archived=createAdminActivity(true,2);
+        mvc.perform(post(adminPath("activities",archived)+"/archive").header("Authorization",token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0,\"archived\":true}")).andExpect(status().isNoContent());
+        var otherSession=uuid7(0xffa);
+        jdbcTemplate.update("insert into rti.program_sessions(id,organization_id,program_id,module_id,name,position,created_at,updated_at,version) values(?,?,?,?,'Otra sesión',2,now(),now(),0)",otherSession,organization,program,module);
+        mvc.perform(post(consultantPath()).header("Authorization",token(consultant)).contentType(MediaType.APPLICATION_JSON)
+                .content(allBody().replace(session.toString(),otherSession.toString())))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.assignees").isEmpty());
+        setAgenda(agendaToday().plusDays(2),null,"",enrollment).andExpect(status().isOk());
+        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.activity_assignments where program_id=?",Long.class,program)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.activity_assignments where activity_id=?",Long.class,first)).isEqualTo(1);
+        mvc.perform(post(adminPath("activities",archived)+"/archive").header("Authorization",token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":1,\"archived\":false}")).andExpect(status().isNoContent());
+        mvc.perform(get(collaboratorPath()).header("Authorization",token(collaborator))).andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(2));
+        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.activity_assignments where program_id=?",Long.class,program)).isEqualTo(2);
+    }
+
+    @Test void sessionAgendaHidesUnscheduledSessionsAndActivitiesIncludingDirectSubmission() throws Exception {
+        agendaDates(); var activity=createAdminActivity(true,1);
+        mvc.perform(get(collaboratorPath()).header("Authorization",token(collaborator))).andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(0));
+        mvc.perform(get("/api/v1/me/programs/"+program+"/sessions").header("Authorization",token(collaborator))).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+        mvc.perform(post(collaboratorPath()+"/"+activity+"/submission").header("Authorization",token(collaborator)).contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"No debe enviarse\"}"))
+                .andExpect(status().isNotFound());
+        var date=agendaToday().plusDays(2);
+        setAgenda(date,null,"",enrollment).andExpect(status().isOk());
+        mvc.perform(get(collaboratorPath()).header("Authorization",token(collaborator))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1)).andExpect(jsonPath("$.items[0].dueDate").value(date.plusDays(3).toString()));
+        mvc.perform(get(collaboratorPath()).header("Authorization",token(otherCollaborator))).andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(0));
+        mvc.perform(get("/api/v1/me/programs/"+program+"/sessions").header("Authorization",token(collaborator))).andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].scheduledDate").value(date.toString()));
+        assertThat(inbox(collaborator).toString()).doesNotContain("SESSION_RESCHEDULED");
+    }
+
+    @Test void sessionAgendaReschedulesSubgroupsAndFreezesDeliveredDeadlinesWithPrivateNotification() throws Exception {
+        agendaDates(); var first=createAdminActivity(true,1); var second=createAdminActivity(true,2);
+        var date=agendaToday().plusDays(1);setAgenda(date,null,"",enrollment,otherEnrollment).andExpect(status().isOk());
+        mvc.perform(post(collaboratorPath()+"/"+first+"/submission").header("Authorization",token(collaborator)).contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"Entrega conservada\"}"))
+                .andExpect(status().isOk());
+        setAgenda(date.plusDays(3),0L,"Cambio acordado con el colaborador",enrollment).andExpect(status().isOk());
+        mvc.perform(get(collaboratorPath()).header("Authorization",token(collaborator))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].dueDate").value(date.plusDays(3).toString()))
+                .andExpect(jsonPath("$.items[1].dueDate").value(date.plusDays(6).toString()));
+        mvc.perform(get(collaboratorPath()).header("Authorization",token(otherCollaborator))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[1].dueDate").value(date.plusDays(3).toString()));
+        var notice=inbox(collaborator).path("items");
+        assertThat(notice.toString()).contains("SESSION_RESCHEDULED","Cambio acordado con el colaborador");
+        assertThat(inbox(otherCollaborator).toString()).doesNotContain("SESSION_RESCHEDULED");
+        var noticeId=java.util.stream.StreamSupport.stream(notice.spliterator(),false).filter(n->n.path("kind").asText().equals("SESSION_RESCHEDULED")).findFirst().orElseThrow().path("id").asText();
+        mvc.perform(post("/api/v1/me/notifications/"+noticeId+"/read").header("Authorization",token(otherCollaborator))).andExpect(status().isNotFound());
+        mvc.perform(post("/api/v1/me/notifications/"+noticeId+"/read").header("Authorization",token(collaborator))).andExpect(status().isNoContent());
+        mvc.perform(get(agendaBase()+"/sessions/"+session+"/schedule-history").param("enrollmentId",enrollment.toString()).header("Authorization",token(consultant)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(2)).andExpect(jsonPath("$.items[0].reason").value("Cambio acordado con el colaborador"));
+    }
+
+    @Test void sessionAgendaRequiresReasonVersionsAndValidDatesAndDoesNotPartiallySchedule() throws Exception {
+        agendaDates();var date=agendaToday().plusDays(1);
+        setAgenda(agendaToday().minusDays(1),null,"",enrollment).andExpect(status().isBadRequest());
+        setAgenda(java.time.LocalDate.of(9999,12,29),null,"",enrollment).andExpect(status().isBadRequest());
+        setAgenda(date,null,"",enrollment,uuid7(0xeeee)).andExpect(status().isNotFound());
+        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.session_schedules where organization_id=?",Long.class,organization)).isZero();
+        setAgenda(date,null,"",enrollment).andExpect(status().isOk());
+        setAgenda(date.plusDays(1),0L,"",enrollment).andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("reason"));
+        setAgenda(date.plusDays(1),null,"Motivo válido",enrollment).andExpect(status().isConflict());
+        setAgenda(date.plusDays(1),0L,"Motivo válido",enrollment).andExpect(status().isOk());
+        setAgenda(date.plusDays(2),0L,"Versión desactualizada",enrollment).andExpect(status().isConflict());
+        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.session_schedule_history where organization_id=?",Long.class,organization)).isEqualTo(2);
+    }
+
+    @Test void sessionAgendaAllowsDatesAndReschedulingAfterProgramEndWithIndividualDeadlines() throws Exception {
+        agendaDates(); var activity=createAdminActivity(true,1);
+        var date=agendaToday().plusDays(40);
+        setAgenda(date,null,"",enrollment).andExpect(status().isOk());
+        mvc.perform(get(collaboratorPath()).header("Authorization",token(collaborator))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].dueDate").value(date.plusDays(3).toString()));
+        mvc.perform(post(collaboratorPath()+"/"+activity+"/submission").header("Authorization",token(collaborator)).contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"Entrega conservada\"}"))
+                .andExpect(status().isOk());
+        var pending=createAdminActivity(true,2);
+        setAgenda(date.plusDays(10),0L,"Cambio posterior al fin previsto",enrollment).andExpect(status().isOk())
+                .andExpect(jsonPath("$.endDate").value(agendaToday().plusDays(30).toString()));
+        mvc.perform(get(collaboratorPath()).header("Authorization",token(collaborator))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].id").value(activity.toString()))
+                .andExpect(jsonPath("$.items[0].dueDate").value(date.plusDays(3).toString()))
+                .andExpect(jsonPath("$.items[1].id").value(pending.toString()))
+                .andExpect(jsonPath("$.items[1].dueDate").value(date.plusDays(13).toString()));
+        assertThat(inbox(collaborator).toString()).contains("SESSION_RESCHEDULED","Cambio posterior al fin previsto");
+    }
+
+    @Test void sessionAgendaBlocksDatesBeforeProgramStartEvenWhenTheyAreInTheFuture() throws Exception {
+        agendaDates();
+        jdbcTemplate.update("update rti.programs set start_date=? where id=?",agendaToday().plusDays(5),program);entityManager.clear();
+        setAgenda(agendaToday().plusDays(2),null,"",enrollment).andExpect(status().isBadRequest());
+    }
+
+    @Test void sessionAgendaReadersCannotWriteAndSuspendedPeopleLoseAccess() throws Exception {
+        agendaDates(); var date=agendaToday().plusDays(30);setAgenda(date,null,"",enrollment).andExpect(status().isOk());
+        var activity=createAdminActivity(true,1);
+        mvc.perform(get(collaboratorPath()).header("Authorization",token(collaborator))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].dueDate").value(date.plusDays(3).toString()));
+        mvc.perform(get(agendaBase()+"/session-schedules")).andExpect(status().isUnauthorized());
+        mvc.perform(get(agendaBase()+"/session-schedules").header("Authorization",token(collaborator))).andExpect(status().isForbidden());
+        for(var role:java.util.List.of("LEADER","COMPANY_ADMIN")) {
+            jdbcTemplate.update("delete from rti.membership_roles where membership_id=?",otherMembership);
+            jdbcTemplate.update("insert into rti.membership_roles values(?,?)",otherMembership,role);
+            mvc.perform(get(agendaBase()+"/session-schedules").header("Authorization",token(otherCollaborator))).andExpect(status().isOk()).andExpect(jsonPath("$.canEdit").value(false));
+            mvc.perform(post(agendaBase()+"/sessions/"+session+"/schedules").header("Authorization",token(otherCollaborator)).contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"scheduledDate\":\""+date+"\",\"participants\":[{\"enrollmentId\":\""+enrollment+"\",\"version\":0}]}"))
+                    .andExpect(status().isForbidden());
+        }
+        jdbcTemplate.update("update rti.enrollments set status='SUSPENDED',suspended_from_status='ACTIVE' where id=?",enrollment);entityManager.clear();
+        mvc.perform(get("/api/v1/me/programs/"+program+"/sessions").header("Authorization",token(collaborator))).andExpect(status().isNotFound());
+        mvc.perform(get(agendaBase().replace(organization.toString(),uuid7(0xeeee).toString())+"/session-schedules").header("Authorization",token(consultant))).andExpect(status().isNotFound());
+    }
+
+    private java.time.LocalDate agendaToday() {return java.time.LocalDate.now(java.time.ZoneId.of("America/Bogota"));}
+    private void agendaDates() {jdbcTemplate.update("update rti.programs set start_date=?,end_date=? where id=?",agendaToday(),agendaToday().plusDays(30),program);entityManager.clear();}
+    private String agendaBase(){return "/api/v1/organizations/"+organization+"/programs/"+program;}
+    private org.springframework.test.web.servlet.ResultActions setAgenda(java.time.LocalDate date,Long version,String reason,UUID... selected) throws Exception {
+        var targets=java.util.Arrays.stream(selected).map(id->version==null?java.util.Map.of("enrollmentId",id.toString()):java.util.Map.of("enrollmentId",id.toString(),"version",version)).toList();
+        var result=mvc.perform(post(agendaBase()+"/sessions/"+session+"/schedules").header("Authorization",token(consultant)).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(java.util.Map.of("scheduledDate",date.toString(),"participants",targets,"reason",reason))));
+        entityManager.clear();return result;
+    }
+    private String body() {
         return "{\"sessionId\":\"" + session + "\",\"title\":\" Reflexión inicial \","
                 + "\"instructions\":\"Describe tu punto de partida.\","
-                + "\"youtubeUrl\":\"https://youtu.be/dQw4w9WgXcQ\",\"dueDate\":\"2026-10-08\","
-                + "\"position\":1,\"assignToAll\":false,\"enrollmentIds\":[" + ids + "]}";
+                + "\"youtubeUrl\":\"https://youtu.be/dQw4w9WgXcQ\",\"position\":1}";
     }
     private String allBody() {
         return "{\"sessionId\":\"" + session + "\",\"title\":\"Reflexión general\","
-                + "\"instructions\":\"Describe tu avance.\",\"youtubeUrl\":null,\"dueDate\":\"2026-10-08\","
-                + "\"position\":1,\"assignToAll\":true,\"enrollmentIds\":[]}";
+                + "\"instructions\":\"Describe tu avance.\",\"youtubeUrl\":null,\"position\":1}";
     }
     private String surveyResponseBody(tools.jackson.databind.JsonNode evaluation) {
         return "{\"answers\":["

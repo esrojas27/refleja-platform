@@ -26,7 +26,7 @@ public record NewProgramActivity(String title, String instructions, String youtu
         }
         instructions = instructions.strip();
         youtubeUrl = normalizeYoutubeUrl(youtubeUrl);
-        if (dueDate == null || dueDate.getYear() < 1 || dueDate.getYear() > 9999) {
+        if (dueDate != null && (dueDate.getYear() < 1 || dueDate.getYear() > 9999)) {
             throw new InvalidProgramInput("dueDate");
         }
         if (position < 1) throw new InvalidProgramInput("position");

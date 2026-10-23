@@ -29,7 +29,7 @@ class ProgramSessionJpaEntity {
     private String description;
     @Column(name = "objective", columnDefinition = "text")
     private String objective;
-    @Column(name = "scheduled_date", nullable = false)
+    @Column(name = "scheduled_date")
     private LocalDate scheduledDate;
     @Column(name = "position", nullable = false)
     private int position;

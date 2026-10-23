@@ -70,7 +70,7 @@ it("renders the ordered real dimension and session structure", async () => {
   expect(screen.queryByText("Sesión inicial")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: /Fundamentos/, expanded: false }));
   expect(await screen.findByText("Sesión inicial")).toBeTruthy();
-    expect(screen.getByText(/2026-10-01/)).toBeTruthy();
+  expect(screen.getByText(/Agenda individual/)).toBeTruthy();
   expect(screen.queryByText("Reflexión inicial")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: /Sesión inicial/, expanded: false }));
   expect(await screen.findByText(/Definir el punto de partida/)).toBeTruthy();
@@ -106,10 +106,10 @@ it("appends sessions inside their module using the next visible position", async
   expect(screen.getByRole("dialog", { name: "Agregar sesión" })).toBeTruthy();
   fireEvent.change(within(form).getByLabelText("Nombre"), { target: { value: "Segunda sesión" } });
   fireEvent.change(within(form).getByLabelText("Objetivo opcional"), { target: { value: "Practicar lo aprendido" } });
-  fireEvent.change(within(form).getByLabelText("Fecha"), { target: { value: "2026-10-08" } });
+  expect(within(form).queryByLabelText("Fecha")).toBeNull();
   fireEvent.submit(form);
   await waitFor(() => expect(createProgramSession).toHaveBeenCalledWith("org-a", "program-a", "module-a",
-    { name: "Segunda sesión", objective: "Practicar lo aprendido", scheduledDate: "2026-10-08", position: 4 }, expect.any(AbortSignal)));
+    { name: "Segunda sesión", objective: "Practicar lo aprendido", position: 4 }, expect.any(AbortSignal)));
 });
 
 it("creates a visual post-activity evaluation with the four supported question types", async () => {
@@ -167,7 +167,6 @@ it("blocks duplicate dimension and session submissions", () => {
   fireEvent.submit(dimensionForm); fireEvent.submit(dimensionForm);
   const sessionForm = screen.getByRole("form", { name: "Crear sesión" });
   fireEvent.change(within(sessionForm).getByLabelText("Nombre"), { target: { value: "Sesión" } });
-  fireEvent.change(within(sessionForm).getByLabelText("Fecha"), { target: { value: "2026-10-01" } });
   fireEvent.submit(sessionForm); fireEvent.submit(sessionForm);
   expect(createProgramDimension).toHaveBeenCalledTimes(1);
   expect(createProgramSession).toHaveBeenCalledTimes(1);
@@ -202,7 +201,7 @@ it("protects delivered instructions but allows saving activity metadata", async 
   vi.mocked(editActivity).mockResolvedValue();
   const delivered = { ...activity, assignees: [{ submittedAt: "2026-10-19" }] } as ProgramActivity;
   render(<ActivityForm organizationId="org-a" programId="program-a" initial={delivered}
-    sessions={[{ id: "session-a", label: "Sesión inicial" }]} enrollments={[]} activities={[delivered]} onSaved={vi.fn()} />);
+    sessions={[{ id: "session-a", label: "Sesión inicial" }]} activities={[delivered]} onSaved={vi.fn()} />);
   expect((screen.getByLabelText("Instrucciones") as HTMLTextAreaElement).readOnly).toBe(true);
   expect((screen.getByLabelText("Sesión") as HTMLSelectElement).disabled).toBe(true);
   fireEvent.change(screen.getByLabelText("Título"), { target: { value: "Título corregido" } });
@@ -264,13 +263,14 @@ it("disables deletion with assignments and archive with submissions", () => {
   expect((screen.getByRole("button", { name: "Duplicar" }) as HTMLButtonElement).disabled).toBe(false);
 });
 
-it("duplicates content without assignments by default", async () => {
+it("duplicates content using the session agenda without recipient controls", async () => {
   vi.mocked(duplicateActivity).mockResolvedValue({ id: "copy" });
   render(<ContentTools {...toolsProps} />);
   fireEvent.click(screen.getByRole("button", { name: "Duplicar" }));
-  expect((screen.getByLabelText("Preparar sin asignaciones") as HTMLInputElement).checked).toBe(true);
+  expect(screen.queryByRole("radio")).toBeNull();
+  expect(screen.getByText(/Se asignará según la agenda de esta sesión/)).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Crear copia" }));
-  await waitFor(() => expect(duplicateActivity).toHaveBeenCalledWith("org-a", "program-a", "activity-a", 0, false, []));
+  await waitFor(() => expect(duplicateActivity).toHaveBeenCalledWith("org-a", "program-a", "activity-a", 0));
 });
 
 it("sends move and restore actions with the current resource version", async () => {

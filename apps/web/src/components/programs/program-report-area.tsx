@@ -162,7 +162,7 @@ function WorkList({ report }: { report: ProgramReport }) {
         <p className="break-words text-xs text-muted-foreground">{w.dimensionName} · {w.sessionName} · {names.get(w.enrollmentId)}</p>
         <p className="mt-1 break-words font-semibold">{w.activityTitle}</p>
         <p className="mt-2 text-sm">{activityStatusLabel(w.status)} · Avance {w.progressPercentage}%{w.overdue ? " · Vencida" : ""}</p>
-        <p className="mt-1 text-xs leading-5 text-muted-foreground">Fecha límite {w.dueDate} · {w.surveyRequired ? w.surveyCompletedAt ? "Encuesta respondida" : "Encuesta pendiente" : "Sin encuesta"}</p>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">{w.dueDate ? `Fecha límite ${w.dueDate}` : "Sesión sin agendar"} · {w.surveyRequired ? w.surveyCompletedAt ? "Encuesta respondida" : "Encuesta pendiente" : "Sin encuesta"}</p>
       </li>)}
     </ul>}
     <Pager page={page} size={10} count={report.work.length} onPage={setPage} label="Páginas de actividades" />

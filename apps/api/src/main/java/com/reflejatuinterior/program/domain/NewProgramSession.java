@@ -19,7 +19,7 @@ public record NewProgramSession(String name, String description, String objectiv
         description = normalize(description);
         objective = normalize(objective);
         if (objective == null) objective = description;
-        if (scheduledDate == null || scheduledDate.getYear() < 1 || scheduledDate.getYear() > 9999) {
+        if (scheduledDate != null && (scheduledDate.getYear() < 1 || scheduledDate.getYear() > 9999)) {
             throw new InvalidProgramInput("scheduledDate");
         }
         if (position < 1) throw new InvalidProgramInput("position");

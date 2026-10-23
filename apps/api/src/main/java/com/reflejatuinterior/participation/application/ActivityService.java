@@ -4,7 +4,6 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -55,28 +54,12 @@ public class ActivityService {
 
     @Transactional
     public ActivityResponse create(String subject, UUID organizationId, UUID programId, UUID sessionId,
-            String title, String instructions, String youtubeUrl, LocalDate dueDate, int position,
-            boolean assignToAll, List<UUID> enrollmentIds, String requestId) {
+            String title, String instructions, String youtubeUrl, LocalDate dueDate, int position, String requestId) {
         var context = authorizeConsultant(subject, organizationId, programId, "CREATE_ACTIVITY", requestId);
         programs.lock(context.organizationId(), programId).orElseThrow(ProgramActivities.Missing::new).requireEditable();
-        var uniqueEnrollmentIds = new LinkedHashSet<>(enrollmentIds);
-        if ((assignToAll && !uniqueEnrollmentIds.isEmpty())
-                || (!assignToAll && uniqueEnrollmentIds.isEmpty())
-                || uniqueEnrollmentIds.size() != enrollmentIds.size()) {
-            throw new InvalidActivityAssignment("enrollmentIds");
-        }
-        var activeEnrollments = assignToAll
-                ? enrollments.findAllActive(context.organizationId(), programId)
-                : enrollments.findActive(context.organizationId(), programId, uniqueEnrollmentIds);
-        if (!assignToAll && activeEnrollments.size() != uniqueEnrollmentIds.size()) {
-            throw new EnrollmentNotFound();
-        }
-
         var activity = activities.create(context.organizationId(), programId, sessionId,
                 title, instructions, youtubeUrl, dueDate, position);
-        var createdAssignments = activeEnrollments.isEmpty() ? List.<ActivityAssignments.Data>of()
-                : assignments.create(context.organizationId(), programId, activity.id(),
-                        activeEnrollments.stream().map(Enrollments.Data::id).toList());
+        var createdAssignments = assignments.assignScheduledActivity(context.organizationId(), programId, activity.id());
         auditAfterCommit(createdAssignments.isEmpty() ? "PROGRAM_ACTIVITY_CREATED" : "PROGRAM_ACTIVITY_ASSIGNED",
                 context.userId(), context.organizationId(), activity.id(), requestId);
         return response(activity, createdAssignments, Optional.empty(), Map.of());
@@ -250,7 +233,7 @@ public class ActivityService {
                 participant.firstName(), participant.lastName(), assignment.status(), assignment.responseText(),
                 assignment.submittedAt(), assignment.reviewComment(), assignment.reviewedAt(),
                 surveyStatus(evaluation, assignment, surveyCompletedAt),
-                completionPercentage(evaluation, assignment, surveyCompletedAt), assignment.version());
+                completionPercentage(evaluation, assignment, surveyCompletedAt), assignment.version(),assignment.dueDate());
     }
 
     private AssignedActivityResponse assignedResponse(ProgramActivities.Activity activity,
@@ -259,7 +242,7 @@ public class ActivityService {
         return new AssignedActivityResponse(activity.id(), activity.organizationId(), activity.programId(),
                 activity.moduleId(), activity.sessionId(), activity.dimensionName(), activity.dimensionPosition(),
                 activity.sessionName(), activity.sessionPosition(),
-                activity.title(), activity.instructions(), activity.youtubeUrl(), activity.dueDate(),
+                activity.title(), activity.instructions(), activity.youtubeUrl(), assignment.dueDate(),
                 activity.position(), activity.version(), assignment.id(), assignment.status(),
                 assignment.responseText(), assignment.submittedAt(), assignment.reviewComment(),
                 assignment.reviewedAt(), assignment.version(),
@@ -308,7 +291,7 @@ public class ActivityService {
     public record AssigneeResponse(UUID assignmentId, UUID enrollmentId, String email, String firstName,
             String lastName, String status, String responseText, Instant submittedAt,
             String reviewComment, Instant reviewedAt, String surveyStatus,
-            int completionPercentage, long version) {}
+            int completionPercentage, long version, LocalDate dueDate) {}
     public record ActivityResponse(UUID id, UUID organizationId, UUID programId, UUID moduleId, UUID sessionId,
             String dimensionName, int dimensionPosition, String sessionName, int sessionPosition,
             String title, String instructions, String youtubeUrl,

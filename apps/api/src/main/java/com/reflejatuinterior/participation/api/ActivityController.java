@@ -44,17 +44,16 @@ class ActivityController {
 
     @PostMapping(path = "/api/v1/organizations/{organizationId}/programs/{programId}/activities",
             consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    @Operation(summary = "Create a program activity and assign it when active enrollments exist",
-            description = "The activity definition can be created before participants are enrolled. When active enrollments exist, "
-                    + "the requested assignments are created atomically and make the activity visible to those collaborators.")
+    @Operation(summary = "Create an activity and assign it to scheduled session participants",
+            description = "Recipients come from the individual session agenda, not from the creation form. "
+                    + "Participants scheduled later receive the session activities when their date is saved.")
     @ApiResponse(responseCode = "201", description = "Activity created, with zero or more assignments")
     ResponseEntity<ActivityService.ActivityResponse> create(@AuthenticationPrincipal Jwt jwt,
             @PathVariable UUID organizationId, @PathVariable UUID programId,
             @Valid @RequestBody CreateActivityRequest input, HttpServletRequest request) {
         var id = EnrollmentController.requestId(request);
         var result = service.create(jwt.getSubject(), organizationId, programId, input.sessionId(), input.title(),
-                input.instructions(), input.youtubeUrl(), input.dueDate(), input.position(), input.assignToAll(),
-                input.enrollmentIds(), id);
+                input.instructions(), input.youtubeUrl(), null, input.position(), id);
         var location = "/api/v1/organizations/" + organizationId + "/programs/" + programId
                 + "/activities/" + result.id();
         return ResponseEntity.created(URI.create(location)).cacheControl(CacheControl.noStore())
@@ -101,10 +100,7 @@ class ActivityController {
                                  @NotBlank @Size(max = 255) String title,
                                  @NotBlank @Size(max = 10000) String instructions,
                                  @Size(max = 2048) String youtubeUrl,
-                                 @NotNull LocalDate dueDate,
-                                 @Positive int position,
-                                 boolean assignToAll,
-                                 @NotNull @Size(max = 100) List<@NotNull UUID> enrollmentIds) {}
+                                 @Positive int position) {}
     record SubmitActivityRequest(@NotBlank @Size(max = 10000) String responseText) {}
     record ReviewActivityRequest(@NotNull ActivityReviewDecision decision,
                                  @Size(max = 5000) String comment) {}

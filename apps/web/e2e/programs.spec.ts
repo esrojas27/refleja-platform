@@ -4,6 +4,7 @@ const base = "/organizations/01900000-0000-7000-8000-000000000901/programs";
 for (const [path, heading] of [[base, "Programas"], [`${base}/new`, "Crear programa"],
   [`${base}/01900000-0000-7000-8000-000000000905`, "Detalle del programa"],
   [`${base}/01900000-0000-7000-8000-000000000905/content`, "Contenido"],
+  [`${base}/01900000-0000-7000-8000-000000000905/agenda`, "Agenda de sesiones"],
   [`${base}/01900000-0000-7000-8000-000000000905/activities`, "Actividades"],
   [`${base}/01900000-0000-7000-8000-000000000905/progress`, "Progreso"],
   [`${base}/01900000-0000-7000-8000-000000000905/reports`, "Reportes"],

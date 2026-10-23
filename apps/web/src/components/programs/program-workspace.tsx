@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BarChart3, BookOpenText, BrainCircuit, CheckSquare2, ChevronLeft, ListTree, UsersRound, ChartNoAxesCombined, FileChartColumn } from "lucide-react";
+import { BarChart3, BookOpenText, BrainCircuit, CheckSquare2, ChevronLeft, ListTree, UsersRound, ChartNoAxesCombined, FileChartColumn, CalendarDays } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { fetchCurrentIdentity } from "@/lib/auth/authenticated-api";
@@ -39,6 +39,7 @@ export function ProgramWorkspace({
   }, [organizationId]);
 
   const items: WorkspaceItem[] = [
+    { href: `${programPath}/agenda`, label: "Agenda", icon: CalendarDays, active: current => current === `${programPath}/agenda` },
     {
       href: programPath,
       label: "Resumen",

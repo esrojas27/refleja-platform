@@ -1,11 +1,12 @@
 import { fetchAuthSession } from "aws-amplify/auth";
 
-export type NotificationKind = "ACTIVITY_ASSIGNED" | "SUBMISSION_RECEIVED" | "CHANGES_REQUESTED" | "ACTIVITY_APPROVED" | "SURVEY_PENDING";
+export type NotificationKind = "ACTIVITY_ASSIGNED" | "SUBMISSION_RECEIVED" | "CHANGES_REQUESTED" | "ACTIVITY_APPROVED" | "SURVEY_PENDING" | "SESSION_RESCHEDULED";
 export type AppNotification = {
   id: string; organizationId: string; organizationName: string; programId: string; programName: string;
   activityId: string; activityTitle: string; assignmentId: string; kind: NotificationKind;
   participantName: string | null;
   createdAt: string; readAt: string | null;
+  sessionId?: string | null; previousDate?: string | null; scheduledDate?: string | null; reason?: string | null;
 };
 export type NotificationPage = { items: AppNotification[]; unreadCount: number; hasMore: boolean };
 export class NotificationRequestError extends Error {
@@ -37,9 +38,11 @@ export const notificationLabels: Record<NotificationKind, string> = {
   CHANGES_REQUESTED: "Tu actividad necesita ajustes",
   ACTIVITY_APPROVED: "Tu actividad fue aprobada",
   SURVEY_PENDING: "Te falta completar la encuesta",
+  SESSION_RESCHEDULED: "Tu sesión fue reprogramada",
 };
 export function notificationDestination(item: AppNotification) {
   const program = encodeURIComponent(item.programId);
+  if(item.kind === "SESSION_RESCHEDULED") return `/my-programs/${program}/agenda#session-${encodeURIComponent(item.sessionId ?? "")}`;
   return item.kind === "SUBMISSION_RECEIVED"
     ? `/organizations/${encodeURIComponent(item.organizationId)}/programs/${program}/activities#review-${encodeURIComponent(item.assignmentId)}`
     : `/my-programs/${program}/activities#activity-${encodeURIComponent(item.activityId)}`;

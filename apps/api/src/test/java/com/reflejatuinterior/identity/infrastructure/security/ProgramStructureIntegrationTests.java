@@ -55,7 +55,7 @@ class ProgramStructureIntegrationTests extends PostgreSqlIntegrationTestSupport 
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.moduleId").value(moduleId.toString()))
                 .andExpect(jsonPath("$.objective").value("Definir el punto de partida"))
                 .andExpect(jsonPath("$.description").doesNotExist())
-                .andExpect(jsonPath("$.scheduledDate").value("2026-10-01")).andExpect(jsonPath("$.position").value(1))
+                .andExpect(jsonPath("$.scheduledDate").isEmpty()).andExpect(jsonPath("$.position").value(1))
                 .andReturn().getResponse();
         var sessionId = UUID.fromString(json.readTree(sessionResponse.getContentAsString()).path("id").asText());
         assertThat(sessionId.version()).isEqualTo(7);

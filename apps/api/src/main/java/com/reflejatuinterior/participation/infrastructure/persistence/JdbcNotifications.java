@@ -57,6 +57,7 @@ class JdbcNotifications implements Notifications {
               AND owner.status='ACTIVE' AND participant.status='ACTIVE'
               AND EXISTS(SELECT FROM rti.membership_roles r WHERE r.membership_id=owner.id AND r.role='COLLABORATOR')
               AND NOT act.archived AND NOT s.archived AND NOT d.archived
+              AND EXISTS(SELECT FROM rti.session_schedules c WHERE c.organization_id=a.organization_id AND c.session_id=s.id AND c.enrollment_id=a.enrollment_id)
               AND ((n.kind='SUBMISSION_RECEIVED' AND a.status='SUBMITTED' AND a.version=n.source_version
                 AND EXISTS(SELECT FROM rti.membership_roles r WHERE r.membership_id=m.id AND r.role='CONSULTANT'))
                 OR (n.kind<>'SUBMISSION_RECEIVED' AND m.id=e.participant_membership_id AND m.profile_status='COMPLETE'
@@ -79,7 +80,7 @@ class JdbcNotifications implements Notifications {
                 new Item(rs.getObject("id",UUID.class),org,rs.getString("organization_name"),rs.getObject("program_id",UUID.class),
                     rs.getString("program_name"),rs.getObject("activity_id",UUID.class),rs.getString("activity_title"),
                     rs.getObject("assignment_id",UUID.class),Kind.valueOf(rs.getString("kind")),rs.getString("participant_name"),
-                    rs.getTimestamp("created_at").toInstant(),rs.getTimestamp("read_at")==null?null:rs.getTimestamp("read_at").toInstant()));
+                    rs.getTimestamp("created_at").toInstant(),rs.getTimestamp("read_at")==null?null:rs.getTimestamp("read_at").toInstant(),null,null,null,null));
     }
     public long unreadCount(UUID org, UUID user) {
         return jdbc.queryForObject("SELECT count(*) " + VISIBLE + " AND n.read_at IS NULL",params(org,user),Long.class);

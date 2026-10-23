@@ -56,7 +56,7 @@ export function ConsultantProgressOverview({ activities }: { activities: Program
 
 export function ActivityStatusBadges({ status, dueDate, surveyStatus }: {
   status: ActivityAssignmentStatus;
-  dueDate: string;
+  dueDate: string | null;
   surveyStatus?: "LOCKED" | "PENDING" | "COMPLETED";
 }) {
   const styles = {

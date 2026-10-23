@@ -69,7 +69,7 @@ class ProgramStructureController {
             @Valid @RequestBody CreateSessionRequest input, HttpServletRequest request) {
         var id = requestId(request);
         var result = structure.createSession(jwt.getSubject(), organizationId, programId, moduleId,
-                input.name(), input.description(), input.objective(), input.scheduledDate(), input.position(), id);
+                input.name(), input.description(), input.objective(), null, input.position(), id);
         var location = "/api/v1/organizations/" + organizationId + "/programs/" + programId
                 + "/modules/" + moduleId + "/sessions/" + result.id();
         return ResponseEntity.created(URI.create(location)).cacheControl(CacheControl.noStore())
@@ -88,7 +88,6 @@ class ProgramStructureController {
     record CreateSessionRequest(@NotBlank @Size(max = 255) String name,
                                 @Size(max = 10000) String description,
                                 @Size(max = 10000) String objective,
-                                @NotNull LocalDate scheduledDate,
                                 @Positive int position) {}
     record ModuleListResponse(List<ModuleResponse> items) {}
     record ModuleResponse(UUID id, UUID organizationId, UUID programId, String name, String description,

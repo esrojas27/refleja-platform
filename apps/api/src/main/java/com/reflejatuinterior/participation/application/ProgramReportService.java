@@ -78,12 +78,12 @@ public class ProgramReportService {
             boolean required = surveyActivities.contains(definition.id());
             int progress = assignment.submittedAt() == null ? 0 : required && surveyAt == null ? 50 : 100;
             // This is the latest submitted version, not a historical first-submission metric.
-            boolean onTime = assignment.submittedAt() != null && !assignment.submittedAt().atZone(zone).toLocalDate().isAfter(definition.dueDate())
-                    && (!required || surveyAt != null && !surveyAt.atZone(zone).toLocalDate().isAfter(definition.dueDate()));
+            boolean onTime = assignment.dueDate()!=null && assignment.submittedAt() != null && !assignment.submittedAt().atZone(zone).toLocalDate().isAfter(assignment.dueDate())
+                    && (!required || surveyAt != null && !surveyAt.atZone(zone).toLocalDate().isAfter(assignment.dueDate()));
             work.add(new ProgramReport.Work(assignment.id(), assignment.enrollmentId(), definition.id(), definition.title(),
-                    definition.moduleId(), definition.dimensionName(), definition.sessionId(), definition.sessionName(), definition.dueDate(),
+                    definition.moduleId(), definition.dimensionName(), definition.sessionId(), definition.sessionName(), assignment.dueDate(),
                     assignment.status(), assignment.submittedAt(), required, surveyAt, progress,
-                    !"COMPLETED".equals(assignment.status()) && definition.dueDate().isBefore(today), onTime));
+                    assignment.dueDate()!=null && !"COMPLETED".equals(assignment.status()) && assignment.dueDate().isBefore(today), onTime));
         }
         var byPerson = work.stream().collect(Collectors.groupingBy(ProgramReport.Work::enrollmentId));
         var personReports = participants.stream().map(p -> {
@@ -105,8 +105,8 @@ public class ProgramReportService {
         int submitted = (int) work.stream().filter(w -> w.submittedAt() != null).count();
         int participating = (int) work.stream().filter(w -> w.submittedAt() != null).map(ProgramReport.Work::enrollmentId).distinct().count();
         int approved = count(work, "COMPLETED");
-        int due = (int) work.stream().filter(w -> w.dueDate().isBefore(today)).count();
-        int onTime = (int) work.stream().filter(w -> w.dueDate().isBefore(today) && w.onTime()).count();
+        int due = (int) work.stream().filter(w -> w.dueDate()!=null && w.dueDate().isBefore(today)).count();
+        int onTime = (int) work.stream().filter(w -> w.dueDate()!=null && w.dueDate().isBefore(today) && w.onTime()).count();
         return new ProgramReport.Summary(participantCount, participating, work.size(), submitted, count(work, "ASSIGNED"), count(work, "SUBMITTED"),
                 count(work, "CHANGES_REQUESTED"), approved, (int) work.stream().filter(ProgramReport.Work::overdue).count(),
                 (int) work.stream().filter(ProgramReport.Work::surveyRequired).count(), (int) work.stream().filter(w -> w.surveyRequired() && w.surveyCompletedAt() != null).count(),

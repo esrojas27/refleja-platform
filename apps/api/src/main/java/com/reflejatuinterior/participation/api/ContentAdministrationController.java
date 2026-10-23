@@ -31,14 +31,14 @@ class ContentAdministrationController {
     ResponseEntity<Void> session(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID organizationId, @PathVariable UUID programId,
             @PathVariable UUID id, @Valid @RequestBody SessionRequest input, HttpServletRequest request) {
         var rid = EnrollmentController.requestId(request);
-        service.editSession(jwt.getSubject(), organizationId, programId, id, input.version(), input.name(), input.objective(), input.scheduledDate(), rid);
+        service.editSession(jwt.getSubject(), organizationId, programId, id, input.version(), input.name(), input.objective(), null, rid);
         return done(rid);
     }
     @PutMapping("/activities/{id}")
     ResponseEntity<Void> activity(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID organizationId, @PathVariable UUID programId,
             @PathVariable UUID id, @Valid @RequestBody ActivityRequest input, HttpServletRequest request) {
         var rid = EnrollmentController.requestId(request);
-        service.editActivity(jwt.getSubject(), organizationId, programId, id, input.version(), input.title(), input.instructions(), input.youtubeUrl(), input.dueDate(), rid);
+        service.editActivity(jwt.getSubject(), organizationId, programId, id, input.version(), input.title(), input.instructions(), input.youtubeUrl(), null, rid);
         return done(rid);
     }
     @PutMapping("/activities/{id}/survey")
@@ -71,19 +71,19 @@ class ContentAdministrationController {
     ResponseEntity<Duplicated> duplicate(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID organizationId, @PathVariable UUID programId,
             @PathVariable UUID id, @Valid @RequestBody DuplicateRequest input, HttpServletRequest request) {
         var rid = EnrollmentController.requestId(request);
-        var result = service.duplicate(jwt.getSubject(), organizationId, programId, id, input.version(), input.assignToAll(), input.enrollmentIds(), rid);
+        var result = service.duplicate(jwt.getSubject(), organizationId, programId, id, input.version(), rid);
         return ResponseEntity.status(201).cacheControl(CacheControl.noStore()).header("X-Request-ID", rid).body(new Duplicated(result));
     }
     private ResponseEntity<Void> done(String rid) { return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).header("X-Request-ID", rid).build(); }
     record DimensionRequest(@NotBlank @Size(max=255) String name, @Size(max=10000) String description, @NotNull @PositiveOrZero Long version) {}
-    record SessionRequest(@NotBlank @Size(max=255) String name, @Size(max=10000) String objective, @NotNull LocalDate scheduledDate, @NotNull @PositiveOrZero Long version) {}
+    record SessionRequest(@NotBlank @Size(max=255) String name, @Size(max=10000) String objective, @NotNull @PositiveOrZero Long version) {}
     record ActivityRequest(@NotBlank @Size(max=255) String title, @NotBlank @Size(max=10000) String instructions,
-            @Size(max=2048) String youtubeUrl, @NotNull LocalDate dueDate, @NotNull @PositiveOrZero Long version) {}
+            @Size(max=2048) String youtubeUrl, @NotNull @PositiveOrZero Long version) {}
     record SurveyRequest(@NotBlank @Size(max=255) String title, @Size(max=2000) String instructions,
             @NotNull @Size(min=1,max=20) List<@Valid QuestionRequest> questions, @NotNull @PositiveOrZero Long version) {}
     record VersionRequest(@NotNull @PositiveOrZero Long version) {}
     record ArchiveRequest(@NotNull @PositiveOrZero Long version, @NotNull Boolean archived) {}
     record MoveRequest(@NotNull @PositiveOrZero Long version, @NotNull @Pattern(regexp="UP|DOWN") String direction) {}
-    record DuplicateRequest(@NotNull @PositiveOrZero Long version, boolean assignToAll, @NotNull @Size(max=100) List<@NotNull UUID> enrollmentIds) {}
+    record DuplicateRequest(@NotNull @PositiveOrZero Long version) {}
     record Duplicated(UUID id) {}
 }

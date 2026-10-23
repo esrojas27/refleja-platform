@@ -12,7 +12,7 @@ export type ReportSummary = {
 };
 export type ReportParticipant = { enrollmentId: string; name: string; email: string; status: EnrollmentStatus; summary: ReportSummary };
 export type ReportWork = { assignmentId: string; enrollmentId: string; activityId: string; activityTitle: string;
-  dimensionId: string; dimensionName: string; sessionId: string; sessionName: string; dueDate: string;
+  dimensionId: string; dimensionName: string; sessionId: string; sessionName: string; dueDate: string | null;
   status: ActivityAssignmentStatus; submittedAt: string | null; surveyRequired: boolean; surveyCompletedAt: string | null;
   progressPercentage: number; overdue: boolean; onTime: boolean };
 export type ProgramReport = { organizationId: string; organizationName: string; programId: string; programName: string;

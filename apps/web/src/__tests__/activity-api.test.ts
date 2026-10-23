@@ -21,7 +21,7 @@ describe("activity API", () => {
     vi.stubGlobal("fetch", fetcher);
     const input = { sessionId: "session-a", title: "Reflexión", instructions: "Escribe",
       youtubeUrl: "https://youtu.be/dQw4w9WgXcQ", dueDate: "2026-10-08",
-      position: 1, assignToAll: false, enrollmentIds: ["enrollment-a"] };
+      position: 1 };
     await listProgramActivities("org a", "program/a");
     await createProgramActivity("org a", "program/a", input);
     const path = "http://localhost:8082/api/v1/organizations/org%20a/programs/program%2Fa/activities";

@@ -21,7 +21,7 @@ async function request<T = void>(org: string, program: string, suffix: string, m
   });
   if (result.status !== expected) {
     const body = await result.json().catch(() => null);
-    const allowed = ["name", "description", "objective", "scheduledDate", "title", "instructions", "youtubeUrl", "dueDate", "questions", "enrollmentIds"];
+    const allowed = ["name", "description", "objective", "scheduledDate", "title", "instructions", "youtubeUrl", "dueDate", "questions"];
     const fields = body?.code === "VALIDATION_ERROR" && Array.isArray(body.errors)
       ? body.errors.map((e: { field?: unknown }) => e?.field).filter((f: unknown): f is string => typeof f === "string" && allowed.includes(f)) : [];
     const rid = typeof body?.requestId === "string" && /^[a-f0-9-]{36}$/i.test(body.requestId) ? body.requestId : undefined;
@@ -33,11 +33,11 @@ export const editDimension = (org: string, program: string, id: string,
   input: { name: string; description: string; version: number }, signal?: AbortSignal) =>
   request(org, program, `dimensions/${encodeURIComponent(id)}`, "PUT", { name: input.name, description: input.description, version: input.version }, signal);
 export const editSession = (org: string, program: string, id: string,
-  input: { name: string; objective: string; scheduledDate: string; version: number }, signal?: AbortSignal) =>
-  request(org, program, `sessions/${encodeURIComponent(id)}`, "PUT", { name: input.name, objective: input.objective, scheduledDate: input.scheduledDate, version: input.version }, signal);
+  input: { name: string; objective: string; version: number }, signal?: AbortSignal) =>
+  request(org, program, `sessions/${encodeURIComponent(id)}`, "PUT", { name: input.name, objective: input.objective, version: input.version }, signal);
 export const editActivity = (org: string, program: string, id: string,
-  input: { title: string; instructions: string; youtubeUrl: string | null; dueDate: string; version: number }, signal?: AbortSignal) =>
-  request(org, program, `activities/${encodeURIComponent(id)}`, "PUT", { title: input.title, instructions: input.instructions, youtubeUrl: input.youtubeUrl, dueDate: input.dueDate, version: input.version }, signal);
+  input: { title: string; instructions: string; youtubeUrl: string | null; version: number }, signal?: AbortSignal) =>
+  request(org, program, `activities/${encodeURIComponent(id)}`, "PUT", { title: input.title, instructions: input.instructions, youtubeUrl: input.youtubeUrl, version: input.version }, signal);
 export const editSurvey = (org: string, program: string, activity: string, input: EvaluationInput & { version: number }, signal?: AbortSignal) =>
   request<ActivityEvaluation>(org, program, `activities/${encodeURIComponent(activity)}/survey`, "PUT",
     { title: input.title, instructions: input.instructions, questions: input.questions.map(q => ({ prompt: q.prompt, type: q.type, position: q.position })), version: input.version }, signal, 200);
@@ -47,5 +47,5 @@ export const moveContent = (org: string, program: string, kind: ContentKind, id:
   request(org, program, `${kind}/${encodeURIComponent(id)}/move`, "POST", { version, direction });
 export const deleteContent = (org: string, program: string, kind: ContentKind, id: string, version: number) =>
   request(org, program, `${kind}/${encodeURIComponent(id)}/delete`, "POST", { version });
-export const duplicateActivity = (org: string, program: string, id: string, version: number, assignToAll: boolean, enrollmentIds: string[]) =>
-  request<{ id: string }>(org, program, `activities/${encodeURIComponent(id)}/duplicate`, "POST", { version, assignToAll, enrollmentIds }, undefined, 201);
+export const duplicateActivity = (org: string, program: string, id: string, version: number) =>
+  request<{ id: string }>(org, program, `activities/${encodeURIComponent(id)}/duplicate`, "POST", { version }, undefined, 201);

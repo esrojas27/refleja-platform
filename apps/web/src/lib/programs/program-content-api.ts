@@ -3,14 +3,14 @@ import { programsPath } from "@/lib/programs/program-api";
 
 export type ProgramSession = {
   id: string; organizationId: string; programId: string; dimensionId: string;
-  name: string; objective: string | null; scheduledDate: string; position: number; version: number; archived?: boolean;
+  name: string; objective: string | null; scheduledDate: string | null; position: number; version: number; archived?: boolean;
 };
 export type ProgramDimension = {
   id: string; organizationId: string; programId: string; name: string;
   description: string | null; position: number; version: number; sessions: ProgramSession[]; archived?: boolean;
 };
 export type ProgramDimensionInput = { name: string; description: string; position: number };
-export type ProgramSessionInput = { name: string; objective: string; scheduledDate: string; position: number };
+export type ProgramSessionInput = { name: string; objective: string; position: number };
 
 type LegacyProgramSession = Omit<ProgramSession, "dimensionId" | "objective"> & {
   moduleId: string; description: string | null; objective?: string | null;
@@ -81,7 +81,7 @@ export async function createProgramSession(organizationId: string, programId: st
   input: ProgramSessionInput, signal?: AbortSignal) {
   const created = await request<LegacyProgramSession>(
     `${programDimensionsPath(organizationId, programId)}/${encodeURIComponent(dimensionId)}/sessions`, "POST",
-    { name: input.name, objective: input.objective, scheduledDate: input.scheduledDate, position: input.position }, signal);
+    { name: input.name, objective: input.objective, position: input.position }, signal);
   return dimension({ id: dimensionId, organizationId, programId, name: "", description: null,
     position: 1, version: 0, sessions: [created] }).sessions[0];
 }
@@ -92,6 +92,7 @@ export function programContentErrorMessage(error: unknown) {
   const messages: Record<string, string> = {
     CONTENT_HAS_SUBMISSIONS: "Ya existen entregas. Conserva las instrucciones y la encuesta; duplica la actividad para preparar una nueva versión.",
     CONTENT_HAS_ASSIGNMENTS: "No se puede eliminar contenido con asignaciones o respuestas. Si todavía no tiene entregas, puedes archivarlo.",
+    CONTENT_HAS_SCHEDULES: "Esta sesión o dimensión tiene fechas e historial de participantes. Puedes archivarla si no tiene entregas, pero no eliminarla.",
     CONTENT_VERSION_CONFLICT: "El contenido cambió. Actualiza antes de guardar nuevamente.",
     CONTENT_ARCHIVED: "Este contenido está archivado. Restáuralo antes de modificarlo.",
     CONTENT_PARENT_ARCHIVED: "Restaura primero la dimensión o sesión que contiene este elemento.",

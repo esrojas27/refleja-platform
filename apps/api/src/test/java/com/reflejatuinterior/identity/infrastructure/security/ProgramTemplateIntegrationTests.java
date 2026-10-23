@@ -123,9 +123,9 @@ class ProgramTemplateIntegrationTests extends PostgreSqlIntegrationTestSupport {
         assertThat(jdbcTemplate.queryForObject("select count(*) from rti.activity_evaluations where program_id=?", Long.class,
                 clonedProgram)).isEqualTo(1);
         assertThat(jdbcTemplate.queryForObject("select scheduled_date from rti.program_sessions where program_id=?",
-                java.time.LocalDate.class, clonedProgram)).isEqualTo(java.time.LocalDate.parse("2027-02-05"));
+                java.time.LocalDate.class, clonedProgram)).isNull();
         assertThat(jdbcTemplate.queryForObject("select due_date from rti.program_activities where program_id=?",
-                java.time.LocalDate.class, clonedProgram)).isEqualTo(java.time.LocalDate.parse("2027-02-08"));
+                java.time.LocalDate.class, clonedProgram)).isNull();
         assertThat(jdbcTemplate.queryForObject("select count(*) from rti.enrollments where program_id=?", Long.class,
                 clonedProgram)).isZero();
         assertThat(jdbcTemplate.queryForObject("select count(*) from rti.activity_assignments where program_id=?", Long.class,

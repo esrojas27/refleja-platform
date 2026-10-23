@@ -81,7 +81,7 @@ it("renders real sessions, assignments and existing activities", async () => {
   expect(screen.queryByRole("form", { name: "Crear actividad" })).toBeNull();
   expect(screen.getByRole("link", { name: "Ver video en YouTube" }).getAttribute("href")).toBe("https://youtu.be/dQw4w9WgXcQ");
   expect(screen.getByTitle("Video de la actividad: Reflexión inicial").tagName).toBe("IFRAME");
-  expect(listEnrollments).toHaveBeenCalledWith("org-a", "program-a", 0, expect.any(AbortSignal), 100);
+  expect(listEnrollments).not.toHaveBeenCalled();
 });
 
 it("preserves consultant access to submitted work after closure without creation or review controls", async () => {
@@ -92,40 +92,39 @@ it("preserves consultant access to submitted work after closure without creation
   fireEvent.click(screen.getByText("Consultar entregas (1)"));
   expect(screen.getByText("Mi avance")).toBeTruthy();
   expect(screen.getByText("Avance conservado: 100%")).toBeTruthy();
-  expect(screen.queryByRole("button", { name: "Crear y asignar" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Crear actividad" })).toBeNull();
   expect(screen.queryByRole("button", { name: /Revisar actividades/ })).toBeNull();
 });
 
-it("assigns the next activity to every active enrollment by default", async () => {
+it("creates activity content with recipients derived from the session agenda", async () => {
   render(<ProgramActivityArea organizationId="org-a" programId="program-a" />);
-  fireEvent.click(await screen.findByRole("button", { name: "Crear y asignar" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Crear actividad" }));
   const form = await screen.findByRole("form", { name: "Crear actividad" });
-  expect(screen.getByRole("dialog", { name: "Crear y asignar" })).toBeTruthy();
+  expect(screen.getByRole("dialog", { name: "Crear actividad" })).toBeTruthy();
   fireEvent.change(within(form).getByLabelText("Título"), { target: { value: "Práctica consciente" } });
   fireEvent.change(within(form).getByLabelText("Instrucciones"), { target: { value: "Registra tres hallazgos" } });
   fireEvent.change(within(form).getByLabelText("Video de YouTube (opcional)"), { target: { value: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" } });
-  fireEvent.change(within(form).getByLabelText("Fecha límite"), { target: { value: "2026-10-15" } });
+  expect(within(form).queryByLabelText("Fecha límite")).toBeNull();
   expect(within(form).queryByLabelText(/Ana Prueba/)).toBeNull();
   fireEvent.submit(form);
   await waitFor(() => expect(createProgramActivity).toHaveBeenCalledWith("org-a", "program-a", {
     sessionId: "session-a", title: "Práctica consciente", instructions: "Registra tres hallazgos",
-    youtubeUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", dueDate: "2026-10-15",
-    position: 2, assignToAll: true, enrollmentIds: [],
+    youtubeUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    position: 2,
   }, expect.any(AbortSignal)));
 });
 
 it("highlights every missing required field and focuses the first one", async () => {
   render(<ProgramActivityArea organizationId="org-a" programId="program-a" />);
-  fireEvent.click(await screen.findByRole("button", { name: "Crear y asignar" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Crear actividad" }));
   const form = await screen.findByRole("form", { name: "Crear actividad" });
   fireEvent.submit(form);
 
   expect(await within(form).findByText("Escribe el título de la actividad.")).toBeTruthy();
   expect(within(form).getByText("Escribe las instrucciones que debe seguir el colaborador.")).toBeTruthy();
-  expect(within(form).getByText("Selecciona la fecha límite.")).toBeTruthy();
   expect(within(form).getByLabelText("Título").getAttribute("aria-invalid")).toBe("true");
   expect(within(form).getByLabelText("Instrucciones").getAttribute("aria-invalid")).toBe("true");
-  expect(within(form).getByLabelText("Fecha límite").getAttribute("aria-invalid")).toBe("true");
+  expect(within(form).queryByLabelText("Fecha límite")).toBeNull();
   await waitFor(() => expect(document.activeElement).toBe(within(form).getByLabelText("Título")));
   expect(createProgramActivity).not.toHaveBeenCalled();
 
@@ -134,18 +133,18 @@ it("highlights every missing required field and focuses the first one", async ()
   expect(within(form).getByLabelText("Instrucciones").getAttribute("aria-invalid")).toBeNull();
 });
 
-it("reveals individual collaborators when assigning to everyone is disabled", async () => {
+it("does not offer a separate recipient selector when creating activities", async () => {
   render(<ProgramActivityArea organizationId="org-a" programId="program-a" />);
-  fireEvent.click(await screen.findByRole("button", { name: "Crear y asignar" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Crear actividad" }));
   const form = await screen.findByRole("form", { name: "Crear actividad" });
-  fireEvent.click(within(form).getByRole("checkbox", { name: /^Asignar a todos los colaboradores activos/ }));
+  expect(within(form).queryByRole("checkbox")).toBeNull();
+  expect(within(form).queryByRole("group", { name: "Destinatarios" })).toBeNull();
+  expect(within(form).getByText(/Los destinatarios se definen en Agendar participantes/)).toBeTruthy();
   fireEvent.change(within(form).getByLabelText("Título"), { target: { value: "Práctica individual" } });
   fireEvent.change(within(form).getByLabelText("Instrucciones"), { target: { value: "Describe tu caso" } });
-  fireEvent.change(within(form).getByLabelText("Fecha límite"), { target: { value: "2026-10-15" } });
-  fireEvent.click(within(form).getByLabelText(/Ana Prueba/));
   fireEvent.submit(form);
   await waitFor(() => expect(createProgramActivity).toHaveBeenCalledWith("org-a", "program-a",
-    expect.objectContaining({ assignToAll: false, enrollmentIds: ["enrollment-a"] }), expect.any(AbortSignal)));
+    {sessionId:"session-a",title:"Práctica individual",instructions:"Describe tu caso",youtubeUrl:null,position:2}, expect.any(AbortSignal)));
 });
 
 it("creates program content even when there are no active enrollments", async () => {
@@ -158,10 +157,9 @@ it("creates program content even when there are no active enrollments", async ()
   expect(within(form).queryByRole("group", { name: "Destinatarios" })).toBeNull();
   fireEvent.change(within(form).getByLabelText("Título"), { target: { value: "Actividad de plantilla" } });
   fireEvent.change(within(form).getByLabelText("Instrucciones"), { target: { value: "Contenido predefinido" } });
-  fireEvent.change(within(form).getByLabelText("Fecha límite"), { target: { value: "2026-10-15" } });
   fireEvent.submit(form);
   await waitFor(() => expect(createProgramActivity).toHaveBeenCalledWith("org-a", "program-a",
-    expect.objectContaining({ assignToAll: true, enrollmentIds: [] }), expect.any(AbortSignal)));
+    {sessionId:"session-a",title:"Actividad de plantilla",instructions:"Contenido predefinido",youtubeUrl:null,position:2}, expect.any(AbortSignal)));
 });
 
 it("lets the consultant approve a submitted response", async () => {

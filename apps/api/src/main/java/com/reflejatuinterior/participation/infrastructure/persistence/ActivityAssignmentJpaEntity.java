@@ -41,6 +41,8 @@ class ActivityAssignmentJpaEntity {
     private Instant reviewedAt;
     @Column(name = "reviewed_by")
     private UUID reviewedBy;
+    @Column(name = "due_date")
+    private java.time.LocalDate dueDate;
     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
     @UpdateTimestamp @Column(name = "updated_at", nullable = false)
@@ -93,4 +95,6 @@ class ActivityAssignmentJpaEntity {
     Instant reviewedAt() { return reviewedAt; }
     UUID reviewedBy() { return reviewedBy; }
     long version() { return version; }
+    java.time.LocalDate dueDate() { return dueDate; }
+    void deadline(java.time.LocalDate value) { dueDate=value; }
 }

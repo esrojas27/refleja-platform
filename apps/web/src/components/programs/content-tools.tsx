@@ -4,23 +4,20 @@ import { Archive, ArrowDown, ArrowUp, Copy, Pencil, RotateCcw, Trash2 } from "lu
 import { useRef, useState } from "react";
 import { archiveContent, deleteContent, duplicateActivity, moveContent, type ContentKind } from "@/lib/programs/content-administration-api";
 import { programContentErrorMessage } from "@/lib/programs/program-content-api";
-import type { Enrollment } from "@/lib/participation/participation-api";
 import { ProgramModal } from "./program-modal";
 
 export function ContentTools({ organizationId, programId, kind, item, parentArchived = false, hasAssignments,
-  hasSubmissions, first, last, enrollments, onEdit, onSaved }: {
+  hasSubmissions, first, last, onEdit, onSaved }: {
   organizationId: string; programId: string; kind: ContentKind;
   item: { id: string; version: number; archived?: boolean; name?: string; title?: string };
   parentArchived?: boolean; hasAssignments: boolean; hasSubmissions: boolean; first: boolean; last: boolean;
-  enrollments: Enrollment[]; onEdit: () => void; onSaved: (message: string) => void;
+  onEdit: () => void; onSaved: (message: string) => void;
 }) {
   const name = item.name ?? item.title ?? "";
   const [dialog, setDialog] = useState<"archive" | "delete" | "duplicate" | null>(null);
   const [pending, setPending] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [message, setMessage] = useState("");
-  const [mode, setMode] = useState("none");
-  const [selected, setSelected] = useState<string[]>([]);
   const submitting = useRef(false);
   const unavailable = pending || blocked;
   const visible = !item.archived && !parentArchived;
@@ -58,25 +55,12 @@ export function ContentTools({ organizationId, programId, kind, item, parentArch
         ? "Se eliminará este elemento y su contenido descendiente, incluidas las encuestas. Solo está permitido sin asignaciones ni respuestas. Esta acción no se puede deshacer."
         : dialog === "archive"
           ? "Este elemento y su contenido descendiente dejarán de aparecer en las tareas y el progreso vigente del colaborador y en nuevas plantillas. Las asignaciones se conservan y volverán a estar disponibles al restaurarlo."
-          : "La copia incluye instrucciones, video, fecha y encuesta con nuevos identificadores. No copia entregas, respuestas, revisiones ni progreso."}</p>
-      {dialog === "duplicate" && <fieldset className="mt-5 space-y-3" disabled={unavailable}>
-        <legend className="mb-2 text-sm font-semibold">Asignación de la copia</legend>
-        <label className="block text-sm"><input type="radio" name={`targets-${item.id}`} checked={mode === "none"} onChange={() => setMode("none")} /> Preparar sin asignaciones</label>
-        <label className="block text-sm"><input type="radio" name={`targets-${item.id}`} checked={mode === "all"} onChange={() => setMode("all")} /> Todos los colaboradores inscritos</label>
-        <label className="block text-sm"><input type="radio" name={`targets-${item.id}`} checked={mode === "selected"} onChange={() => setMode("selected")} /> Elegir colaboradores</label>
-        {mode === "selected" && <div className="max-h-56 space-y-2 overflow-y-auto rounded-xl border border-border p-3">
-          {enrollments.length === 0 && <p className="text-sm">No hay colaboradores activos.</p>}
-          {enrollments.map(person => <label key={person.id} className="flex items-start gap-2 break-all text-sm">
-            <input type="checkbox" checked={selected.includes(person.id)} onChange={() => setSelected(ids => ids.includes(person.id) ? ids.filter(id => id !== person.id) : [...ids, person.id])} />
-            {person.participant.email}
-          </label>)}
-        </div>}
-      </fieldset>}
+          : "La copia incluye instrucciones, video y encuesta con nuevos identificadores. Se asignará según la agenda de esta sesión. No copia entregas, respuestas, revisiones ni progreso."}</p>
       {message && <p role="status" className="mt-4 text-sm">{message}</p>}
-      <button type="button" className="rti-button-primary mt-6" disabled={unavailable || (dialog === "duplicate" && mode === "selected" && !selected.length)}
+      <button type="button" className="rti-button-primary mt-6" disabled={unavailable}
         onClick={() => void perform(() => dialog === "delete" ? deleteContent(organizationId, programId, kind, item.id, item.version)
           : dialog === "archive" ? archiveContent(organizationId, programId, kind, item.id, item.version, true)
-            : duplicateActivity(organizationId, programId, item.id, item.version, mode === "all", mode === "selected" ? selected : []),
+            : duplicateActivity(organizationId, programId, item.id, item.version),
           dialog === "delete" ? "Contenido eliminado." : dialog === "archive" ? "Contenido archivado." : "Actividad duplicada.")}>
         {pending ? "Guardando…" : dialog === "delete" ? "Confirmar eliminación" : dialog === "archive" ? "Confirmar archivado" : "Crear copia"}
       </button>

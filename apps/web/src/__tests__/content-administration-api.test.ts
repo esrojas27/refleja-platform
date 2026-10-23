@@ -14,7 +14,7 @@ it("sends versioned edits with explicit fields, scoped paths and no cache", asyn
   const fetcher = vi.fn().mockImplementation(() => Promise.resolve(new Response(null, { status: 204 })));
   vi.stubGlobal("fetch", fetcher);
   await editDimension("org a", "program/a", "dim/a", { name: "Interior", description: "", version: 3 });
-  await editSession("org a", "program/a", "session", { name: "Sesión", objective: "Objetivo", scheduledDate: "2026-10-20", version: 2 });
+  await editSession("org a", "program/a", "session", { name: "Sesión", objective: "Objetivo", version: 2 });
   const input = { title: "Actividad", instructions: "Instrucciones", youtubeUrl: null, dueDate: "2026-10-21", version: 4, assignees: ["never-send"] };
   await editActivity("org a", "program/a", "activity", input);
   expect(fetcher.mock.calls[0]).toEqual(["http://localhost:8081/api/v1/organizations/org%20a/programs/program%2Fa/content/dimensions/dim%2Fa",
@@ -37,14 +37,14 @@ it("sends reorder, archive, restore and delete intents without automatic retries
   ]);
 });
 
-it("duplicates definitions with explicit new assignment targets and replaces survey definition only", async () => {
+it("duplicates definitions without manual assignment targets and replaces survey definition only", async () => {
   const fetcher = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ id: "copy" }), { status: 201 }))
     .mockResolvedValueOnce(new Response(JSON.stringify({ id: "survey" }), { status: 200 }));
   vi.stubGlobal("fetch", fetcher);
-  expect(await duplicateActivity("o", "p", "a", 3, false, [])).toEqual({ id: "copy" });
+  expect(await duplicateActivity("o", "p", "a", 3)).toEqual({ id: "copy" });
   await editSurvey("o", "p", "a", { title: "Encuesta", instructions: null, version: 5,
     questions: [{ prompt: "¿Qué aprendiste?", type: "OPEN_TEXT", position: 1 }] });
-  expect(JSON.parse(fetcher.mock.calls[0][1].body)).toEqual({ version: 3, assignToAll: false, enrollmentIds: [] });
+  expect(JSON.parse(fetcher.mock.calls[0][1].body)).toEqual({ version: 3 });
   expect(fetcher.mock.calls[1][0]).toMatch(/activities\/a\/survey$/);
   expect(JSON.parse(fetcher.mock.calls[1][1].body).version).toBe(5);
 });

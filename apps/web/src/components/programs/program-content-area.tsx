@@ -6,7 +6,6 @@ import { ActivityVideo } from "@/components/participation/activity-video";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import { fetchCurrentIdentity, IdentityRequestError } from "@/lib/auth/authenticated-api";
-import { listEnrollments, ParticipationRequestError, type Enrollment } from "@/lib/participation/participation-api";
 import { ActivityRequestError, listProgramActivities, type ProgramActivity } from "@/lib/participation/activity-api";
 import { EvaluationRequestError, listActivityEvaluations, type ActivityEvaluation } from "@/lib/participation/evaluation-api";
 import {
@@ -35,7 +34,6 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
   const [dimensions, setDimensions] = useState<ProgramDimension[]>();
   const [activities, setActivities] = useState<ProgramActivity[]>();
   const [evaluations, setEvaluations] = useState<ActivityEvaluation[]>();
-  const [enrollments, setEnrollments] = useState<Enrollment[]>();
   const [attempt, setAttempt] = useState(0);
   const [pending, setPending] = useState(true);
   const [message, setMessage] = useState("Comprobando acceso al contenido…");
@@ -55,24 +53,21 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
           setMessage("Sólo un consultor autorizado puede gestionar el contenido.");
           return;
         }
-        const [structure, activityList, evaluationList, enrollmentPage] = await Promise.all([
+        const [structure, activityList, evaluationList] = await Promise.all([
           listProgramDimensions(organizationId, programId, controller.signal, true),
           listProgramActivities(organizationId, programId, controller.signal, true),
           listActivityEvaluations(organizationId, programId, controller.signal),
-          listEnrollments(organizationId, programId, 0, controller.signal, 100),
         ]);
         if (!controller.signal.aborted) {
           setDimensions(structure.items);
           setActivities(activityList.items);
           setEvaluations(evaluationList.items);
-          setEnrollments(enrollmentPage.items.filter(enrollment => enrollment.status === "ACTIVE"));
           setMessage(structure.items.length ? "" : "Este programa todavía no tiene dimensiones.");
         }
       } catch (error) {
         if (!controller.signal.aborted) {
           const status = error instanceof IdentityRequestError || error instanceof ActivityRequestError
-            || error instanceof EvaluationRequestError
-            || error instanceof ParticipationRequestError ? error.status : undefined;
+            || error instanceof EvaluationRequestError ? error.status : undefined;
           setMessage(programContentErrorMessage(status === undefined ? error : new ProgramContentRequestError(status)));
         }
       } finally {
@@ -92,15 +87,14 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
   }, [activities]);
 
   function refresh(saved: string) {
-    setDimensions(undefined); setActivities(undefined); setEvaluations(undefined); setEnrollments(undefined);
+    setDimensions(undefined); setActivities(undefined); setEvaluations(undefined);
     setPending(true); setMessage("Actualizando contenido…"); setNotice(saved);
     setAttempt(value => value + 1);
   }
 
-  const ready = dimensions !== undefined && activities !== undefined && evaluations !== undefined
-    && enrollments !== undefined;
+  const ready = dimensions !== undefined && activities !== undefined && evaluations !== undefined;
   const nextDimensionPosition = dimensions ? Math.max(0, ...dimensions.map(dimension => dimension.position)) + 1 : 1;
-  const toolsContext = { organizationId, programId, enrollments: enrollments ?? [], onSaved: refresh };
+  const toolsContext = { organizationId, programId, onSaved: refresh };
   function usage(items: ProgramActivity[]) {
     return { hasAssignments: items.some(a => a.assignees.length > 0),
       hasSubmissions: items.some(a => a.assignees.some(person => person.submittedAt != null)) };
@@ -176,7 +170,7 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
                     <span className="min-w-0"><span className="text-xs font-semibold uppercase tracking-wide text-primary">Sesión {session.position}</span>
                       <span className="mt-1 block font-semibold">{session.name}</span>
                       {(dimension.archived || session.archived) && <span className="mt-1 block text-xs text-muted-foreground">Sesión archivada</span>}
-                      <span className="mt-1 block text-sm text-muted-foreground">{session.scheduledDate} · {sessionActivities.length} {sessionActivities.length === 1 ? "actividad" : "actividades"}</span>
+                      <span className="mt-1 block text-sm text-muted-foreground">Agenda individual · {sessionActivities.length} {sessionActivities.length === 1 ? "actividad" : "actividades"}</span>
                     </span>
                     <ChevronDown aria-hidden="true" className={`size-5 shrink-0 transition-transform ${sessionOpen ? "rotate-180" : ""}`} />
                   </button>
@@ -185,6 +179,7 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
                     onEdit={() => setDialog({ kind: "session", dimension, initial: session })} />}
 
                   {sessionOpen && <div id={`session-panel-${session.id}`} className="border-t border-border/70 px-4 py-4">
+                    <Link className="rti-button-secondary mb-4" href={`/organizations/${encodeURIComponent(organizationId)}/programs/${encodeURIComponent(programId)}/agenda?session=${encodeURIComponent(session.id)}`}>Agendar participantes</Link>
                     {session.objective && <p className="whitespace-pre-wrap text-sm text-muted-foreground"><span className="font-medium text-foreground">Objetivo: </span>{session.objective}</p>}
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                       <h4 className="font-semibold">Actividades</h4>
@@ -201,7 +196,7 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
                         <p className="mt-2 font-semibold">{activity.title}</p>
                         {(activity.archived || dimension.archived || session.archived) && <p className="mt-1 text-xs text-muted-foreground">Actividad archivada</p>}
                         <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{activity.instructions}</p>
-                        <p className="mt-3 text-xs font-medium text-muted-foreground">Fecha límite: {activity.dueDate}</p>
+                        <p className="mt-3 text-xs font-medium text-muted-foreground">Vence 3 días calendario después de la sesión de cada persona.</p>
                         <p className="mt-1 text-xs font-medium text-muted-foreground">Asignaciones: {activity.assignees.length}</p>
                         {canEdit && <ContentTools {...toolsContext} kind="activities" item={activity} parentArchived={dimension.archived || session.archived}
                           {...usage([activity])} {...bounds(activity, allSessionActivities)}
@@ -246,10 +241,10 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
       <ActivityForm organizationId={organizationId} programId={programId}
         initial={dialog.initial}
         sessions={[{ id: dialog.session.id, label: `${dialog.dimensionName} · ${dialog.session.name}` }]}
-        enrollments={enrollments ?? []} activities={activities ?? []}
+        activities={activities ?? []}
         onSaved={saved => { setDialog(null); refresh(dialog.initial ? "Actividad actualizada." : saved.assignees.length
           ? `Actividad creada y asignada a ${saved.assignees.length} colaborador${saved.assignees.length === 1 ? "" : "es"}.`
-          : "Actividad creada sin asignaciones."); }} />
+          : "Actividad creada. Se asignará al agendar participantes en su sesión."); }} />
     </ProgramModal>}
     {dialog?.kind === "evaluation" && <ProgramModal titleId="create-evaluation-title"
       closeLabel="Cerrar creación de encuesta" onClose={() => setDialog(null)}>
@@ -316,7 +311,7 @@ export function DimensionForm({ organizationId, programId, position, onSaved, in
 export function SessionForm({ organizationId, programId, dimensionId, position, onSaved, initial }: {
   organizationId: string; programId: string; dimensionId: string; position: number; onSaved: () => void; initial?: ProgramSession;
 }) {
-  const [input, setInput] = useState({ name: initial?.name ?? "", objective: initial?.objective ?? "", scheduledDate: initial?.scheduledDate ?? "" });
+  const [input, setInput] = useState({ name: initial?.name ?? "", objective: initial?.objective ?? "" });
   const [pending, setPending] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [message, setMessage] = useState("");
@@ -327,10 +322,9 @@ export function SessionForm({ organizationId, programId, dimensionId, position, 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (submitting.current || blocked) return;
-    const clean: ProgramSessionInput = { name: input.name.trim(), objective: input.objective.trim(),
-      scheduledDate: input.scheduledDate, position };
-    if (!clean.name || clean.name.length > 255 || clean.objective.length > 10000 || !/^\d{4}-\d{2}-\d{2}$/.test(clean.scheduledDate)) {
-      setMessage("Revisa el nombre, el objetivo y la fecha."); return;
+    const clean: ProgramSessionInput = { name: input.name.trim(), objective: input.objective.trim(), position };
+    if (!clean.name || clean.name.length > 255 || clean.objective.length > 10000) {
+      setMessage("Revisa el nombre y el objetivo."); return;
     }
     submitting.current = true; setPending(true); setMessage(initial ? "Guardando sesión…" : "Creando sesión…");
     const controller = new AbortController(); request.current = controller;
@@ -354,9 +348,7 @@ export function SessionForm({ organizationId, programId, dimensionId, position, 
     <div><label htmlFor={`${prefix}-name`} className="block text-sm font-medium">Nombre</label>
       <input id={`${prefix}-name`} className="rti-field" required maxLength={255} value={input.name}
         onChange={event => setInput({ ...input, name: event.target.value })} disabled={pending || blocked} /></div>
-    <div><label htmlFor={`${prefix}-date`} className="block text-sm font-medium">Fecha</label>
-      <input id={`${prefix}-date`} type="date" className="rti-field" required value={input.scheduledDate}
-        onChange={event => setInput({ ...input, scheduledDate: event.target.value })} disabled={pending || blocked} /></div>
+    <p className="text-sm text-muted-foreground">Después de crear la sesión, asigna la fecha de cada participante desde Agenda. Sin fecha asignada, la sesión permanece oculta para esa persona.</p>
     <div><label htmlFor={`${prefix}-objective`} className="block text-sm font-medium">Objetivo opcional</label>
       <textarea id={`${prefix}-objective`} className="rti-field min-h-20 resize-y" maxLength={10000} value={input.objective}
         onChange={event => setInput({ ...input, objective: event.target.value })} disabled={pending || blocked} /></div>

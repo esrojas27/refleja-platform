@@ -133,11 +133,12 @@ export function NotificationCenter() {
           <div className="flex items-start justify-between gap-2"><p className="font-semibold">{notificationLabels[item.kind]}</p>
             <span className="shrink-0 rounded-full bg-muted px-2 py-1 text-xs">{item.readAt ? "Leída" : "Nueva"}</span></div>
           <p className="mt-2 break-words text-sm font-medium">{item.activityTitle}</p>
+          {item.kind === "SESSION_RESCHEDULED" && <div className="mt-2 text-sm"><p>{item.previousDate} → {item.scheduledDate}</p><p className="mt-1 whitespace-pre-wrap break-words">{item.reason}</p></div>}
           {item.kind === "SUBMISSION_RECEIVED" && item.participantName && <p className="mt-1 break-words text-sm">De: {item.participantName}</p>}
           <p className="mt-1 break-words text-xs text-muted-foreground">{item.organizationName} · {item.programName}</p>
           <time dateTime={item.createdAt} className="mt-2 block text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" })}</time>
           <div className="mt-4 flex flex-wrap gap-2">
-            <button type="button" disabled={busy} className="rti-button-primary" onClick={() => void mark(item, true)}>Ver actividad</button>
+            <button type="button" disabled={busy} className="rti-button-primary" onClick={() => void mark(item, true)}>{item.kind === "SESSION_RESCHEDULED" ? "Ver sesión" : "Ver actividad"}</button>
             {!item.readAt && <button type="button" disabled={busy} className="rti-button-secondary gap-2" onClick={() => void mark(item, false)}><Check aria-hidden="true" className="size-4" />Marcar como leída</button>}
           </div>
         </li>)}</ul>

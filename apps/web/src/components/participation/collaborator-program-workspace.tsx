@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpenText, CheckSquare2, ChevronLeft } from "lucide-react";
+import { BookOpenText, CheckSquare2, ChevronLeft, CalendarDays } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -20,6 +20,7 @@ export function CollaboratorProgramWorkspace({ programId, children }: { programI
   const pendingCount = activities && currentResult?.status === "ACTIVE" && currentResult.enrollmentStatus !== "COMPLETED" ? pendingAssignedActivities(activities).length : 0;
   const items = [
     { href: summaryPath, label: "Resumen", icon: BookOpenText },
+    { href: `${summaryPath}/agenda`, label: "Mi agenda", icon: CalendarDays },
     { href: `${summaryPath}/activities`, label: "Actividades", icon: CheckSquare2 },
   ];
 

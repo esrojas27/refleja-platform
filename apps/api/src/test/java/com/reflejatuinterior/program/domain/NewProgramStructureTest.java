@@ -19,7 +19,7 @@ class NewProgramStructureTest {
     @Test void rejectsMissingNamesDatesAndNonPositivePositions() {
         assertThatThrownBy(() -> new NewProgramModule(" ", null, 1)).isInstanceOf(InvalidProgramInput.class);
         assertThatThrownBy(() -> new NewProgramModule("Módulo", null, 0)).isInstanceOf(InvalidProgramInput.class);
-        assertThatThrownBy(() -> new NewProgramSession("Sesión", null, null, null, 1)).isInstanceOf(InvalidProgramInput.class);
+        assertThat(new NewProgramSession("Sesión", null, null, null, 1).scheduledDate()).isNull();
         assertThatThrownBy(() -> new NewProgramSession("Sesión", null, null, LocalDate.now(), -1)).isInstanceOf(InvalidProgramInput.class);
     }
 

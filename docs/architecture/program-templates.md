@@ -11,8 +11,8 @@ ya creadas.
 La copia incluye:
 
 - dimensiones y su orden;
-- sesiones, objetivo, contenido y fecha relativa al inicio;
-- actividades, instrucciones, enlace de YouTube y fecha límite relativa;
+- sesiones, objetivo y contenido, sin agenda personal;
+- actividades, instrucciones y enlace de YouTube, con vencimiento individual calculado;
 - encuesta de cada actividad y sus preguntas ordenadas.
 
 No se copian inscripciones, invitaciones, roles, asignaciones, entregas,
@@ -47,10 +47,15 @@ habilitar el botón no constituye una autorización.
 
 ## Fechas y materialización
 
-La plantilla conserva la cantidad de días entre el inicio del programa fuente y
-cada sesión o actividad. Al elegir una fecha de inicio nueva, esas distancias se
-aplican a la nueva cohorte. El consultor sigue definiendo las fechas de inicio y
-fin del programa resultante.
+La plantilla no copia fechas de sesiones ni vencimientos de actividades. El
+consultor define el inicio y fin del nuevo programa y después agenda a cada
+participante. El vencimiento se calcula como fecha individual de sesión + tres
+días calendario. Los offsets presentes en snapshots históricos no se utilizan
+al crear programas nuevos. Véase `individual-session-schedules.md`.
+
+Al guardar la fecha de una sesión se asignan sus actividades al participante.
+Las actividades nuevas o duplicadas se asignan a quienes ya tienen esa sesión
+agendada. No se solicitan destinatarios al construir el contenido de la plantilla.
 
 La materialización crea el programa en estado `DRAFT` y, dentro de una sola
 transacción, crea dimensiones, sesiones, actividades y encuestas. Un error en

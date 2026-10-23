@@ -46,7 +46,7 @@ type ProgressItem = {
   dimensionName: string;
   sessionId: string;
   sessionName: string;
-  dueDate: string;
+  dueDate: string | null;
   status: ActivityAssignmentStatus;
   completionPercentage?: number;
 };
@@ -65,11 +65,11 @@ export function todayIso(now = new Date()) {
 }
 
 export function isActivityOverdue(
-  dueDate: string,
+  dueDate: string | null,
   status: ActivityAssignmentStatus,
   today = todayIso(),
 ) {
-  return status !== "COMPLETED" && dueDate < today;
+  return dueDate !== null && status !== "COMPLETED" && dueDate < today;
 }
 
 export function collaboratorProgress(
@@ -96,7 +96,7 @@ export function consultantProgress(
     dimensionName: activity.dimensionName,
     sessionId: activity.sessionId,
     sessionName: activity.sessionName,
-    dueDate: activity.dueDate,
+    dueDate: assignee.dueDate ?? null,
     status: assignee.status,
     enrollmentId: assignee.enrollmentId,
     name: [assignee.firstName, assignee.lastName].filter(Boolean).join(" ") || assignee.email,

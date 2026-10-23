@@ -8,7 +8,8 @@ import java.time.Instant;
 import com.reflejatuinterior.participation.domain.ActivityReviewDecision;
 
 public interface ActivityAssignments {
-    List<Data> create(UUID organizationId, UUID programId, UUID activityId, Collection<UUID> enrollmentIds);
+    List<Data> assignScheduledActivity(UUID organizationId, UUID programId, UUID activityId);
+    void assignScheduledSession(UUID organizationId, UUID programId, UUID sessionId, Collection<UUID> enrollmentIds);
     List<Data> listByActivities(UUID organizationId, UUID programId, Collection<UUID> activityIds);
     List<Data> listOwned(UUID organizationId, UUID programId, UUID enrollmentId);
     Optional<Data> submit(UUID organizationId, UUID programId, UUID activityId, UUID enrollmentId,
@@ -18,5 +19,5 @@ public interface ActivityAssignments {
 
     record Data(UUID id, UUID organizationId, UUID programId, UUID activityId, UUID enrollmentId,
                 String status, String responseText, Instant submittedAt, String reviewComment,
-                Instant reviewedAt, UUID reviewedBy, long version) {}
+                Instant reviewedAt, UUID reviewedBy, long version, java.time.LocalDate dueDate) {}
 }

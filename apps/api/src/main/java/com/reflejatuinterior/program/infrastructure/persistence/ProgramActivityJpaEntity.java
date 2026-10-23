@@ -33,7 +33,7 @@ class ProgramActivityJpaEntity {
     private String instructions;
     @Column(name = "youtube_url", length = 2048)
     private String youtubeUrl;
-    @Column(name = "due_date", nullable = false)
+    @Column(name = "due_date")
     private LocalDate dueDate;
     @Column(name = "position", nullable = false)
     private int position;

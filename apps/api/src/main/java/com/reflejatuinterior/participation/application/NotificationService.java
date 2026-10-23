@@ -15,8 +15,9 @@ public class NotificationService {
     private final NotificationAccess access;
     private final OrganizationTenantContext tenants;
     private final Notifications notifications;
-    NotificationService(NotificationAccess access, OrganizationTenantContext tenants, Notifications notifications) {
-        this.access=access; this.tenants=tenants; this.notifications=notifications;
+    private final SessionSchedules schedules;
+    NotificationService(NotificationAccess access, OrganizationTenantContext tenants, Notifications notifications, SessionSchedules schedules) {
+        this.access=access; this.tenants=tenants; this.notifications=notifications;this.schedules=schedules;
     }
     @Transactional(readOnly=true)
     public Page list(String subject, Instant before, UUID beforeId) {
@@ -27,7 +28,9 @@ public class NotificationService {
         for(var org:context.organizationIds()) {
             tenants.activate(org);
             rows.addAll(notifications.list(org,context.userId(),before,beforeId,21));
+            rows.addAll(schedules.notifications(org,context.userId(),before,beforeId,21));
             unread+=notifications.unreadCount(org,context.userId());
+            unread+=schedules.unread(org,context.userId());
         }
         rows.sort(Comparator.comparing(Notifications.Item::createdAt).thenComparing(n->n.id().toString()).reversed());
         return new Page(rows.stream().limit(20).toList(),unread,rows.size()>20);
@@ -37,7 +40,7 @@ public class NotificationService {
         var context=access.resolve(subject);
         for(var org:context.organizationIds()) {
             tenants.activate(org);
-            if(notifications.markRead(org,context.userId(),id)) return;
+            if(notifications.markRead(org,context.userId(),id)||schedules.markRead(org,context.userId(),id)) return;
         }
         throw new Missing();
     }

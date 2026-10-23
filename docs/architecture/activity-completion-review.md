@@ -2,9 +2,8 @@
 
 ## Alcance
 
-Este incremento completa el primer ciclo operativo de una actividad. Al crearla,
-el consultor puede asignarla a todos los colaboradores activos del programa o
-desmarcar esa opción y elegir destinatarios individuales. El colaborador responde
+El consultor define el contenido de la actividad sin seleccionar destinatarios.
+La agenda individual de su sesión determina la asignación. El colaborador responde
 con texto y el consultor aprueba la entrega o solicita cambios.
 
 La actividad puede conservar un enlace HTTPS validado a un video de YouTube y lo
@@ -26,13 +25,15 @@ Las únicas transiciones permitidas son `ASSIGNED → SUBMITTED`,
 `CHANGES_REQUESTED → SUBMITTED` y `SUBMITTED → CHANGES_REQUESTED | COMPLETED`.
 Las operaciones inválidas responden `409` y no modifican información.
 
-## Asignación masiva
+## Asignación mediante agenda
 
-`assignToAll=true` no envía identificadores de inscripción. El backend resuelve
-todas las inscripciones `ACTIVE` del programa dentro del contexto tenant y crea la
-actividad y sus asignaciones en una sola transacción. Con `assignToAll=false`, la
-lista explícita debe ser no vacía, no contener duplicados y pertenecer por completo
-al mismo programa y organización.
+Guardar la fecha de una sesión asigna sus actividades no archivadas al subgrupo
+seleccionado. Crear o duplicar una actividad incorpora automáticamente a quienes
+ya tienen fecha, incluidas inscripciones invitadas habilitadas; estas deben aceptar
+la invitación antes de acceder. Los contratos de creación y duplicación ya no
+reciben `assignToAll` ni `enrollmentIds`. El programa se bloquea para serializar las
+operaciones y las asignaciones existentes nunca se duplican ni sobrescriben.
+Véase `individual-session-schedules.md` para vencimientos y reprogramación.
 
 ## Persistencia y seguridad
 
@@ -59,9 +60,10 @@ La primera recibe `responseText`. La segunda recibe `decision` (`APPROVE` o
 
 1. Ingresar como consultor y abrir **Actividades** de un programa con dos
    colaboradores activos.
-2. Crear una actividad dejando marcada la asignación a todos y comprobar ambos
-   destinatarios.
-3. Crear otra desmarcando la opción, elegir sólo uno y comprobar el destinatario.
+2. Crear una actividad y agendar la sesión para un subgrupo. Comprobar que solo
+   esas personas reciben sus actividades, con vencimiento tres días después.
+3. Crear otra actividad en esa sesión: debe asignarse al mismo subgrupo sin
+   solicitar destinatarios. Guardar la misma fecha no debe duplicar asignaciones.
 4. Ingresar como ese colaborador, abrir **Mis programas**, responder y pulsar
    **Completar actividad**. Debe quedar **En revisión**.
 5. Volver como consultor, abrir **Actividades**, leer la respuesta y solicitar

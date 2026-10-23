@@ -2,7 +2,6 @@ package com.reflejatuinterior.participation.application;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.UUID;
 import com.reflejatuinterior.identity.OrganizationAccess;
@@ -25,13 +24,14 @@ public class ContentAdministrationService {
     private final ProgramActivities activities;
     private final ActivityAssignments assignments;
     private final ActivityEvaluations surveys;
-    private final Enrollments enrollments;
+    private final SessionSchedules schedules;
 
     ContentAdministrationService(OrganizationAccess access, OrganizationTenantContext tenant, ProgramDirectory programs,
             ProgramContent content, ProgramContentUsage usage, ProgramActivities activities,
-            ActivityAssignments assignments, ActivityEvaluations surveys, Enrollments enrollments) {
+            ActivityAssignments assignments, ActivityEvaluations surveys, SessionSchedules schedules) {
         this.access = access; this.tenant = tenant; this.programs = programs; this.content = content;
-        this.usage = usage; this.activities = activities; this.assignments = assignments; this.surveys = surveys; this.enrollments = enrollments;
+        this.usage = usage; this.activities = activities; this.assignments = assignments; this.surveys = surveys;
+        this.schedules=schedules;
     }
 
     public void editDimension(String subject, UUID org, UUID program, UUID id, long version, String name, String description, String request) {
@@ -70,6 +70,7 @@ public class ContentAdministrationService {
         if (node.parentArchived()) throw new ProgramContent.Conflict("CONTENT_PARENT_ARCHIVED");
         if (archived && started(org, program, node.activityIds())) throw new ProgramContent.Conflict("CONTENT_HAS_SUBMISSIONS");
         content.archive(org, program, kind, id, archived);
+        if (!archived) node.activityIds().forEach(activity -> assignments.assignScheduledActivity(org,program,activity));
         audit(actor, program, id, archived ? "CONTENT_ARCHIVED" : "CONTENT_RESTORED", request);
     }
     public void move(String subject, UUID org, UUID program, String kindPath, UUID id, long version, boolean up, String request) {
@@ -84,24 +85,20 @@ public class ContentAdministrationService {
         // These checks and all child deletions share the program lock and transaction.
         if (usage.hasAssignments(org, program, node.activityIds()) || usage.hasResponses(org, program, node.activityIds()))
             throw new ProgramContent.Conflict("CONTENT_HAS_ASSIGNMENTS");
+        if(kind!=ProgramContent.Kind.ACTIVITY&&schedules.hasSchedules(org,program,kindPath,id)) throw new ProgramContent.Conflict("CONTENT_HAS_SCHEDULES");
         surveys.deleteUnassignedDefinitions(org, program, node.activityIds());
         content.deleteUnassigned(org, program, kind, id);
         audit(actor, program, id, "UNASSIGNED_CONTENT_DELETED", request);
     }
-    public UUID duplicate(String subject, UUID org, UUID program, UUID id, long version,
-            boolean assignAll, List<UUID> selected, String request) {
+    public UUID duplicate(String subject, UUID org, UUID program, UUID id, long version, String request) {
         var actor = authorize(subject, org, program);
         node(org, program, ProgramContent.Kind.ACTIVITY, id, version).requireVisible();
         var source = source(org, program, id);
-        var ids = new LinkedHashSet<>(selected);
-        if (ids.size() != selected.size() || (assignAll && !ids.isEmpty())) throw new ProgramActivities.InvalidInput("enrollmentIds");
-        var targets = assignAll ? enrollments.findAllActive(org, program) : enrollments.findActive(org, program, ids);
-        if (!assignAll && targets.size() != ids.size()) throw new EnrollmentNotFound();
         int position = activities.listIncludingArchived(org, program).stream().filter(a -> a.sessionId().equals(source.sessionId()))
                 .mapToInt(ProgramActivities.Activity::position).max().orElse(0) + 1;
         String title = source.title().substring(0, Math.min(247, source.title().length())) + " (copia)";
-        var created = activities.create(org, program, source.sessionId(), title, source.instructions(), source.youtubeUrl(), source.dueDate(), position);
-        if (!targets.isEmpty()) assignments.create(org, program, created.id(), targets.stream().map(Enrollments.Data::id).toList());
+        var created = activities.create(org, program, source.sessionId(), title, source.instructions(), source.youtubeUrl(), null, position);
+        assignments.assignScheduledActivity(org, program, created.id());
         surveys.find(org, program, id).ifPresent(survey -> surveys.create(org, program, created.id(), survey.title(), survey.instructions(),
                 survey.questions().stream().map(q -> new ActivityEvaluations.QuestionInput(q.prompt(), q.type(), q.position())).toList()));
         audit(actor, program, created.id(), "ACTIVITY_DUPLICATED", request); return created.id();

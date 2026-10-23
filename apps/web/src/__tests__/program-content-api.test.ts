@@ -29,7 +29,7 @@ describe("program content API", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: "session-a" }), { status: 201 }));
     vi.stubGlobal("fetch", fetcher);
     const dimensionInput = { name: "Interior", description: "Contexto", position: 1 };
-    const sessionInput = { name: "Sesión inicial", objective: "Encuentro", scheduledDate: "2026-10-01", position: 1 };
+    const sessionInput = { name: "Sesión inicial", objective: "Encuentro", position: 1 };
     await createProgramDimension("org-a", "program-a", dimensionInput);
     await createProgramSession("org-a", "program-a", "module-a", sessionInput);
     expect(fetcher.mock.calls[0][1]).toEqual(expect.objectContaining({ method: "POST", body: JSON.stringify(dimensionInput) }));

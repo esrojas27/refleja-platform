@@ -32,10 +32,10 @@ describe("progress calculation", () => {
     const activities: ProgramActivity[] = [{ ...base, assignees: [
       { assignmentId: "one", enrollmentId: "enrollment-a", email: "ana@example.test", firstName: "Ana",
         lastName: null, status: "SUBMITTED", responseText: "Lista", submittedAt: null,
-        reviewComment: null, reviewedAt: null, surveyStatus: "NOT_REQUIRED", completionPercentage: 100, version: 1 },
+        reviewComment: null, reviewedAt: null, surveyStatus: "NOT_REQUIRED", completionPercentage: 100, version: 1, dueDate: "2026-09-19" },
       { assignmentId: "two", enrollmentId: "enrollment-b", email: "bea@example.test", firstName: "Bea",
         lastName: null, status: "COMPLETED", responseText: "Lista", submittedAt: null,
-        reviewComment: null, reviewedAt: null, surveyStatus: "NOT_REQUIRED", completionPercentage: 100, version: 1 },
+        reviewComment: null, reviewedAt: null, surveyStatus: "NOT_REQUIRED", completionPercentage: 100, version: 1, dueDate: "2026-09-19" },
     ] }];
 
     const progress = consultantProgress(activities, "2026-09-20");
