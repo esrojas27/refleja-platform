@@ -41,7 +41,7 @@ it("warns that completing with pending work does not turn progress into one hund
 it("reinstatement of an unaccepted revoked invitation explains new consent and link",()=>{
   render(<EnrollmentAdministration enrollment={{...enrollment,status:"WITHDRAWN",invitation:{id:"i",role:"COLLABORATOR",status:"REVOKED",expiresAt:"2026-10-20T00:00:00Z",deliveryStatus:"SENT"}}} onSaved={vi.fn()}/>);
   fireEvent.click(screen.getByRole("button",{name:"Reincorporar"}));
-  expect(screen.getByText(/invitación nueva de siete días/)).toBeTruthy();expect(changeEnrollment).not.toHaveBeenCalled();
+  expect(screen.getByText(/invitación nueva sin enviar correos/)).toBeTruthy();expect(changeEnrollment).not.toHaveBeenCalled();
 });
 it("protects consultant access and never reactivates disabled global membership",()=>{
   const view=render(<EnrollmentAdministration enrollment={{...enrollment,access:{...enrollment.access!,roles:["CONSULTANT"]}}} onSaved={vi.fn()}/>);

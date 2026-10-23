@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { fetchAuthSession } from "aws-amplify/auth";
 import { acceptInvitation, createEnrollment, getMyProgram, listEnrollments, listInvitations, listMyPrograms,
-  retryInvitationDelivery, ParticipationRequestError, deliveryMessage, myProgramsPath } from "@/lib/participation/participation-api";
+  retryInvitationDelivery, sendProgramInvitations, ParticipationRequestError, deliveryMessage, myProgramsPath } from "@/lib/participation/participation-api";
 
 vi.mock("aws-amplify/auth", () => ({ fetchAuthSession: vi.fn() }));
 const input = { email: "participant@example.test", firstName: "Ana", lastName: "Prueba", role: "COLLABORATOR" as const };
@@ -34,6 +34,26 @@ it("lists own invitations directly without calling /me or accepting on GET", asy
   expect(fetcher).toHaveBeenCalledTimes(1);
   expect(fetcher).toHaveBeenCalledWith("http://localhost:8082/api/v1/invitations?page=1&size=20", expect.objectContaining({ method: "GET", body: undefined }));
 });
+it("sends program invitations with one explicit scoped POST and no recipient identity fields", async () => {
+  const fetcher = vi.fn().mockResolvedValue(new Response('{"sent":23,"failed":0,"inProgress":0,"skipped":1}'));
+  vi.stubGlobal("fetch", fetcher);
+  await expect(sendProgramInvitations("org/a", "program/b")).resolves.toMatchObject({ sent: 23, skipped: 1, failures: [] });
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(fetcher).toHaveBeenCalledWith("http://localhost:8082/api/v1/organizations/org%2Fa/programs/program%2Fb/enrollments/invitation-delivery",
+    expect.objectContaining({ method: "POST", body: undefined, cache: "no-store", headers: { Authorization: "Bearer test-access" } }));
+});
+it.each([undefined, null])("normalizes an omitted or null failure list on an already-sent batch (%s)", async failures => {
+  const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ sent: 0, failed: 0, inProgress: 0, skipped: 1, failures })));
+  vi.stubGlobal("fetch", fetcher);
+  await expect(sendProgramInvitations("org-a", "program-a")).resolves.toEqual({ sent: 0, failed: 0, inProgress: 0, skipped: 1, failures: [] });
+  expect(fetcher).toHaveBeenCalledOnce();
+});
+it.each([{}, { sent: -1, failed: 0, inProgress: 0, skipped: 0 }, { sent: 1, failed: 0, inProgress: 0, skipped: 0, failures: {} }])(
+  "does not claim success for an invalid batch response", async body => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify(body))); vi.stubGlobal("fetch", fetcher);
+    await expect(sendProgramInvitations("org-a", "program-a")).rejects.toBeInstanceOf(ParticipationRequestError);
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
 it("accepts only with an explicit POST and no client identity fields", async () => {
   const fetcher = vi.fn().mockResolvedValue(new Response("{}")); vi.stubGlobal("fetch", fetcher);
   await acceptInvitation("invite/a");

@@ -44,14 +44,15 @@ acceso administrativo protegido y no se administran desde una inscripción.
 - Si ya aceptó, se restaura la inscripción activa y se conserva todo el trabajo.
   Suspender una participación completada y reincorporarla restaura `COMPLETED`,
   no `ACTIVE`; reincorporarla de nuevo expresamente permite retomar entregas.
-- Si nunca aceptó una invitación revocada/expirada, se crea otra invitación de
-  siete días. La inscripción queda `INVITED` hasta su nueva aceptación. No se
+- Si nunca aceptó una invitación revocada/expirada, se prepara otra invitación
+  **Sin enviar**. Sus siete días comienzan al pulsar **Enviar Invitaciones**.
+  La inscripción queda `INVITED` hasta su nueva aceptación. No se
   provisiona otra cuenta ni se modifica la validez del enlace viejo.
 - Las invitaciones antiguas siguen siendo consultables con su programa, pero no
   pueden activar una inscripción que ya cambió de invitación, fue retirada,
   suspendida o completada. Repetir una aceptación no reabre accesos.
-- El envío externo ocurre después del commit. Si no se confirma, se conserva la
-  invitación nueva y se ofrece el reintento existente al actualizar. No hay
+- El envío externo solo ocurre mediante una acción explícita posterior al registro.
+  Si no se confirma, se conserva la invitación y se puede reintentar al actualizar. No hay
   reenvíos automáticos ante un resultado incierto. Un correo enviado no puede
   retirarse del buzón: se invalida su enlace, no el correo.
 - Reincorporar no asigna automáticamente actividades que se hayan creado mientras

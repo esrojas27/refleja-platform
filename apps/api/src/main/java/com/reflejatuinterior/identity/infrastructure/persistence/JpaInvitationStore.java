@@ -58,7 +58,7 @@ class JpaInvitationStore implements InvitationStore {
             em.persist(new MembershipRoleJpaEntity(member.id(), membershipRole));
         } else { member = memberships.getFirst(); enabled(member); }
         var invitation = new UserInvitationJpaEntity(organizationId, user.id(), member.id(), membershipRole,
-                actorId, account.username(), clock.instant().plus(Duration.ofDays(7)));
+                actorId, account.username(), null);
         em.persist(invitation); em.flush();
         return data(invitation, user);
     }
@@ -66,15 +66,16 @@ class JpaInvitationStore implements InvitationStore {
     @Override public Invitation findOwned(String subject, UUID invitationId) {
         var user = user(subject, false);
         var invitation = owned(user.id(), invitationId, false);
+        if (invitation.status == DRAFT) throw new Unavailable();
         return data(invitation, user);
     }
     @Override public Page listOwned(String subject, int page, int size) {
         var user = user(subject, false);
         if (page < 0 || size < 1 || size > 100 || (long) page * size > Integer.MAX_VALUE) throw new InvalidInput("page", "size");
-        var rows = em.createQuery("select i from UserInvitationJpaEntity i where i.userId = :user order by i.id desc", UserInvitationJpaEntity.class)
-                .setParameter("user", user.id()).setFirstResult(page * size).setMaxResults(size).getResultList();
-        long total = em.createQuery("select count(i) from UserInvitationJpaEntity i where i.userId = :user", Long.class)
-                .setParameter("user", user.id()).getSingleResult();
+        var rows = em.createQuery("select i from UserInvitationJpaEntity i where i.userId = :user and i.status <> :draft order by i.id desc", UserInvitationJpaEntity.class)
+                .setParameter("user", user.id()).setParameter("draft", DRAFT).setFirstResult(page * size).setMaxResults(size).getResultList();
+        long total = em.createQuery("select count(i) from UserInvitationJpaEntity i where i.userId = :user and i.status <> :draft", Long.class)
+                .setParameter("user", user.id()).setParameter("draft", DRAFT).getSingleResult();
         return new Page(rows.stream().map(row -> data(row, user)).toList(), page, size, total, (int) Math.min(Integer.MAX_VALUE, (total + size - 1) / size));
     }
     @Override public Invitation findInOrganization(UUID organizationId, UUID invitationId) {
@@ -105,7 +106,7 @@ class JpaInvitationStore implements InvitationStore {
         activeOrganization(invitation.organizationId);
         var member = em.find(OrganizationMembershipJpaEntity.class, invitation.membershipId, LockModeType.PESSIMISTIC_WRITE);
         enabled(member);
-        if (invitation.status == REVOKED) throw new Unavailable();
+        if (invitation.status == DRAFT || invitation.status == REVOKED) throw new Unavailable();
         if (invitation.status == ACCEPTED) return data(invitation, user);
         if (!clock.instant().isBefore(invitation.expiresAt) || invitation.status == EXPIRED) throw new Expired();
         user.acceptInvitation(); member.acceptInvitation(clock.instant());
@@ -125,6 +126,10 @@ class JpaInvitationStore implements InvitationStore {
         if (invitation.status == REVOKED) throw new Unavailable();
         if (invitation.status == ACCEPTED) return new Attempt(data(invitation, user), null, false);
         var now = clock.instant();
+        if (invitation.status == DRAFT) {
+            invitation.status = UserInvitationJpaEntity.InvitationStatus.PENDING;
+            invitation.expiresAt = now.plus(Duration.ofDays(7));
+        }
         if (!now.isBefore(invitation.expiresAt) || invitation.status == EXPIRED) throw new Expired();
         if (invitation.deliveryStatus == SENT || (invitation.deliveryStatus == SENDING && invitation.deliveryLeaseUntil != null && now.isBefore(invitation.deliveryLeaseUntil))) {
             return new Attempt(data(invitation, user), null, false);

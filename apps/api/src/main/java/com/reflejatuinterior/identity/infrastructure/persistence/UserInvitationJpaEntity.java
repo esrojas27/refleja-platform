@@ -18,7 +18,7 @@ class UserInvitationJpaEntity {
     @Column(name = "invited_by", nullable = false) UUID invitedBy;
     @Column(name = "cognito_username", nullable = false) String cognitoUsername;
     @Enumerated(EnumType.STRING) @Column(nullable = false) InvitationStatus status;
-    @Column(name = "expires_at", nullable = false) Instant expiresAt;
+    @Column(name = "expires_at") Instant expiresAt;
     @Column(name = "accepted_at") Instant acceptedAt;
     @Enumerated(EnumType.STRING) @Column(name = "delivery_status", nullable = false) DeliveryStatus deliveryStatus;
     @Column(name = "delivery_lease_until") Instant deliveryLeaseUntil;
@@ -34,11 +34,11 @@ class UserInvitationJpaEntity {
                             UUID invitedBy, String cognitoUsername, Instant expiresAt) {
         this.organizationId = organizationId; this.userId = userId; this.membershipId = membershipId;
         this.invitedRole = invitedRole; this.invitedBy = invitedBy; this.cognitoUsername = cognitoUsername; this.expiresAt = expiresAt;
-        status = InvitationStatus.PENDING; deliveryStatus = DeliveryStatus.PENDING;
+        status = expiresAt == null ? InvitationStatus.DRAFT : InvitationStatus.PENDING; deliveryStatus = DeliveryStatus.PENDING;
     }
     String effectiveStatus(Instant now) {
         return status == InvitationStatus.PENDING && !now.isBefore(expiresAt) ? InvitationStatus.EXPIRED.name() : status.name();
     }
-    enum InvitationStatus { PENDING, ACCEPTED, EXPIRED, REVOKED }
+    enum InvitationStatus { DRAFT, PENDING, ACCEPTED, EXPIRED, REVOKED }
     enum DeliveryStatus { PENDING, SENDING, SENT, FAILED }
 }

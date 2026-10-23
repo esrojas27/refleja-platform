@@ -92,12 +92,16 @@ test.describe("@mvp RTI-VS1-013 authenticated vertical slice", () => {
     await page.getByLabel("Correo electrónico").fill(collaboratorEmail);
     await page.getByLabel("Nombre", { exact: true }).fill("Colaborador");
     await page.getByLabel("Apellido", { exact: true }).fill("MVP");
-    await page.getByRole("button", { name: "Registrar e invitar" }).click();
+    await page.getByRole("button", { name: "Agregar persona" }).click();
     await expect(page.getByText(collaboratorEmail, { exact: true })).toBeVisible({ timeout: 60_000 });
     const enrollment = page.getByRole("listitem").filter({ has: page.getByText(collaboratorEmail, { exact: true }) });
     await expect(enrollment).toHaveCount(1);
-    await expect(enrollment.getByText("Invitada", { exact: true })).toBeVisible();
-    await expect(enrollment).toContainText("Invitación: Pendiente");
+    await expect(enrollment.getByText("Registrada", { exact: true })).toBeVisible();
+    await expect(enrollment).toContainText("Invitación: Sin enviar");
+    await page.getByRole("button", { name: "Enviar Invitaciones", exact: true }).click();
+    await page.getByRole("button", { name: "Confirmar envío", exact: true }).click();
+    await expect(enrollment).toContainText("Invitación: Pendiente", { timeout: 60_000 });
+    await expect(enrollment).toContainText("Envío solicitado al proveedor", { timeout: 60_000 });
 
     await page.goto("/account");
     await page.getByRole("button", { name: "Cerrar sesión" }).click();

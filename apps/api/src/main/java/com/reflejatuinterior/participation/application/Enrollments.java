@@ -8,6 +8,7 @@ import java.util.UUID;
 public interface Enrollments {
     Data create(UUID organizationId, UUID programId, UUID membershipId, UUID invitationId);
     Page list(UUID organizationId, UUID programId, int page, int size);
+    List<Data> findInvited(UUID organizationId, UUID programId);
     Optional<Data> find(UUID organizationId, UUID programId, UUID enrollmentId);
     Data lock(UUID organizationId, UUID programId, UUID enrollmentId);
     Data change(UUID organizationId, UUID programId, UUID enrollmentId, long version, String action, UUID invitationId);

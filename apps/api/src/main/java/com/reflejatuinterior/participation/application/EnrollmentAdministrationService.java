@@ -31,7 +31,7 @@ public class EnrollmentAdministrationService {
         this.access=access; this.tenant=tenant; this.programs=programs; this.enrollments=enrollments;
         this.invitations=invitations; this.identities=identities; this.changes=changes; this.enrollmentService=enrollmentService;
     }
-    public record Changed(EnrollmentService.EnrollmentResponse enrollment,boolean needsDelivery) {}
+    public record Changed(EnrollmentService.EnrollmentResponse enrollment) {}
 
     @Transactional
     public Changed change(String subject,UUID org,UUID program,UUID enrollmentId,long expectedVersion,
@@ -74,7 +74,7 @@ public class EnrollmentAdministrationService {
         var updatedIdentity=identities.inspect(org,before.membershipId());
         changes.record(before,current,action,identity.roles(),updatedIdentity.roles(),actor.userId(),enrollmentService.actorLabel(actor),clean,requestId);
         audit(actor,program,enrollmentId,action,requestId);
-        return new Changed(enrollmentService.response(current),newInvitation!=null);
+        return new Changed(enrollmentService.response(current));
     }
     @Transactional(readOnly=true)
     public EnrollmentChanges.Page history(String subject,UUID org,UUID program,UUID enrollment,int page,int size,String requestId) {

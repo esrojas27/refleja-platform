@@ -82,6 +82,7 @@ class ActuatorHealthSecurityConfiguration {
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/activities/{activityId}/assignments/{assignmentId}/review",
                                 "/api/v1/me/programs/{programId}/activities/{activityId}/survey-response",
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/enrollments/{enrollmentId}/invitation-delivery",
+                                "/api/v1/organizations/{organizationId}/programs/{programId}/enrollments/invitation-delivery",
                                 "/api/v1/invitations/{invitationId}/accept",
                                 "/api/v1/me/programs/{programId}/activities/{activityId}/submission").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/api/v1/me/profile",

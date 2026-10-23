@@ -3,9 +3,9 @@ import { fetchAuthSession } from "aws-amplify/auth";
 export type PageResult<T> = { items: T[]; page: number; size: number; totalElements: number; totalPages: number };
 export type InviteeRole = "COLLABORATOR" | "LEADER" | "COMPANY_ADMIN";
 export type EnrollmentInput = { email: string; firstName: string; lastName: string; role: InviteeRole };
-export type InvitationStatus = "PENDING" | "ACCEPTED" | "EXPIRED" | "REVOKED";
+export type InvitationStatus = "DRAFT" | "PENDING" | "ACCEPTED" | "EXPIRED" | "REVOKED";
 export const invitationStatusLabels: Record<InvitationStatus, string> = {
-  PENDING: "Pendiente", ACCEPTED: "Aceptada", EXPIRED: "Vencida", REVOKED: "Revocada",
+  DRAFT: "Sin enviar", PENDING: "Pendiente", ACCEPTED: "Aceptada", EXPIRED: "Vencida", REVOKED: "Revocada",
 };
 export type EnrollmentStatus = "PENDING_APPROVAL" | "INVITED" | "ACTIVE" | "SUSPENDED" | "COMPLETED" | "WITHDRAWN";
 export type Enrollment = {
@@ -13,11 +13,13 @@ export type Enrollment = {
   version?: number; suspendedFromStatus?: "ACTIVE" | "COMPLETED" | null;
   access?: { roles: string[]; version: number; membershipStatus: string; userStatus: string };
   participant: { userId: string; membershipId: string; email: string; firstName: string | null; lastName: string | null };
-  invitation: { id: string; role: InviteeRole; status: InvitationStatus; expiresAt: string; deliveryStatus: "PENDING" | "SENDING" | "SENT" | "FAILED" } | null;
+  invitation: { id: string; role: InviteeRole; status: InvitationStatus; expiresAt: string | null; deliveryStatus: "PENDING" | "SENDING" | "SENT" | "FAILED" } | null;
 };
+export type FailedInvitation = { enrollmentId: string; email: string };
+export type InvitationBatch = { sent: number; failed: number; inProgress: number; skipped: number; failures: FailedInvitation[] };
 export type Invitation = {
   id: string; organizationId: string; organizationName: string; programId: string; programName: string;
-  role: InviteeRole; status: InvitationStatus; expiresAt: string;
+  role: InviteeRole; status: Exclude<InvitationStatus, "DRAFT">; expiresAt: string | null;
 };
 export type AcceptedInvitation = { invitationId: string; role: InviteeRole; status: "ACCEPTED"; enrollmentId: string; enrollmentStatus: "ACTIVE" };
 export type MyProgram = {
@@ -71,6 +73,16 @@ export const createEnrollment = (org: string, program: string, input: Enrollment
   request<Enrollment>(enrollmentsPath(org, program), "POST", 201, signal, input);
 export const retryInvitationDelivery = (org: string, program: string, enrollment: string, signal?: AbortSignal) =>
   request<Enrollment>(`${enrollmentsPath(org, program)}/${encodeURIComponent(enrollment)}/invitation-delivery`, "POST", 200, signal);
+export async function sendProgramInvitations(org: string, program: string, signal?: AbortSignal): Promise<InvitationBatch> {
+  const result = await request<InvitationBatch>(`${enrollmentsPath(org, program)}/invitation-delivery`, "POST", 200, signal);
+  if (!result || ![result.sent, result.failed, result.inProgress, result.skipped].every(value => Number.isSafeInteger(value) && value >= 0)) {
+    throw new ParticipationRequestError(0);
+  }
+  // Servers started before failure details were introduced return only the counts.
+  // Normalize at the boundary so React never stores an undefined failure list.
+  if (result.failures != null && !Array.isArray(result.failures)) throw new ParticipationRequestError(0);
+  return { ...result, failures: result.failures ?? [] };
+}
 // Invited users can receive 403 from /me. Invitations require Cognito identity, not an already-active membership.
 export const listInvitations = (page = 0, signal?: AbortSignal) =>
   request<PageResult<Invitation>>(`/invitations?page=${page}&size=20`, "GET", 200, signal);

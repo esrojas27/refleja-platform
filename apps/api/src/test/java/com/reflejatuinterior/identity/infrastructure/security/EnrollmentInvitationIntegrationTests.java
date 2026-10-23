@@ -95,7 +95,7 @@ class EnrollmentInvitationIntegrationTests extends PostgreSqlIntegrationTestSupp
         jdbcTemplate.update("delete from rti.organizations where id in (?, ?)", organization, other);
     }
 
-    @Test void createsAnInvitedEnrollmentAndSevenDayInvitationWithoutActivatingAccess() throws Exception {
+    @Test void preparesAHiddenInvitationWithoutMailAndStartsValidityOnlyOnExplicitSend() throws Exception {
         Instant before = Instant.now();
         var response = create(organization, program, valid(EMAIL)).andExpect(status().isCreated())
                 .andExpect(jsonPath("$.organizationId").value(organization.toString()))
@@ -104,14 +104,26 @@ class EnrollmentInvitationIntegrationTests extends PostgreSqlIntegrationTestSupp
                 .andExpect(jsonPath("$.participant.email").value(EMAIL))
                 .andExpect(jsonPath("$.participant.firstName").value("Ana"))
                 .andExpect(jsonPath("$.invitation.role").value("COLLABORATOR"))
-                .andExpect(jsonPath("$.invitation.status").value("PENDING"))
-                .andExpect(jsonPath("$.invitation.deliveryStatus").value("SENT"))
+                .andExpect(jsonPath("$.invitation.status").value("DRAFT"))
+                .andExpect(jsonPath("$.invitation.deliveryStatus").value("PENDING"))
+                .andExpect(jsonPath("$.invitation.expiresAt").isEmpty())
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(header().exists("X-Request-ID")).andReturn().getResponse();
         var enrollment = json.readTree(response.getContentAsString());
         assertThat(id(enrollment).version()).isEqualTo(7);
         assertThat(invitation(enrollment).version()).isEqualTo(7);
-        assertThat(Instant.parse(enrollment.path("invitation").path("expiresAt").asText()))
+        assertState("user_invitations", invitation(enrollment), "DRAFT");
+        verify(gateway, never()).sendWelcomeIfRequired(any());
+        verify(gateway, never()).sendInvitation(any());
+        mvc.perform(get("/api/v1/invitations").header("Authorization", token(SUBJECT)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0))
+                .andExpect(jsonPath("$.items.length()").value(0));
+        accept(enrollment, SUBJECT).andExpect(status().isNotFound());
+        // Prepared registrations can wait longer than the old seven-day expiration.
+        jdbcTemplate.update("update rti.user_invitations set created_at=now()-interval '14 days' where id=?", invitation(enrollment));
+        send(organization, program).andExpect(status().isOk()).andExpect(jsonPath("$.sent").value(1))
+                .andExpect(header().string("Cache-Control", "no-store"));
+        assertThat(jdbcTemplate.queryForObject("select expires_at from rti.user_invitations where id=?", java.sql.Timestamp.class, invitation(enrollment)).toInstant())
                 .isBetween(before.plus(Duration.ofDays(7)), Instant.now().plus(Duration.ofDays(7)));
         assertPending(enrollment);
         assertThat(roles(membership(enrollment))).containsExactly("COLLABORATOR");
@@ -131,6 +143,7 @@ class EnrollmentInvitationIntegrationTests extends PostgreSqlIntegrationTestSupp
         assertThat(jdbcTemplate.queryForObject("select invited_role from rti.user_invitations where id=?", String.class,
                 invitation(enrollment))).isEqualTo(role);
         assertThat(roles(membership(enrollment))).containsExactly(role);
+        send(organization, program).andExpect(status().isOk());
         assertPending(enrollment);
 
         accept(enrollment, SUBJECT).andExpect(status().isOk())
@@ -187,6 +200,7 @@ class EnrollmentInvitationIntegrationTests extends PostgreSqlIntegrationTestSupp
         mvc.perform(post("/api/v1/invitations/" + uuid7(0xa10) + "/accept")).andExpect(status().isUnauthorized());
         mvc.perform(post(path(organization, program) + "/" + uuid7(0xa10) + "/invitation-delivery"))
                 .andExpect(status().isUnauthorized());
+        mvc.perform(post(path(organization, program) + "/invitation-delivery")).andExpect(status().isUnauthorized());
         verifyNoInteractions(gateway);
     }
 
@@ -195,6 +209,7 @@ class EnrollmentInvitationIntegrationTests extends PostgreSqlIntegrationTestSupp
         actorRole(role);
         create(organization, program, valid(EMAIL)).andExpect(status().isForbidden());
         mvc.perform(get(path(organization, program)).header("Authorization", consultant)).andExpect(status().isForbidden());
+        send(organization, program).andExpect(status().isForbidden());
         verifyNoInteractions(gateway);
     }
 
@@ -349,9 +364,7 @@ class EnrollmentInvitationIntegrationTests extends PostgreSqlIntegrationTestSupp
 
     @Test void deliveryFailurePreservesCommittedEnrollmentAndRetryDoesNotDuplicateOrExtendValidity() throws Exception {
         when(gateway.sendInvitation(any())).thenThrow(new DeliveryUnavailable());
-        var enrollment = create(organization, program, valid(EMAIL)).andExpect(status().isCreated())
-                .andExpect(jsonPath("$.invitation.deliveryStatus").value("FAILED")).andReturn().getResponse();
-        var saved = json.readTree(enrollment.getContentAsString());
+        var saved = enroll(EMAIL);
         String expiration = saved.path("invitation").path("expiresAt").asText();
         assertPending(saved);
         doReturn("retried-ses-message-id").when(gateway).sendInvitation(any());
@@ -366,9 +379,9 @@ class EnrollmentInvitationIntegrationTests extends PostgreSqlIntegrationTestSupp
 
     @Test void credentialsDeliveryFailureRemainsRecoverableWithoutPretendingAnInvitationWasSent() throws Exception {
         doThrow(new DeliveryUnavailable()).when(gateway).sendWelcomeIfRequired(any());
-        var enrollment = create(organization, program, valid(EMAIL)).andExpect(status().isCreated())
-                .andExpect(jsonPath("$.invitation.deliveryStatus").value("FAILED")).andReturn().getResponse();
-        assertPending(json.readTree(enrollment.getContentAsString()));
+        var enrollment = enroll(EMAIL);
+        assertThat(enrollment.path("invitation").path("deliveryStatus").asText()).isEqualTo("FAILED");
+        assertPending(enrollment);
         verify(gateway, never()).sendInvitation(any());
     }
 
@@ -400,7 +413,7 @@ class EnrollmentInvitationIntegrationTests extends PostgreSqlIntegrationTestSupp
         accept(first, SUBJECT).andExpect(status().isOk());
         assertState("enrollments", id(first), "ACTIVE");
         assertState("enrollments", id(second), "INVITED");
-        assertState("user_invitations", invitation(second), "PENDING");
+        assertState("user_invitations", invitation(second), "DRAFT");
     }
 
     @ParameterizedTest @ValueSource(strings = {"COMPLETED", "CANCELLED"})
@@ -419,6 +432,7 @@ class EnrollmentInvitationIntegrationTests extends PostgreSqlIntegrationTestSupp
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PROGRAM_READ_ONLY"));
         retry(enrollment, organization, program)
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PROGRAM_READ_ONLY"));
+        send(organization, program).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PROGRAM_READ_ONLY"));
         accept(enrollment, SUBJECT)
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PROGRAM_READ_ONLY"));
 
@@ -436,8 +450,11 @@ class EnrollmentInvitationIntegrationTests extends PostgreSqlIntegrationTestSupp
         clearInvocations(gateway);
         var fresh=json.readTree(change(first,1,"REINSTATE").andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("INVITED")).andExpect(jsonPath("$.version").value(2))
-                .andExpect(jsonPath("$.invitation.deliveryStatus").value("SENT")).andReturn().getResponse().getContentAsString());
+                .andExpect(jsonPath("$.invitation.status").value("DRAFT"))
+                .andExpect(jsonPath("$.invitation.deliveryStatus").value("PENDING")).andReturn().getResponse().getContentAsString());
         assertThat(invitation(fresh)).isNotEqualTo(invitation(first));
+        verifyNoInteractions(gateway);
+        send(organization, program).andExpect(status().isOk()).andExpect(jsonPath("$.sent").value(1));
         assertPending(fresh);
         verify(gateway,never()).provision(any());
         verify(gateway).sendInvitation(any());
@@ -460,6 +477,7 @@ class EnrollmentInvitationIntegrationTests extends PostgreSqlIntegrationTestSupp
         assertThat(invitation(fresh)).isNotEqualTo(invitation(first));
         assertState("user_invitations",invitation(first),"EXPIRED");
         accept(first,SUBJECT).andExpect(status().isConflict());
+        send(organization, program).andExpect(status().isOk());
         accept(fresh,SUBJECT).andExpect(status().isOk());
         assertThat(count("enrollments")).isEqualTo(1);
     }
@@ -474,6 +492,7 @@ class EnrollmentInvitationIntegrationTests extends PostgreSqlIntegrationTestSupp
                 .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(Map.of("version",0,"action","CHANGE_ROLE",
                         "reason","Responsable de personas","confirmed",true,"role","COMPANY_ADMIN","roleVersion",version))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.invitation.role").value("COMPANY_ADMIN"));
+        send(organization, secondProgram).andExpect(status().isOk());
         accept(second,SUBJECT).andExpect(status().isOk()).andExpect(jsonPath("$.role").value("COMPANY_ADMIN"));
         accept(first,SUBJECT).andExpect(status().isOk()).andExpect(jsonPath("$.role").value("COMPANY_ADMIN"));
         assertThat(roles(membership(first))).containsExactly("COMPANY_ADMIN");
@@ -521,9 +540,98 @@ class EnrollmentInvitationIntegrationTests extends PostgreSqlIntegrationTestSupp
                 .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(Map.of("version",version,"action",action,"reason","Cambio de prueba","confirmed",true))));
     }
 
-    private JsonNode enroll(String email) throws Exception {
+    @Test void batchSendsTheWholeProgramBeyondOnePageAndDoesNotResendConfirmedEmails() throws Exception {
+        for (int index = 0; index < 23; index++) register("batch-010-" + index + "@example.test");
+        create(organization, foreignProgram, valid("foreign-010@example.test")).andExpect(status().isNotFound());
+        var otherProgram = uuid7(0xa30); insertProgram(otherProgram, organization);
+        create(organization, otherProgram, valid("another-program-010@example.test")).andExpect(status().isCreated());
+        verify(gateway, never()).sendWelcomeIfRequired(any());
+        verify(gateway, never()).sendInvitation(any());
+        send(organization, program).andExpect(status().isOk()).andExpect(jsonPath("$.sent").value(23))
+                .andExpect(jsonPath("$.failed").value(0)).andExpect(jsonPath("$.inProgress").value(0));
+        verify(gateway, times(23)).sendWelcomeIfRequired(any());
+        verify(gateway, times(23)).sendInvitation(any());
+        clearInvocations(gateway);
+        send(organization, program).andExpect(status().isOk()).andExpect(jsonPath("$.sent").value(0))
+                .andExpect(jsonPath("$.skipped").value(23));
+        send(other, foreignProgram).andExpect(status().isNotFound());
+        send(organization, foreignProgram).andExpect(status().isNotFound());
+        verifyNoInteractions(gateway);
+        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.user_invitations where organization_id=? and status='DRAFT'", Long.class, organization)).isEqualTo(1);
+    }
+
+    @Test void partialBatchFailureIsRecoverableAndRetrySendsOnlyTheFailedRecipient() throws Exception {
+        var failedRecipient = register(EMAIL); register("second-010@example.test"); register("third-010@example.test");
+        when(gateway.sendInvitation(any())).thenAnswer(call -> {
+            com.reflejatuinterior.identity.CollaboratorInvitations.Invitation invitation = call.getArgument(0);
+            if (EMAIL.equals(invitation.email())) throw new DeliveryUnavailable();
+            return "accepted-by-provider";
+        });
+        send(organization, program).andExpect(status().isOk()).andExpect(jsonPath("$.sent").value(2))
+                .andExpect(jsonPath("$.failed").value(1))
+                .andExpect(jsonPath("$.failures.length()").value(1))
+                .andExpect(jsonPath("$.failures[0].enrollmentId").value(id(failedRecipient).toString()))
+                .andExpect(jsonPath("$.failures[0].email").value(EMAIL));
+        assertThat(count("enrollments")).isEqualTo(3);
+        clearInvocations(gateway);
+        doReturn("recovered").when(gateway).sendInvitation(any());
+        send(organization, program).andExpect(status().isOk()).andExpect(jsonPath("$.sent").value(1))
+                .andExpect(jsonPath("$.failed").value(0)).andExpect(jsonPath("$.skipped").value(2))
+                .andExpect(jsonPath("$.failures.length()").value(0));
+        verify(gateway, never()).sendWelcomeIfRequired(any());
+        verify(gateway).sendInvitation(any());
+    }
+
+    @Test void batchSkipsExpiredRevokedAndDisabledRegistrations() throws Exception {
+        var expired = enroll(EMAIL); expire(expired);
+        var revoked = register("revoked-010@example.test");
+        change(revoked, 0, "REVOKE").andExpect(status().isOk());
+        var disabled = register("disabled-010@example.test");
+        jdbcTemplate.update("update rti.users set status='SUSPENDED' where id=?", user(disabled));
+        register("enabled-010@example.test");
+        clearInvocations(gateway);
+        send(organization, program).andExpect(status().isOk()).andExpect(jsonPath("$.sent").value(1))
+                .andExpect(jsonPath("$.skipped").value(2));
+        verify(gateway).sendInvitation(any());
+        assertState("user_invitations", invitation(revoked), "REVOKED");
+        assertState("user_invitations", invitation(disabled), "DRAFT");
+    }
+
+    @Test void concurrentBatchRequestsShareTheInvitationLease() throws Exception {
+        register(EMAIL);
+        var entered = new java.util.concurrent.CountDownLatch(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        when(gateway.sendInvitation(any())).thenAnswer(call -> {
+            entered.countDown();
+            if (!release.await(15, java.util.concurrent.TimeUnit.SECONDS)) throw new DeliveryUnavailable();
+            return "only-one-send";
+        });
+        try (var executor = java.util.concurrent.Executors.newSingleThreadExecutor()) {
+            var first = executor.submit(() -> send(organization, program).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.sent").value(1)));
+            try {
+                assertThat(entered.await(15, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+                send(organization, program).andExpect(status().isOk()).andExpect(jsonPath("$.sent").value(0))
+                        .andExpect(jsonPath("$.inProgress").value(1));
+            } finally { release.countDown(); }
+            first.get(15, java.util.concurrent.TimeUnit.SECONDS);
+        }
+        verify(gateway).sendInvitation(any());
+        verify(gateway).sendWelcomeIfRequired(any());
+    }
+
+    private JsonNode register(String email) throws Exception {
         return json.readTree(create(organization, program, valid(email)).andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString());
+    }
+
+    private JsonNode enroll(String email) throws Exception {
+        var registered = register(email);
+        return json.readTree(retry(registered, organization, program).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+    }
+    private ResultActions send(UUID org, UUID programId) throws Exception {
+        return mvc.perform(post(path(org, programId) + "/invitation-delivery").header("Authorization", consultant));
     }
     private void existingParticipant(String userState, String memberState) {
         insertUser(existingUser);

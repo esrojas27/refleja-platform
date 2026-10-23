@@ -70,11 +70,59 @@ public class EnrollmentService {
             var invitation = invitations.create(organizationId, context.userId(), account, person, invitedRole);
             var enrollment = enrollments.create(organizationId, programId, invitation.membershipId(), invitation.id());
             var roles=identities.inspect(organizationId,enrollment.membershipId()).roles();
-            changes.record(null,enrollment,"INVITED",Set.of(),roles,context.userId(),actorLabel(context),"Invitación creada.",requestId);
-            auditAfterCommit("PROGRAM_PARTICIPANT_INVITED", context.userId(), organizationId, enrollment.id(), requestId);
+            changes.record(null,enrollment,"INVITED",Set.of(),roles,context.userId(),actorLabel(context),"Persona registrada; invitación sin enviar.",requestId);
+            auditAfterCommit("PROGRAM_PARTICIPANT_REGISTERED", context.userId(), organizationId, enrollment.id(), requestId);
             return response(enrollment);
         });
-        return deliver(created, requestId);
+        return created;
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public InvitationBatch sendInvitations(String subject, UUID organizationId, UUID programId, String requestId) {
+        // Snapshot the whole program, not the page visible in the browser. New registrations
+        // made after this snapshot belong to the next explicit send action.
+        var candidates = transactions.execute(status -> {
+            authorize(subject, organizationId, programId, requestId);
+            requireEditable(organizationId, programId);
+            return enrollments.findInvited(organizationId, programId);
+        });
+        int sent = 0, failed = 0, inProgress = 0, skipped = 0;
+        var failures = new ArrayList<FailedInvitation>();
+        for (var candidate : candidates) {
+            var current = transactions.execute(status -> {
+                // Recheck authorization and participant state between provider round trips.
+                authorize(subject, organizationId, programId, requestId);
+                requireEditable(organizationId, programId);
+                var row = enrollments.find(organizationId, programId, candidate.id()).orElse(null);
+                if (row == null || !"INVITED".equals(row.status()) || row.invitationId() == null) return null;
+                var enrollment = response(row);
+                if (!Set.of("DRAFT", "PENDING").contains(enrollment.invitation().status())
+                        || "SENT".equals(enrollment.invitation().deliveryStatus())
+                        || !Set.of("ACTIVE", "PENDING").contains(enrollment.access().membershipStatus())
+                        || !Set.of("ACTIVE", "INVITED").contains(enrollment.access().userStatus())) return null;
+                return enrollment;
+            });
+            if (current == null) { skipped++; continue; }
+            try {
+                var delivered = deliver(current, requestId);
+                switch (delivered.invitation().deliveryStatus()) {
+                    case "SENT" -> sent++;
+                    case "SENDING" -> inProgress++;
+                    default -> {
+                        failed++;
+                        failures.add(new FailedInvitation(current.id(), current.participant().email()));
+                    }
+                }
+            } catch (CollaboratorInvitations.Unavailable | CollaboratorInvitations.Expired
+                     | CollaboratorInvitations.Conflict | CollaboratorInvitations.Denied exception) {
+                // A recipient can be revoked or disabled while the batch is running.
+                skipped++;
+            }
+        }
+        LoggerFactory.getLogger(EnrollmentService.class).info(
+                "action=PROGRAM_INVITATIONS_BATCH organization={} program={} requestId={} sent={} failed={} inProgress={} skipped={}",
+                organizationId, programId, requestId, sent, failed, inProgress, skipped);
+        return new InvitationBatch(sent, failed, inProgress, skipped, failures);
     }
 
     @Transactional(readOnly = true)
@@ -303,6 +351,10 @@ public class EnrollmentService {
     }
 
     public record InvitationInfo(UUID id, String role, String status, Instant expiresAt, String deliveryStatus) {}
+    public record FailedInvitation(UUID enrollmentId, String email) {}
+    public record InvitationBatch(int sent, int failed, int inProgress, int skipped, List<FailedInvitation> failures) {
+        public InvitationBatch { failures = List.copyOf(failures); }
+    }
     public record EnrollmentResponse(UUID id, UUID organizationId, UUID programId, String status,
                                      CollaboratorInvitations.Participant participant, InvitationInfo invitation,
                                      long version,String suspendedFromStatus,ParticipantIdentityAdministration.State access) {}

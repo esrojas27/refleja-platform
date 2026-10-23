@@ -1,7 +1,6 @@
 package com.reflejatuinterior.identity.infrastructure.persistence;
 
 import java.time.Clock;
-import java.time.Duration;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -64,7 +63,7 @@ class JpaParticipantIdentityAdministration implements ParticipantIdentityAdminis
         if(!Set.of("EXPIRED","REVOKED").contains(previous.effectiveStatus(clock.instant()))) throw new Conflict("INVITATION_RENEWAL_NOT_ALLOWED");
         if(previous.status!=UserInvitationJpaEntity.InvitationStatus.REVOKED) previous.status=UserInvitationJpaEntity.InvitationStatus.EXPIRED;
         previous.deliveryAttemptId=null; previous.deliveryLeaseUntil=null;
-        var fresh=new UserInvitationJpaEntity(org,previous.userId,previous.membershipId,previous.invitedRole,actor,previous.cognitoUsername,clock.instant().plus(Duration.ofDays(7)));
+        var fresh=new UserInvitationJpaEntity(org,previous.userId,previous.membershipId,previous.invitedRole,actor,previous.cognitoUsername,null);
         em.persist(fresh); em.flush(); return invitations.findInOrganization(org,fresh.id);
     }
     private OrganizationMembershipJpaEntity member(UUID org,UUID id,boolean lock) {

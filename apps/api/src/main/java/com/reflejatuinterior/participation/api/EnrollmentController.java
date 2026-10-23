@@ -34,12 +34,12 @@ class EnrollmentController {
     EnrollmentController(EnrollmentService service) { this.service = service; }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
-    @Operation(summary = "Enroll and invite a program participant", description = "CONSULTANT only. Role may be COLLABORATOR, LEADER or COMPANY_ADMIN; omitted role defaults to COLLABORATOR. "
+    @Operation(summary = "Register a program participant without sending email", description = "CONSULTANT only. Role may be COLLABORATOR, LEADER or COMPANY_ADMIN; omitted role defaults to COLLABORATOR. "
             + "COMPANY_ADMIN is presented as RRHH in the product. Email up to 254 and first/last name 1–100 characters. "
             + "Actual Cognito sub is resolved before the atomic internal creation. New User INVITED, membership PENDING and enrollment INVITED. "
             + "Existing active access/profile is preserved; suspended or revoked access is never restored. "
-            + "Invitation expires in seven days. Email is requested after commit; 201 does not guarantee delivery. "
-            + "Check invitation.deliveryStatus; SENT means accepted by provider, FAILED/PENDING can be retried explicitly. Duplicate enrollment returns 409.")
+            + "Invitation remains DRAFT, hidden from its recipient, without an expiration date. No Cognito welcome or SES email is sent. "
+            + "Explicit batch delivery starts seven-day validity. Duplicate enrollment returns 409.")
     @ApiResponse(responseCode = "201", description = "Direct enrollment DTO with participant and invitation; no passwords or Cognito identifiers")
     ResponseEntity<EnrollmentService.EnrollmentResponse> create(@AuthenticationPrincipal Jwt jwt,
             @PathVariable UUID organizationId, @PathVariable UUID programId, @Valid @RequestBody CreateRequest input,
@@ -60,6 +60,18 @@ class EnrollmentController {
         String id = requestId(request);
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("X-Request-ID", id)
                 .body(service.list(jwt.getSubject(), organizationId, programId, page, size, id));
+    }
+
+    @PostMapping("/invitation-delivery")
+    @Operation(summary = "Send pending invitations for the whole program", description = "Explicit CONSULTANT action on an editable program. "
+            + "Includes registrations beyond the visible page. Skips sent, accepted, expired, revoked and disabled participants. "
+            + "Returns provider-confirmed sending, failed, in-progress and skipped counts; SENT does not guarantee inbox delivery. "
+            + "Each recipient is independent; retrying does not resend confirmed invitations. Concurrent requests share per-invitation leases.")
+    ResponseEntity<EnrollmentService.InvitationBatch> send(@AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID organizationId, @PathVariable UUID programId, HttpServletRequest request) {
+        String id = requestId(request);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("X-Request-ID", id)
+                .body(service.sendInvitations(jwt.getSubject(), organizationId, programId, id));
     }
 
     @PostMapping("/{enrollmentId}/invitation-delivery")

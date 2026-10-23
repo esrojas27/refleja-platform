@@ -4,12 +4,12 @@ import { EnrollmentArea, EnrollmentForm } from "@/components/participation/enrol
 import { AccountSession } from "@/components/auth/account-session";
 import { AccountWorkspace } from "@/components/auth/account-workspace";
 import { fetchCurrentIdentity, IdentityRequestError, type CurrentIdentity } from "@/lib/auth/authenticated-api";
-import { createEnrollment, listEnrollments, retryInvitationDelivery, ParticipationRequestError, type Enrollment } from "@/lib/participation/participation-api";
+import { createEnrollment, listEnrollments, retryInvitationDelivery, sendProgramInvitations, ParticipationRequestError, type Enrollment, type InvitationBatch } from "@/lib/participation/participation-api";
 
 vi.mock("aws-amplify/auth", () => ({ signOut: vi.fn() }));
 vi.mock("next/navigation", () => ({ usePathname: () => "/account", useRouter: () => ({ replace: vi.fn() }) }));
 vi.mock("@/lib/auth/authenticated-api", async original => ({ ...await original<typeof import("@/lib/auth/authenticated-api")>(), fetchCurrentIdentity: vi.fn() }));
-vi.mock("@/lib/participation/participation-api", async original => ({ ...await original<typeof import("@/lib/participation/participation-api")>(), createEnrollment: vi.fn(), listEnrollments: vi.fn(), retryInvitationDelivery: vi.fn() }));
+vi.mock("@/lib/participation/participation-api", async original => ({ ...await original<typeof import("@/lib/participation/participation-api")>(), createEnrollment: vi.fn(), listEnrollments: vi.fn(), retryInvitationDelivery: vi.fn(), sendProgramInvitations: vi.fn() }));
 const identity: CurrentIdentity = { cognitoSubject: "subject", user: { id: "user", email: "consultant@example.test", firstName: null, lastName: null },
   organizations: [{ id: "org-a", name: "Empresa A", roles: ["CONSULTANT"], profileStatus: "COMPLETE" as const }], activeOrganizationId: "org-a", roles: ["CONSULTANT"] };
 const enrollment: Enrollment = { id: "enrollment-a", organizationId: "org-a", programId: "program-a", status: "INVITED",
@@ -35,7 +35,7 @@ it("renders actual scoped collaborators and makes no mail delivery claim", async
   const enrolledPerson = screen.getByText("participant@example.test").closest("li");
   expect(enrolledPerson?.textContent).toContain("Inscripción: Invitada · Invitación: Pendiente");
   expect(enrolledPerson?.textContent).not.toContain("Inscripción: INVITED");
-  expect(screen.getByRole("form", { name: "Invitar persona" })).toBeTruthy();
+  expect(screen.getByRole("form", { name: "Registrar persona" })).toBeTruthy();
   expect(listEnrollments).toHaveBeenCalledWith("org-a", "program-a", 0, expect.any(AbortSignal));
 });
 it("denies non-consultants without loading collaborator data", async () => {
@@ -54,11 +54,93 @@ it("shows unavailable without revealing a foreign program", async () => {
   await screen.findByText(/no está disponible para esta cuenta/); expect(screen.queryByRole("form")).toBeNull();
 });
 it("registers once and refreshes the real list", async () => {
+  const draft = { ...enrollment, invitation: { ...enrollment.invitation!, status: "DRAFT" as const, expiresAt: null, deliveryStatus: "PENDING" as const } };
+  vi.mocked(createEnrollment).mockResolvedValue(draft);
+  vi.mocked(listEnrollments).mockResolvedValue({ ...data, items: [draft] });
   render(<EnrollmentArea organizationId="org-a" programId="program-a" />);
   await screen.findByRole("form"); fill(); fireEvent.submit(screen.getByRole("form"));
-  await screen.findByText(/Registro guardado: Invitada/);
+  await screen.findByText(/Persona registrada sin enviar correos/);
   expect(createEnrollment).toHaveBeenCalledWith("org-a", "program-a", { email: "participant@example.test", firstName: "Ana", lastName: "Prueba", role: "COLLABORATOR" }, expect.any(AbortSignal));
   await waitFor(() => expect(listEnrollments).toHaveBeenCalledTimes(2));
+  expect(sendProgramInvitations).not.toHaveBeenCalled();
+  expect(retryInvitationDelivery).not.toHaveBeenCalled();
+  expect(screen.getByText("Registrada")).toBeTruthy();
+  expect(screen.queryByText(/^Vence:/)).toBeNull();
+  expect(screen.queryByRole("button", { name: "Reintentar envío" })).toBeNull();
+});
+it("requires confirmation and sends a program-wide batch, not the current page", async () => {
+  vi.mocked(listEnrollments).mockResolvedValue({ ...data, items: [], totalElements: 23, totalPages: 2 });
+  vi.mocked(sendProgramInvitations).mockResolvedValue({ sent: 22, failed: 1, inProgress: 0, skipped: 0,
+    failures: [{ enrollmentId: "off-page", email: "other-page@example.test" }] });
+  render(<EnrollmentArea organizationId="org-a" programId="program-a" />);
+  fireEvent.click(await screen.findByRole("button", { name: "Enviar Invitaciones" }));
+  expect(sendProgramInvitations).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+  expect(sendProgramInvitations).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Enviar Invitaciones" }));
+  fireEvent.click(screen.getByRole("button", { name: "Confirmar envío" }));
+  await screen.findByText(/22 con envío confirmado por el proveedor, 1 con fallo/);
+  await screen.findByText("Hay invitaciones por revisar");
+  await screen.findByText("other-page@example.test");
+  expect(screen.getByRole("link", { name: "Ver correos con envío no confirmado" }).getAttribute("href")).toBe("#invitation-delivery-failures");
+  expect(sendProgramInvitations).toHaveBeenCalledWith("org-a", "program-a", expect.any(AbortSignal));
+  await waitFor(() => expect(listEnrollments).toHaveBeenCalledTimes(2));
+});
+it("blocks repeated batch clicks and refresh while sending", async () => {
+  vi.mocked(sendProgramInvitations).mockReturnValue(new Promise(() => {}));
+  render(<EnrollmentArea organizationId="org-a" programId="program-a" />);
+  fireEvent.click(await screen.findByRole("button", { name: "Enviar Invitaciones" }));
+  fireEvent.click(screen.getByRole("button", { name: "Confirmar envío" }));
+  fireEvent.click(screen.getByRole("button", { name: "Enviando invitaciones…" }));
+  expect(sendProgramInvitations).toHaveBeenCalledTimes(1);
+  expect((screen.getByRole("button", { name: "Actualizar listado" }) as HTMLButtonElement).disabled).toBe(true);
+});
+it.each([undefined, null])("handles clicking send again when a legacy response has no failure details (%s)", async failures => {
+  vi.mocked(sendProgramInvitations).mockResolvedValue({ sent: 0, failed: 0, inProgress: 0, skipped: 1, failures } as unknown as InvitationBatch);
+  render(<EnrollmentArea organizationId="org-a" programId="program-a" />);
+  fireEvent.click(await screen.findByRole("button", { name: "Enviar Invitaciones" }));
+  fireEvent.click(screen.getByRole("button", { name: "Confirmar envío" }));
+  await screen.findByText("Lista de invitaciones actualizada");
+  await waitFor(() => expect(listEnrollments).toHaveBeenCalledTimes(2));
+  expect(screen.getByText("participant@example.test")).toBeTruthy();
+  expect(screen.queryByText("Invitaciones enviadas")).toBeNull();
+  expect(screen.queryByText("No se pudo confirmar el envío")).toBeNull();
+  expect(sendProgramInvitations).toHaveBeenCalledOnce();
+  expect(retryInvitationDelivery).not.toHaveBeenCalled();
+});
+it("refreshes after an uncertain batch without claiming delivery or automatically retrying", async () => {
+  vi.mocked(sendProgramInvitations).mockRejectedValue(new ParticipationRequestError(0));
+  render(<EnrollmentArea organizationId="org-a" programId="program-a" />);
+  fireEvent.click(await screen.findByRole("button", { name: "Enviar Invitaciones" }));
+  fireEvent.click(screen.getByRole("button", { name: "Confirmar envío" }));
+  await screen.findByText(/algunos envíos pudieron completarse/);
+  await screen.findByText("No se pudo confirmar el envío");
+  await waitFor(() => expect(listEnrollments).toHaveBeenCalledTimes(2));
+  expect(sendProgramInvitations).toHaveBeenCalledTimes(1);
+});
+it("clears a confirmed individual retry from the failed batch detail and shows success", async () => {
+  const failed = { ...enrollment, invitation: { ...enrollment.invitation!, deliveryStatus: "FAILED" as const } };
+  vi.mocked(listEnrollments).mockResolvedValue({ ...data, items: [failed] });
+  vi.mocked(sendProgramInvitations).mockResolvedValue({ sent: 0, failed: 1, inProgress: 0, skipped: 0,
+    failures: [{ enrollmentId: enrollment.id, email: enrollment.participant.email }] });
+  render(<EnrollmentArea organizationId="org-a" programId="program-a" />);
+  fireEvent.click(await screen.findByRole("button", { name: "Enviar Invitaciones" }));
+  fireEvent.click(screen.getByRole("button", { name: "Confirmar envío" }));
+  await screen.findByRole("region", { name: "Envíos no confirmados" });
+  vi.mocked(listEnrollments).mockResolvedValue(data);
+  fireEvent.click(await screen.findByRole("button", { name: "Reintentar envío" }));
+  await screen.findByText("Invitación enviada");
+  await waitFor(() => expect(screen.queryByRole("region", { name: "Envíos no confirmados" })).toBeNull());
+});
+it("shows success for a completely confirmed batch and allows closing the popup", async () => {
+  vi.mocked(sendProgramInvitations).mockResolvedValue({ sent: 1, failed: 0, inProgress: 0, skipped: 0, failures: [] });
+  render(<EnrollmentArea organizationId="org-a" programId="program-a" />);
+  fireEvent.click(await screen.findByRole("button", { name: "Enviar Invitaciones" }));
+  fireEvent.click(screen.getByRole("button", { name: "Confirmar envío" }));
+  await screen.findByText("Invitaciones enviadas");
+  expect(screen.queryByRole("region", { name: "Envíos no confirmados" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Cerrar aviso de invitaciones" }));
+  expect(screen.queryByText("Invitaciones enviadas")).toBeNull();
 });
 it("sends the selected RRHH role as COMPANY_ADMIN", async () => {
   render(<EnrollmentArea organizationId="org-a" programId="program-a" />);
@@ -81,7 +163,7 @@ it("rejects missing or malformed participant input", () => {
 it.each([409, 403, 503, 0])("blocks unsafe resubmission after HTTP %s", async status => {
   vi.mocked(createEnrollment).mockRejectedValue(new ParticipationRequestError(status));
   render(<EnrollmentForm organizationId="org-a" programId="program-a" onSaved={vi.fn()} />); fill(); fireEvent.submit(screen.getByRole("form"));
-  await waitFor(() => expect((screen.getByRole("button", { name: "Registrar e invitar" }) as HTMLButtonElement).disabled).toBe(true));
+  await waitFor(() => expect((screen.getByRole("button", { name: "Agregar persona" }) as HTMLButtonElement).disabled).toBe(true));
   expect(screen.queryByText("Colaborador registrado.")).toBeNull();
 });
 it("allows a deliberate delivery retry only for a pending invitation with failed delivery", async () => {

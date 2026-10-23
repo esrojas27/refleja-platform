@@ -58,7 +58,7 @@ function ChangeForm({ action,enrollment,onSaved }: {action:EnrollmentAction;enro
     SUSPEND:"Se pausa temporalmente el acceso a este programa. No podrá ver el contenido ni enviar actividades o encuestas. Su progreso se conserva.",
     COMPLETE:"Puede haber actividades o encuestas pendientes. La participación quedará en solo consulta, sin nuevas entregas. No se aprueban actividades ni se convierte su progreso en 100%.",
     REINSTATE:enrollment.invitation&&enrollment.invitation.status!=="ACCEPTED"
-      ?"Se generará una invitación nueva de siete días. La persona deberá aceptarla para recuperar el acceso; el enlace anterior seguirá inválido."
+      ?"Se preparará una invitación nueva sin enviar correos. Pulsa Enviar Invitaciones cuando estés listo; su vigencia de siete días comenzará con el envío. La persona deberá aceptarla para recuperar el acceso; el enlace anterior seguirá inválido."
       :enrollment.suspendedFromStatus==="COMPLETED"?"Se restaurará su participación completada en solo consulta, conservando todo su progreso."
         :"Se restablecerá la inscripción activa conservando entregas y progreso. No se asignan automáticamente actividades nuevas.",
     CHANGE_ROLE:"Este cambio afecta todos sus programas en esta organización y sus invitaciones no aceptadas. Reemplaza los roles Colaborador, Líder y RRHH por el seleccionado; no modifica sus otras organizaciones.",

@@ -20,8 +20,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/organizations/{organizationId}/programs/{programId}/enrollments/{enrollmentId}")
 class EnrollmentAdministrationController {
     private final EnrollmentAdministrationService service;
-    private final EnrollmentService delivery;
-    EnrollmentAdministrationController(EnrollmentAdministrationService service,EnrollmentService delivery) { this.service=service; this.delivery=delivery; }
+    EnrollmentAdministrationController(EnrollmentAdministrationService service) { this.service=service; }
     @PostMapping("/administration")
     ResponseEntity<EnrollmentService.EnrollmentResponse> change(@AuthenticationPrincipal Jwt jwt,@PathVariable UUID organizationId,
             @PathVariable UUID programId,@PathVariable UUID enrollmentId,@Valid @RequestBody ChangeRequest input,HttpServletRequest request) {
@@ -29,15 +28,7 @@ class EnrollmentAdministrationController {
         var result=service.change(jwt.getSubject(),organizationId,programId,enrollmentId,input.version(),input.action(),
                 input.reason(),Boolean.TRUE.equals(input.confirmed()),input.role(),input.roleVersion(),rid);
         var body=result.enrollment();
-        // The service transaction commits before attempting external email delivery.
-        if(result.needsDelivery()) {
-            try { body=delivery.retryDelivery(jwt.getSubject(),organizationId,programId,enrollmentId,rid); }
-            catch(RuntimeException e) {
-                org.slf4j.LoggerFactory.getLogger(EnrollmentAdministrationController.class).warn(
-                        "action=REINCORPORATION_DELIVERY organization={} program={} enrollment={} requestId={} result=NOT_CONFIRMED",
-                        organizationId,programId,enrollmentId,rid);
-            }
-        }
+        // Renewed invitations are also drafts: only an explicit send action sends email.
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("X-Request-ID",rid).body(body);
     }
     @GetMapping("/history")
