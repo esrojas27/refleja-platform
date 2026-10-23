@@ -104,12 +104,12 @@ describe("In-app notification center", () => {
     expect(notificationDestination({ ...item, kind: "SUBMISSION_RECEIVED" })).toBe("/organizations/org-a/programs/program-a/activities#review-assignment-a");
   });
 
-  it("opens all nested collaborator accordions from a notification link", () => {
+  it("opens the collaborator activity directly from a notification link", () => {
     const id = "01900000-0000-7000-8000-000000000001";
     window.history.replaceState({}, "", `/#activity-${id}`);
-    render(<><details data-testid="dimension"><summary>Dimensión</summary><details data-testid="session"><summary>Sesión</summary>
-      <ul><li id={`activity-${id}`}><details data-testid="activity"><summary>Actividad</summary><p>Instrucciones</p></details></li></ul>
-    </details></details><ActivityLinkTarget /></>);
-    for (const name of ["dimension", "session", "activity"]) expect(screen.getByTestId(name).hasAttribute("open")).toBe(true);
+    render(<><ul><li id={`activity-${id}`}><details data-testid="activity"><summary>Actividad</summary><p>Instrucciones</p></details></li></ul>
+      <ActivityLinkTarget /></>);
+    expect(screen.getByTestId("activity").hasAttribute("open")).toBe(true);
+    expect(document.activeElement).toBe(screen.getByTestId("activity").querySelector("summary"));
   });
 });

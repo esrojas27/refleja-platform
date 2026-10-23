@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ActivityVideo } from "@/components/participation/activity-video";
-import { ChevronDown, Flag } from "lucide-react";
+import { ArrowRight, ChevronDown, Flag } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import {
@@ -19,7 +19,7 @@ import { activityErrorMessage, listMyProgramActivities, submitMyActivity,
 import { useCollaboratorActivities } from "@/components/participation/collaborator-activities-state";
 import { ActivityStatusBadges, CollaboratorProgressOverview } from "@/components/participation/progress-overview";
 import { ActivitySurveyForm } from "@/components/participation/activity-survey-form";
-import { ActivityLinkTarget } from "@/components/participation/activity-link-target";
+import { ActivityLinkTarget, revealActivityTarget } from "@/components/participation/activity-link-target";
 import { programStateMessage, programStatusLabels } from "@/lib/programs/program-lifecycle";
 
 const button = "rti-button-secondary";
@@ -124,34 +124,6 @@ function MyProgramDetail({ programId, section }: { programId: string; section: "
   </div>;
 }
 
-type ActivitySessionGroup = { id: string; name: string; activities: AssignedActivity[] };
-type ActivityDimensionGroup = { id: string; name: string; sessions: ActivitySessionGroup[] };
-
-function groupAssignedActivities(activities: AssignedActivity[]): ActivityDimensionGroup[] {
-  const dimensions = new Map<string, ActivityDimensionGroup & { sessionMap: Map<string, ActivitySessionGroup> }>();
-  for (const activity of [...activities].sort(compareAssignedActivityOrder)) {
-    let dimension = dimensions.get(activity.moduleId);
-    if (!dimension) {
-      dimension = { id: activity.moduleId, name: activity.dimensionName, sessions: [], sessionMap: new Map() };
-      dimensions.set(activity.moduleId, dimension);
-    }
-    let session = dimension.sessionMap.get(activity.sessionId);
-    if (!session) {
-      session = { id: activity.sessionId, name: activity.sessionName, activities: [] };
-      dimension.sessionMap.set(activity.sessionId, session);
-      dimension.sessions.push(session);
-    }
-    session.activities.push(activity);
-  }
-  return [...dimensions.values()].map(dimension => ({
-    id: dimension.id,
-    name: dimension.name,
-    sessions: dimension.sessions.map(session => ({
-      ...session, activities: [...session.activities].sort((left, right) => left.position - right.position),
-    })),
-  }));
-}
-
 function AssignedActivityList({ programId, section, programStatus, enrollmentStatus }: { programId: string; section: "summary" | "activities"; programStatus: MyProgram["status"]; enrollmentStatus?: MyProgram["enrollmentStatus"] }) {
   const readOnly = programStatus !== "ACTIVE" || enrollmentStatus === "COMPLETED";
   const preparing = programStatus === "DRAFT" || programStatus === "SCHEDULED";
@@ -187,36 +159,11 @@ function AssignedActivityList({ programId, section, programStatus, enrollmentSta
     {!preparing && message && <p role="status" className="mt-3 rounded-2xl bg-muted/60 px-4 py-3 text-sm">{message}</p>}
     {!preparing && activities && activities.length > 0 && <div className="mt-4 space-y-4">
       <ActivityLinkTarget key={programId} />
-      {groupAssignedActivities(activities).map(dimension => {
-        const dimensionTotal = dimension.sessions.reduce((total, session) => total + session.activities.length, 0);
-        return <details key={dimension.id} className="group/dimension overflow-hidden rounded-2xl border border-border/70 bg-background/65">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-4 marker:hidden sm:px-5 [&::-webkit-details-marker]:hidden">
-            <span><span className="rti-kicker block">Dimensión</span>
-              <span className="mt-1 block text-lg font-semibold">{dimension.name}</span></span>
-            <span className="flex shrink-0 items-center gap-3 text-sm text-muted-foreground">
-              {dimensionTotal} {dimensionTotal === 1 ? "actividad" : "actividades"}
-              <ChevronDown aria-hidden="true" className="size-5 transition-transform group-open/dimension:rotate-180" />
-            </span>
-          </summary>
-          <div className="space-y-3 border-t border-border/70 bg-muted/20 p-3 sm:p-4">
-            {dimension.sessions.map(session => <details key={session.id}
-              className="group/session overflow-hidden rounded-xl border border-border/70 bg-card">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 marker:hidden [&::-webkit-details-marker]:hidden">
-                <span><span className="rti-kicker block">Sesión</span>
-                  <span className="mt-1 block font-semibold">{session.name}</span></span>
-                <span className="flex shrink-0 items-center gap-3 text-sm text-muted-foreground">
-                  {session.activities.length} {session.activities.length === 1 ? "actividad" : "actividades"}
-                  <ChevronDown aria-hidden="true" className="size-4 transition-transform group-open/session:rotate-180" />
-                </span>
-              </summary>
-              <ol className="space-y-3 border-t border-border/70 p-3 sm:p-4">
-                {session.activities.map(activity => <AssignedActivityAccordion key={activity.id} programId={programId}
-                  activity={activity} readOnly={readOnly} onSubmitted={updateActivity} />)}
-              </ol>
-            </details>)}
-          </div>
-        </details>;
-      })}
+      <p className="text-sm text-muted-foreground">Elige una actividad para empezar. Están ordenadas según el recorrido de tu programa.</p>
+      <ol aria-label="Actividades de tu programa" className="space-y-4">
+        {[...activities].sort(compareAssignedActivityOrder).map(activity => <AssignedActivityAccordion key={activity.id} programId={programId}
+          activity={activity} readOnly={readOnly} onSubmitted={updateActivity} />)}
+      </ol>
     </div>}
     </section>}
   </div>;
@@ -251,6 +198,10 @@ function NextActivityNotice({ activities }: { activities: AssignedActivity[] }) 
         {pending.length > 1 && <p className="mt-3 text-xs font-medium text-muted-foreground">
           Después de esta tienes {pending.length - 1} {pending.length === 2 ? "actividad pendiente" : "actividades pendientes"}.
         </p>}
+        <a href={`#activity-${next.id}`} onClick={() => revealActivityTarget(next.id)} className="rti-button-primary mt-4">
+          {next.survey?.status === "PENDING" ? "Continuar encuesta" : next.assignmentStatus === "CHANGES_REQUESTED" ? "Corregir actividad" : "Comenzar actividad"}
+          <ArrowRight aria-hidden="true" className="size-4 shrink-0" />
+        </a>
       </div>
     </div>
   </aside>;
@@ -259,13 +210,15 @@ function NextActivityNotice({ activities }: { activities: AssignedActivity[] }) 
 function AssignedActivityAccordion({ programId, activity, onSubmitted, readOnly }: {
   programId: string; activity: AssignedActivity; onSubmitted: (activity: AssignedActivity) => void; readOnly: boolean;
 }) {
-  return <li id={`activity-${activity.id}`}><details className="group/activity overflow-hidden rounded-xl border border-border/70 bg-background">
-    <summary className="flex cursor-pointer list-none flex-col gap-3 px-4 py-3 marker:hidden sm:flex-row sm:items-center sm:justify-between [&::-webkit-details-marker]:hidden">
-      <span><span className="rti-kicker block">Actividad {activity.position}</span>
-        <span className="mt-1 block font-semibold">{activity.title}</span></span>
-      <span className="flex items-center justify-between gap-3 sm:justify-end">
+  return <li id={`activity-${activity.id}`} className="scroll-mt-28"><details className="group/activity overflow-hidden rounded-2xl border border-border/70 bg-background">
+    <summary className="flex cursor-pointer list-none flex-col gap-3 px-4 py-4 marker:hidden focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-primary sm:flex-row sm:items-center sm:justify-between sm:px-5 [&::-webkit-details-marker]:hidden">
+      <span className="min-w-0"><span className="rti-kicker block break-words">{activity.dimensionName} · {activity.sessionName}</span>
+        <span className="mt-2 block break-words text-lg font-semibold">{activity.title}</span>
+        <span className="mt-1 block text-xs text-muted-foreground">Actividad {activity.position} · {activity.dueDate ? `Fecha límite: ${activity.dueDate}` : "Sin fecha límite"}</span></span>
+      <span className="flex shrink-0 flex-wrap items-center justify-between gap-3 sm:justify-end">
         <ActivityStatusBadges status={activity.assignmentStatus} dueDate={activity.dueDate}
           surveyStatus={activity.survey?.status} />
+        <span className="text-sm font-semibold text-primary"><span className="group-open/activity:hidden">{readOnly || activity.completionPercentage === 100 ? "Ver actividad" : activity.survey?.status === "PENDING" ? "Continuar encuesta" : activity.assignmentStatus === "CHANGES_REQUESTED" ? "Corregir" : activity.assignmentStatus === "SUBMITTED" ? "Ver entrega" : "Comenzar"}</span><span className="hidden group-open/activity:inline">Cerrar</span></span>
         <ChevronDown aria-hidden="true" className="size-4 shrink-0 transition-transform group-open/activity:rotate-180" />
       </span>
     </summary>

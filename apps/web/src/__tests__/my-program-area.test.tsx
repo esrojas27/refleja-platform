@@ -47,17 +47,15 @@ beforeEach(() => {
   vi.mocked(submitMyActivitySurvey).mockResolvedValue({ evaluationId: "survey-a", status: "COMPLETED",
     completedAt: "2026-10-07T12:05:00Z" });
 });
-afterEach(() => { cleanup(); vi.resetAllMocks(); });
+afterEach(() => { cleanup(); vi.resetAllMocks(); window.history.replaceState({}, "", "/"); });
 
 async function openAssignedActivity() {
-  await screen.findByText("Interior", { exact: true });
-  for (const label of ["Interior", "Autoconocimiento", "Reflexión inicial"]) {
-    const summary = screen.getAllByText(label, { exact: true })
-      .map(element => element.closest("summary")).find(Boolean);
-    expect(summary).not.toBeNull();
-    fireEvent.click(summary!);
-    expect((summary!.parentElement as HTMLDetailsElement).open).toBe(true);
-  }
+  const titles = await screen.findAllByText("Reflexión inicial", { exact: true });
+  const summary = titles.map(element => element.closest("summary")).find(Boolean);
+  expect(summary).not.toBeNull();
+  expect(summary!.parentElement?.parentElement?.closest("details")).toBeNull();
+  fireEvent.click(summary!);
+  expect((summary!.parentElement as HTMLDetailsElement).open).toBe(true);
 }
 
 it("renders only the collaborator's returned programs with basic metadata", async () => {
@@ -114,16 +112,45 @@ it("opens the program summary with progress without requesting participant ident
   expect(listMyProgramActivities).toHaveBeenCalledWith("program-a", expect.any(AbortSignal));
 });
 
-it("shows assigned work only in the activities section", async () => {
+it("lists activities directly and opens the full activity in one click without dimension or session dropdowns", async () => {
   render(<MyProgramArea mode="activities" programId="program-a" />);
   expect((await screen.findAllByText("Reflexión inicial")).length).toBe(2);
-  expect(screen.getByText("Interior", { exact: true }).closest("details")?.open).toBe(false);
-  expect(screen.getByText("Autoconocimiento", { exact: true }).closest("details")?.open).toBe(false);
+  const list = screen.getByRole("list", { name: "Actividades de tu programa" });
+  expect(within(list).getByText("Interior · Autoconocimiento")).toBeTruthy();
+  expect(list.querySelectorAll("details")).toHaveLength(1);
+  expect(list.querySelector("details")?.open).toBe(false);
   await openAssignedActivity();
   expect(screen.getByRole("link", { name: "Ver video en YouTube" }).getAttribute("href")).toBe("https://youtu.be/dQw4w9WgXcQ");
   expect(screen.getByTitle("Video de la actividad: Reflexión inicial").tagName).toBe("IFRAME");
+  expect(screen.getByLabelText("Tu respuesta").closest("details")?.open).toBe(true);
   expect(screen.queryByRole("heading", { name: "Progreso del programa" })).toBeNull();
   expect(listMyProgramActivities).toHaveBeenCalledWith("program-a", expect.any(AbortSignal));
+});
+
+it("opens the next activity directly and reopens it even when its shortcut was already used", async () => {
+  render(<MyProgramArea mode="activities" programId="program-a" />);
+  const start = await screen.findByRole("link", { name: "Comenzar actividad" });
+  expect(start.getAttribute("href")).toBe("#activity-activity-a");
+  fireEvent.click(start);
+  const response=screen.getByLabelText("Tu respuesta");
+  const details=response.closest("details")!;
+  expect(details.open).toBe(true);
+  expect(document.activeElement).toBe(details.querySelector("summary"));
+  fireEvent.click(details.querySelector("summary")!);
+  expect(details.open).toBe(false);
+  fireEvent.click(start);
+  expect(details.open).toBe(true);
+});
+
+it("offers a direct shortcut to the pending survey instead of starting a second delivery", async () => {
+  vi.mocked(listMyProgramActivities).mockResolvedValue({items:[{...assignedActivity,assignmentStatus:"SUBMITTED",
+    responseText:"Mi entrega",completionPercentage:50,survey:{...assignedActivity.survey!,status:"PENDING"}}]});
+  render(<MyProgramArea mode="activities" programId="program-a" />);
+  fireEvent.click(await screen.findByRole("link",{name:"Continuar encuesta"}));
+  const form=screen.getByRole("form",{name:"Completar encuesta de Encuesta de cierre"});
+  expect(form.closest("details")?.open).toBe(true);
+  expect(screen.queryByLabelText("Tu respuesta")).toBeNull();
+  expect(submitMyActivity).not.toHaveBeenCalled();
 });
 
 it("highlights the first actionable activity in program structure order instead of due-date order", async () => {
@@ -143,6 +170,8 @@ it("highlights the first actionable activity in program structure order instead 
   expect(within(notice).getByText("Primera pendiente")).toBeTruthy();
   expect(within(notice).queryByText("Pendiente posterior")).toBeNull();
   expect(within(notice).getByText(/Después de esta tienes 1 actividad pendiente/)).toBeTruthy();
+  const list=screen.getByRole("list",{name:"Actividades de tu programa"});
+  expect(Array.from(list.children).map(item=>item.id)).toEqual(["activity-activity-completed","activity-activity-first","activity-activity-later"]);
 });
 
 it("shows overdue as a visual activity label without replacing its workflow state", async () => {
