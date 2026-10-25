@@ -46,7 +46,7 @@ class ContentAdministrationController {
             @PathVariable UUID id, @Valid @RequestBody SurveyRequest input, HttpServletRequest request) {
         var rid = EnrollmentController.requestId(request);
         var result = service.editSurvey(jwt.getSubject(), organizationId, programId, id, input.version(), input.title(), input.instructions(),
-                input.questions().stream().map(q -> new ActivityEvaluations.QuestionInput(q.prompt(), q.type(), q.position())).toList(), rid);
+                input.questions().stream().map(q -> new ActivityEvaluations.QuestionInput(q.prompt(), q.type(), q.position(), q.options())).toList(), rid);
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("X-Request-ID", rid).body(result);
     }
     @PostMapping("/{kind}/{id}/archive")

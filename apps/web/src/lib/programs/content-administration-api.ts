@@ -21,7 +21,7 @@ async function request<T = void>(org: string, program: string, suffix: string, m
   });
   if (result.status !== expected) {
     const body = await result.json().catch(() => null);
-    const allowed = ["name", "description", "objective", "scheduledDate", "title", "instructions", "youtubeUrl", "dueDate", "questions"];
+    const allowed = ["name", "description", "objective", "scheduledDate", "title", "instructions", "youtubeUrl", "dueDate", "questions", "options"];
     const fields = body?.code === "VALIDATION_ERROR" && Array.isArray(body.errors)
       ? body.errors.map((e: { field?: unknown }) => e?.field).filter((f: unknown): f is string => typeof f === "string" && allowed.includes(f)) : [];
     const rid = typeof body?.requestId === "string" && /^[a-f0-9-]{36}$/i.test(body.requestId) ? body.requestId : undefined;
@@ -40,7 +40,7 @@ export const editActivity = (org: string, program: string, id: string,
   request(org, program, `activities/${encodeURIComponent(id)}`, "PUT", { title: input.title, instructions: input.instructions, youtubeUrl: input.youtubeUrl, version: input.version }, signal);
 export const editSurvey = (org: string, program: string, activity: string, input: EvaluationInput & { version: number }, signal?: AbortSignal) =>
   request<ActivityEvaluation>(org, program, `activities/${encodeURIComponent(activity)}/survey`, "PUT",
-    { title: input.title, instructions: input.instructions, questions: input.questions.map(q => ({ prompt: q.prompt, type: q.type, position: q.position })), version: input.version }, signal, 200);
+    { title: input.title, instructions: input.instructions, questions: input.questions.map(q => ({ prompt: q.prompt, type: q.type, position: q.position, ...(q.options ? { options: q.options } : {}) })), version: input.version }, signal, 200);
 export const archiveContent = (org: string, program: string, kind: ContentKind, id: string, version: number, archived: boolean) =>
   request(org, program, `${kind}/${encodeURIComponent(id)}/archive`, "POST", { version, archived });
 export const moveContent = (org: string, program: string, kind: ContentKind, id: string, version: number, direction: "UP" | "DOWN") =>

@@ -4,19 +4,14 @@ import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { editSurvey } from "@/lib/programs/content-administration-api";
 import { ProgramContentRequestError, programContentErrorMessage } from "@/lib/programs/program-content-api";
+import { QUESTION_TYPE_LABELS, MAX_QUESTION_OPTIONS, hasCustomOptions, parseQuestionOptions, questionOptionsError } from "@/lib/forms/question-catalog";
+import { SingleChoicePreview } from "@/components/forms/single-choice-options";
 import {
   AGREEMENT_OPTIONS, createActivityEvaluation, EMOTION_OPTIONS, evaluationErrorMessage,
   EvaluationRequestError, LIKELIHOOD_OPTIONS, NUMERIC_SCALE_OPTIONS, type ActivityEvaluation, type EvaluationQuestionType,
 } from "@/lib/participation/evaluation-api";
 
-type DraftQuestion = { key: number; prompt: string; type: EvaluationQuestionType };
-const TYPE_LABELS: Record<EvaluationQuestionType, string> = {
-  AGREEMENT_SCALE: "Escala · Nivel de acuerdo",
-  LIKELIHOOD_SCALE: "Escala · Probabilidad",
-  NUMERIC_SCALE: "Escala numérica · 1–5",
-  OPEN_TEXT: "Respuesta abierta",
-  EMOTION_MULTI_SELECT: "Emociones · Máximo 2",
-};
+type DraftQuestion = { key: number; prompt: string; type: EvaluationQuestionType; optionsText: string };
 
 export function ActivityEvaluationForm({ organizationId, programId, activityId, activityTitle, onSaved, initial }: {
   organizationId: string; programId: string; activityId: string; activityTitle: string;
@@ -27,8 +22,8 @@ export function ActivityEvaluationForm({ organizationId, programId, activityId, 
   const submitting = useRef(false);
   const [title, setTitle] = useState(initial?.title ?? `Encuesta posterior · ${activityTitle}`);
   const [instructions, setInstructions] = useState(initial ? initial.instructions ?? "" : "Responde estas preguntas desde tu experiencia con la actividad.");
-  const [questions, setQuestions] = useState<DraftQuestion[]>(initial ? [...initial.questions].sort((a, b) => a.position - b.position).map((q, key) => ({ key, prompt: q.prompt, type: q.type })) : [
-    { key: 0, prompt: "", type: "AGREEMENT_SCALE" },
+  const [questions, setQuestions] = useState<DraftQuestion[]>(initial ? [...initial.questions].sort((a, b) => a.position - b.position).map((q, key) => ({ key, prompt: q.prompt, type: q.type, optionsText: (q.options ?? []).join("\n") })) : [
+    { key: 0, prompt: "", type: "AGREEMENT_SCALE", optionsText: "" },
   ]);
   const [invalid, setInvalid] = useState<string[]>([]);
   const [pending, setPending] = useState(false);
@@ -41,17 +36,17 @@ export function ActivityEvaluationForm({ organizationId, programId, activityId, 
     if (questions.length >= 20) return;
     setOrderNotice("");
     const key = nextKey.current++;
-    setQuestions(current => [...current, { key, prompt: "", type: "OPEN_TEXT" }]);
+    setQuestions(current => [...current, { key, prompt: "", type: "OPEN_TEXT", optionsText: "" }]);
     window.setTimeout(() => document.getElementById(`evaluation-question-${key}-prompt`)?.focus(), 0);
   }
   function updateQuestion(key: number, patch: Partial<DraftQuestion>) {
     setQuestions(current => current.map(question => question.key === key ? { ...question, ...patch } : question));
-    setInvalid(current => current.filter(field => field !== `question-${key}` && field !== "questions"));
+    setInvalid(current => current.filter(field => field !== `question-${key}` && field !== `options-${key}` && field !== "questions"));
   }
   function removeQuestion(key: number) {
     setOrderNotice("");
     setQuestions(current => current.filter(question => question.key !== key));
-    setInvalid(current => current.filter(field => field !== `question-${key}`));
+    setInvalid(current => current.filter(field => field !== `question-${key}` && field !== `options-${key}`));
   }
   function moveQuestion(key: number, direction: "up" | "down") {
     if (pending || blocked || submitting.current) return;
@@ -86,12 +81,15 @@ export function ActivityEvaluationForm({ organizationId, programId, activityId, 
       ...(questions.length === 0 ? ["questions"] : []),
       ...questions.filter(question => !question.prompt.trim() || question.prompt.trim().length > 500)
         .map(question => `question-${question.key}`),
+      ...questions.filter(question => hasCustomOptions(question.type) && questionOptionsError(parseQuestionOptions(question.optionsText)))
+        .map(question => `options-${question.key}`),
     ];
     if (missing.length) {
       setInvalid(missing); setMessage("Revisa los campos resaltados antes de guardar la encuesta.");
       window.setTimeout(() => document.getElementById(missing[0] === "title" ? "evaluation-title"
         : missing[0] === "instructions" ? "evaluation-instructions"
-          : missing[0] === "questions" ? "evaluation-add-question" : `evaluation-${missing[0]}-prompt`)?.focus(), 0);
+          : missing[0] === "questions" ? "evaluation-add-question"
+            : missing[0].startsWith("options-") ? `evaluation-question-${missing[0].slice(8)}-options` : `evaluation-${missing[0]}-prompt`)?.focus(), 0);
       return;
     }
     submitting.current = true; setPending(true); setMessage(initial ? "Guardando encuesta…" : "Creando encuesta…");
@@ -101,6 +99,7 @@ export function ActivityEvaluationForm({ organizationId, programId, activityId, 
         title: cleanTitle, instructions: cleanInstructions || null,
         questions: questions.map((question, index) => ({
           prompt: question.prompt.trim(), type: question.type, position: index + 1,
+          ...(hasCustomOptions(question.type) ? { options: parseQuestionOptions(question.optionsText) } : {}),
         })),
       };
       const saved = initial ? await editSurvey(organizationId, programId, activityId, { ...input, version: initial.version }, controller.signal)
@@ -173,10 +172,21 @@ export function ActivityEvaluationForm({ organizationId, programId, activityId, 
             <div><label htmlFor={`evaluation-question-${question.key}-type`} className="block text-sm font-medium">Tipo de respuesta</label>
               <select id={`evaluation-question-${question.key}-type`} className="rti-field" value={question.type}
                 onChange={event => updateQuestion(question.key, { type: event.target.value as EvaluationQuestionType })}
-                disabled={pending || blocked}>{Object.entries(TYPE_LABELS).map(([value, label]) =>
+                disabled={pending || blocked}>{Object.entries(QUESTION_TYPE_LABELS).map(([value, label]) =>
                   <option key={value} value={value}>{label}</option>)}</select></div>
           </div>
-          <QuestionPreview type={question.type} />
+          {hasCustomOptions(question.type) && <div className="mt-4">
+            <label htmlFor={`evaluation-question-${question.key}-options`} className="block text-sm font-medium">Opciones de respuesta</label>
+            <p id={`evaluation-question-${question.key}-options-help`} className="mt-1 text-sm text-muted-foreground">Escribe o pega una opción por línea. De 2 a 100 opciones, hasta 200 caracteres por opción. Las líneas vacías se omiten.</p>
+            <textarea id={`evaluation-question-${question.key}-options`} className="rti-field mt-2 min-h-40 resize-y" value={question.optionsText} maxLength={25000}
+              aria-invalid={invalid.includes(`options-${question.key}`) || undefined}
+              aria-describedby={`evaluation-question-${question.key}-options-help${invalid.includes(`options-${question.key}`) ? ` evaluation-question-${question.key}-options-error` : ""}`}
+              placeholder={"Primera opción\nSegunda opción"} disabled={pending || blocked}
+              onChange={event => updateQuestion(question.key, { optionsText: event.target.value })} />
+            <p className="mt-1 text-xs text-muted-foreground">{parseQuestionOptions(question.optionsText).length} opciones · El colaborador elegirá solo una.</p>
+            {invalid.includes(`options-${question.key}`) && <p id={`evaluation-question-${question.key}-options-error`} className="mt-1 text-sm text-destructive">{questionOptionsError(parseQuestionOptions(question.optionsText))}</p>}
+          </div>}
+          <QuestionPreview type={question.type} options={parseQuestionOptions(question.optionsText)} />
         </li>;
       })}</ol>
       <button id="evaluation-add-question" type="button" className="rti-button-secondary w-full sm:w-auto"
@@ -188,7 +198,12 @@ export function ActivityEvaluationForm({ organizationId, programId, activityId, 
   </form>;
 }
 
-export function QuestionPreview({ type }: { type: EvaluationQuestionType }) {
+export function QuestionPreview({ type, options: customOptions = [] }: { type: EvaluationQuestionType; options?: string[] }) {
+  if (hasCustomOptions(type)) return <div className="mt-4 rounded-xl border border-dashed border-border bg-muted/35 p-3">
+    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vista para el colaborador · Selección única</p>
+    {customOptions.length ? <SingleChoicePreview options={customOptions.slice(0, MAX_QUESTION_OPTIONS)} words={type === "SINGLE_CHOICE_WORDS"} />
+      : <p className="mt-2 text-sm text-muted-foreground">Agrega las opciones para ver cómo se mostrarán.</p>}
+  </div>;
   if (type === "NUMERIC_SCALE") return <div className="mt-4 rounded-xl border border-dashed border-border bg-muted/35 p-3">
     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vista para el colaborador</p>
     <div className="mt-3 grid grid-cols-5 gap-2">{NUMERIC_SCALE_OPTIONS.map(value => <span key={value}

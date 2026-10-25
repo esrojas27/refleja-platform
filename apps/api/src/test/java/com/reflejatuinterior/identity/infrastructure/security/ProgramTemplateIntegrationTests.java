@@ -134,6 +134,26 @@ class ProgramTemplateIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 clonedProgram)).isZero();
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"SINGLE_CHOICE_LETTERS","SINGLE_CHOICE_WORDS"})
+    void programTemplatesKeepCustomOptionsAsAnIndependentOrderedSnapshot(String type) throws Exception {
+        var options=java.util.stream.IntStream.rangeClosed(1,30).mapToObj(i->"Palabra "+i).toList();
+        jdbcTemplate.update("update rti.activity_evaluation_questions set question_type=?,options=string_to_array(?,'|') where id=?",type,String.join("|",options),question);
+        var created=mvc.perform(post(templatePath()).header("Authorization",bearer).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"sourceProgramId\":\""+sourceProgram+"\",\"name\":\"Con opciones\"}"))
+                .andExpect(status().isCreated()).andReturn().getResponse();
+        var templateId=json.readTree(created.getContentAsString()).path("id").asText();
+        jdbcTemplate.update("update rti.activity_evaluation_questions set options=ARRAY['Original cambiado','Otra'] where id=?",question);
+        var clone=mvc.perform(post(templatePath(destinationOrganization)+"/"+templateId+"/programs").header("Authorization",bearer)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Copia\",\"startDate\":\"2027-02-01\",\"endDate\":\"2027-03-03\"}"))
+                .andExpect(status().isCreated()).andReturn().getResponse();
+        var clonedProgram=UUID.fromString(json.readTree(clone.getContentAsString()).path("id").asText());
+        tenantContext.activate(destinationOrganization);
+        assertThat(jdbcTemplate.queryForObject("select question_type from rti.activity_evaluation_questions where program_id=?",String.class,clonedProgram)).isEqualTo(type);
+        assertThat(jdbcTemplate.queryForObject("select array_to_string(options,'|') from rti.activity_evaluation_questions where program_id=?",String.class,clonedProgram))
+                .isEqualTo(String.join("|",options));
+    }
+
     @Test
     void requiresEveryLevelAndSurveyBeforeEnablingTemplateCreation() throws Exception {
         mvc.perform(get(programPath(emptyProgram) + "/template-readiness").header("Authorization", bearer))

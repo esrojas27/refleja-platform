@@ -21,7 +21,7 @@ class ActivitySurveyBlueprintAdapter implements ActivitySurveyBlueprints {
     public List<Survey> list(UUID organizationId, UUID programId) {
         return evaluations.list(organizationId, programId).stream().map(evaluation -> new Survey(
                 evaluation.activityId(), evaluation.title(), evaluation.instructions(), evaluation.questions().stream()
-                        .map(question -> new Question(question.prompt(), question.type().name(), question.position()))
+                        .map(question -> new Question(question.prompt(), question.type().name(), question.position(), question.options()))
                         .toList())).toList();
     }
 
@@ -29,7 +29,7 @@ class ActivitySurveyBlueprintAdapter implements ActivitySurveyBlueprints {
     public void create(UUID organizationId, UUID programId, UUID activityId, SurveyDraft survey) {
         evaluations.create(organizationId, programId, activityId, survey.title(), survey.instructions(),
                 survey.questions().stream().map(question -> new ActivityEvaluations.QuestionInput(
-                        question.prompt(), EvaluationQuestionType.valueOf(question.type()), question.position()))
+                        question.prompt(), EvaluationQuestionType.valueOf(question.type()), question.position(), question.options()))
                         .toList());
     }
 }

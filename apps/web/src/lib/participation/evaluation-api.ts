@@ -1,15 +1,17 @@
 import { fetchAuthSession } from "aws-amplify/auth";
 import { programActivitiesPath } from "@/lib/participation/activity-api";
 
-export type EvaluationQuestionType = "AGREEMENT_SCALE" | "LIKELIHOOD_SCALE" | "NUMERIC_SCALE" | "OPEN_TEXT" | "EMOTION_MULTI_SELECT";
-export type EvaluationQuestion = { id: string; prompt: string; type: EvaluationQuestionType; position: number; version: number };
+import type { EvaluationQuestionType, FormQuestion } from "@/lib/forms/question-catalog";
+export type { EvaluationQuestionType } from "@/lib/forms/question-catalog";
+export { AGREEMENT_OPTIONS, LIKELIHOOD_OPTIONS, NUMERIC_SCALE_OPTIONS, EMOTION_OPTIONS } from "@/lib/forms/question-catalog";
+export type EvaluationQuestion = FormQuestion & { version: number };
 export type ActivityEvaluation = {
   id: string; organizationId: string; programId: string; activityId: string; title: string;
   instructions: string | null; questions: EvaluationQuestion[]; version: number;
 };
 export type EvaluationInput = {
   title: string; instructions: string | null;
-  questions: Array<{ prompt: string; type: EvaluationQuestionType; position: number }>;
+  questions: Array<{ prompt: string; type: EvaluationQuestionType; position: number; options?: string[] }>;
 };
 
 export class EvaluationRequestError extends Error {
@@ -17,7 +19,6 @@ export class EvaluationRequestError extends Error {
     super("Evaluation request failed"); this.name = "EvaluationRequestError";
   }
 }
-
 export const programEvaluationsPath = (organizationId: string, programId: string) =>
   `${programActivitiesPath(organizationId, programId).replace(/\/activities$/, "")}/evaluations`;
 
@@ -37,7 +38,7 @@ async function request<T>(path: string, method: "GET" | "POST", expected: number
   });
   if (response.status !== expected) {
     const body = await response.json().catch(() => null);
-    const allowed = ["title", "instructions", "questions", "prompt", "type", "position"];
+    const allowed = ["title", "instructions", "questions", "prompt", "type", "position", "options"];
     const fields = body?.code === "VALIDATION_ERROR" && Array.isArray(body.errors)
       ? body.errors.map((error: { field?: unknown }) => error?.field)
         .filter((field: unknown): field is string => typeof field === "string" && allowed.includes(field)) : [];
@@ -66,10 +67,3 @@ export function evaluationErrorMessage(error: unknown) {
             : "No se pudo completar la operación. Inténtalo de nuevo.";
   return message + (error instanceof EvaluationRequestError && error.requestId ? ` Referencia: ${error.requestId}` : "");
 }
-
-export const AGREEMENT_OPTIONS = [
-  "Totalmente en desacuerdo", "En desacuerdo", "Ni de acuerdo ni en desacuerdo", "De acuerdo", "Totalmente de acuerdo",
-];
-export const LIKELIHOOD_OPTIONS = ["Muy improbable", "Improbable", "No estoy seguro(a)", "Probable", "Muy probable"];
-export const NUMERIC_SCALE_OPTIONS = ["1", "2", "3", "4", "5"];
-export const EMOTION_OPTIONS = ["Inspirado(a)", "Motivado(a)", "Reflexivo(a)", "Sorprendido(a)", "Retado(a)", "Confundido(a)", "Indiferente"];

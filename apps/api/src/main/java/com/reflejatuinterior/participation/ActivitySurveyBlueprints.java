@@ -13,7 +13,9 @@ public interface ActivitySurveyBlueprints {
         public Survey { questions = List.copyOf(questions); }
     }
 
-    record Question(String prompt, String type, int position) {}
+    record Question(String prompt, String type, int position, List<String> options) {
+        public Question { options = options == null ? List.of() : List.copyOf(options); }
+    }
 
     record SurveyDraft(String title, String instructions, List<Question> questions) {
         public SurveyDraft { questions = List.copyOf(questions); }

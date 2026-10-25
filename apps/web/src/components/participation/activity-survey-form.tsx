@@ -2,7 +2,7 @@
 
 import { CheckCircle2 } from "lucide-react";
 import { useRef, useState, type FormEvent } from "react";
-import { AGREEMENT_OPTIONS, EMOTION_OPTIONS, LIKELIHOOD_OPTIONS, NUMERIC_SCALE_OPTIONS } from "@/lib/participation/evaluation-api";
+import { SurveyQuestionInput } from "@/components/forms/survey-question-input";
 import { activityErrorMessage, submitMyActivitySurvey, type ActivitySurvey,
   type ActivitySurveySubmission } from "@/lib/participation/activity-api";
 
@@ -19,13 +19,6 @@ export function ActivitySurveyForm({ programId, activityId, survey, onCompleted 
   function setAnswer(questionId: string, values: string[]) {
     setAnswers(current => ({ ...current, [questionId]: values }));
     setInvalid(current => current.filter(id => id !== questionId));
-  }
-
-  function toggleEmotion(questionId: string, value: string) {
-    const selected = answers[questionId] ?? [];
-    setAnswer(questionId, selected.includes(value)
-      ? selected.filter(item => item !== value)
-      : selected.length < 2 ? [...selected, value] : selected);
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -66,46 +59,11 @@ export function ActivitySurveyForm({ programId, activityId, survey, onCompleted 
     <ol className="mt-5 space-y-5">{survey.questions.map((question, index) => {
       const selected = answers[question.id] ?? [];
       const fieldInvalid = invalid.includes(question.id);
-      const options = question.type === "AGREEMENT_SCALE" ? AGREEMENT_OPTIONS
-        : question.type === "LIKELIHOOD_SCALE" ? LIKELIHOOD_OPTIONS : question.type === "NUMERIC_SCALE" ? NUMERIC_SCALE_OPTIONS : [];
-      const numeric = question.type === "NUMERIC_SCALE";
       return <li key={question.id} className="rounded-xl border border-border/70 bg-card p-4">
-        <fieldset aria-invalid={fieldInvalid || undefined}>
+        <fieldset aria-invalid={fieldInvalid || undefined} aria-describedby={fieldInvalid ? `survey-error-${question.id}` : undefined}>
           <legend className="font-medium"><span className="mr-2 text-primary">{index + 1}.</span>{question.prompt}</legend>
-          {question.type === "OPEN_TEXT" ? <textarea id={`survey-question-${question.id}`}
-            aria-label={`Respuesta a ${question.prompt}`} className="rti-field mt-3 min-h-28 resize-y" maxLength={5000}
-            value={selected[0] ?? ""} onChange={event => setAnswer(question.id, [event.target.value])}
-            disabled={pending} /> : question.type === "EMOTION_MULTI_SELECT" ? <div id={`survey-question-${question.id}`}
-              tabIndex={-1} className="mt-3 flex flex-wrap gap-2">
-              {EMOTION_OPTIONS.map(option => <label key={option}
-                className={`cursor-pointer rounded-full border px-3 py-2 text-sm transition ${selected.includes(option)
-                  ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background"}`}>
-                <input type="checkbox" className="sr-only" checked={selected.includes(option)}
-                  disabled={pending || (!selected.includes(option) && selected.length >= 2)}
-                  onChange={() => toggleEmotion(question.id, option)} />{option}
-              </label>)}</div> : <div id={`survey-question-${question.id}`} tabIndex={-1} className="mt-3">
-                {!numeric && <ol className="hidden space-y-1.5 rounded-xl bg-muted/55 px-4 py-3 text-sm sm:block">
-                  {options.map((option, optionIndex) => <li key={option} className="flex gap-2">
-                    <span className="font-semibold text-primary">{optionIndex + 1}.</span>
-                    <span>{option}</span>
-                  </li>)}
-                </ol>}
-                <div className={`grid gap-2 sm:grid-cols-5 sm:gap-3 ${numeric ? "grid-cols-5" : "sm:mt-3"}`}>{options.map((option, optionIndex) => {
-                  const value = String(optionIndex + 1);
-                  const active = selected[0] === value;
-                  return <label key={option} className={`cursor-pointer rounded-xl border px-2 py-3 text-center text-xs transition focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 ${active
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-background hover:border-primary/60 hover:bg-accent/40"}`}>
-                    <input type="radio" className="sr-only" name={`survey-${question.id}`} value={value}
-                      checked={active} disabled={pending}
-                      onChange={() => setAnswer(question.id, [value])} />
-                    <span className="block text-lg font-semibold">{value}</span>
-                    {!numeric && <span className="sm:hidden">{option}</span>}
-                  </label>;
-                })}</div>
-              </div>}
-          {question.type === "EMOTION_MULTI_SELECT" && <p className="mt-2 text-xs text-muted-foreground">Selecciona una o máximo dos emociones.</p>}
-          {fieldInvalid && <p className="mt-2 text-sm text-destructive">Esta pregunta es obligatoria.</p>}
+          <SurveyQuestionInput question={question} selected={selected} disabled={pending} onChange={values => setAnswer(question.id, values)} />
+          {fieldInvalid && <p id={`survey-error-${question.id}`} className="mt-2 text-sm text-destructive">Esta pregunta es obligatoria.</p>}
         </fieldset>
       </li>;
     })}</ol>

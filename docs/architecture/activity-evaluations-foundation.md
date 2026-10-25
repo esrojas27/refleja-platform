@@ -13,6 +13,10 @@ Fecha: 2026-09-20
   - `NUMERIC_SCALE`: escala numérica genérica, solo 1, 2, 3, 4 y 5, sin etiquetas asociadas; selección única obligatoria.
   - `OPEN_TEXT`: respuesta abierta.
   - `EMOTION_MULTI_SELECT`: emociones estandarizadas con máximo dos selecciones.
+  - `SINGLE_CHOICE_LETTERS`: selección única con opciones editables en lista con letras.
+  - `SINGLE_CHOICE_WORDS`: selección única con palabras editables en etiquetas.
+    Definición, límites, pruebas y separación del futuro cierre de sesión:
+    [catálogo compartido de preguntas](shared-question-catalog.md).
 - Las definiciones quedan aisladas por organización mediante RLS.
 - Una actividad puede recibir su encuesta aun cuando todavía no tiene participantes asignados, para soportar la futura plantilla de programas.
 - La encuesta se habilita al colaborador únicamente después de enviar su entrega.

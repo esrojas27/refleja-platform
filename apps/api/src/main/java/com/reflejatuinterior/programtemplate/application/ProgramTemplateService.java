@@ -103,7 +103,7 @@ public class ProgramTemplateService {
                     surveys.create(organizationId, created.program().id(), activityId,
                             new ActivitySurveyBlueprints.SurveyDraft(survey.title(), survey.instructions(),
                                     survey.questions().stream().map(question -> new ActivitySurveyBlueprints.Question(
-                                            question.prompt(), question.type(), question.position())).toList()));
+                                            question.prompt(), question.type(), question.position(), question.options())).toList()));
                 }
             }
         }
@@ -143,7 +143,7 @@ public class ProgramTemplateService {
                                 0, activity.position(),
                                 new ProgramTemplateSnapshot.Survey(survey.title(), survey.instructions(),
                                         survey.questions().stream().map(question -> new ProgramTemplateSnapshot.Question(
-                                                question.prompt(), question.type(), question.position())).toList())));
+                                                question.prompt(), question.type(), question.position(), question.options())).toList())));
                     }
                 }
                 if (source.startDate() != null) {

@@ -44,7 +44,7 @@ class ActivityEvaluationController {
         var result = service.create(jwt.getSubject(), organizationId, programId, activityId,
                 input.title(), input.instructions(), input.questions().stream()
                         .map(question -> new ActivityEvaluations.QuestionInput(
-                                question.prompt(), question.type(), question.position())).toList(), id);
+                                question.prompt(), question.type(), question.position(), question.options())).toList(), id);
         var location = "/api/v1/organizations/" + organizationId + "/programs/" + programId
                 + "/activities/" + activityId + "/evaluation";
         return ResponseEntity.created(URI.create(location)).cacheControl(CacheControl.noStore())
@@ -70,7 +70,8 @@ class ActivityEvaluationController {
                                    @NotNull @Size(min = 1, max = 20) List<@Valid QuestionRequest> questions) {}
     record QuestionRequest(@NotBlank @Size(max = 500) String prompt,
                            @NotNull EvaluationQuestionType type,
-                           @Positive int position) {}
+                           @Positive int position,
+                           @Size(max = 100) List<@NotBlank @Size(max = 200) String> options) {}
     record SubmitSurveyRequest(@NotNull @Size(min = 1, max = 20) List<@Valid SurveyAnswerRequest> answers) {}
     record SurveyAnswerRequest(@NotNull UUID questionId,
                                @NotNull @Size(min = 1, max = 2) List<@NotBlank @Size(max = 5000) String> values) {}

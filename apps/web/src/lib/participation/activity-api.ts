@@ -1,12 +1,12 @@
 import { fetchAuthSession } from "aws-amplify/auth";
 import { programsPath } from "@/lib/programs/program-api";
-import type { EvaluationQuestionType } from "@/lib/participation/evaluation-api";
+import type { FormQuestion } from "@/lib/forms/question-catalog";
 
 export type ActivitySurveyStatus = "LOCKED" | "PENDING" | "COMPLETED";
 export type ActivitySurvey = {
   id: string; title: string; instructions: string | null; status: ActivitySurveyStatus;
   completedAt: string | null;
-  questions: Array<{ id: string; prompt: string; type: EvaluationQuestionType; position: number }>;
+  questions: FormQuestion[];
 };
 
 export type ActivityAssignee = {

@@ -668,6 +668,91 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
             assertThat(text.toString()).contains("NUMERIC_SCALE","Nivel genérico");
         }
     }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"SINGLE_CHOICE_LETTERS","SINGLE_CHOICE_WORDS"})
+    void customSingleChoicePersistsEditsCopiesValidatesAndReportsWithoutAverages(String type) throws Exception {
+        var activity=createAdminActivity(true,1);
+        int size=type.equals("SINGLE_CHOICE_WORDS")?30:6;
+        var options=java.util.stream.IntStream.rangeClosed(1,size).mapToObj(i->"Opción "+i).toList();
+        var definition=customChoiceDefinition(type,options);
+        var response=mvc.perform(post(evaluationPath(activity)).header("Authorization",token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(definition)).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.questions[0].options.length()").value(size)).andReturn().getResponse();
+        assertThat(json.readTree(response.getContentAsString()).path("questions").get(0).path("options").get(size-1).asText()).isEqualTo(options.getLast());
+        var edited=mvc.perform(put(adminPath("activities",activity)+"/survey").header("Authorization",token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(definition.replaceFirst("\\{","{\"version\":0,")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.version").value(1)).andReturn().getResponse();
+        var questionId=json.readTree(edited.getContentAsString()).path("questions").get(0).path("id").asText();
+        entityManager.clear(); // Read the persisted array, not just the freshly created entity.
+        mvc.perform(get(evaluationsPath()).header("Authorization",token(consultant))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].questions[0].options[0]").value(options.getFirst()));
+        mvc.perform(get(collaboratorPath()).header("Authorization",token(collaborator))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].survey.questions[0].options.length()").value(size));
+        var copyResult=mvc.perform(post(adminPath("activities",activity)+"/duplicate").header("Authorization",token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0}")).andExpect(status().isCreated()).andReturn().getResponse();
+        var copy=UUID.fromString(json.readTree(copyResult.getContentAsString()).path("id").asText());
+        assertThat(jdbcTemplate.queryForObject("select array_to_string(q.options,'|') from rti.activity_evaluation_questions q join rti.activity_evaluations e on e.id=q.evaluation_id where e.activity_id=?",String.class,copy))
+                .isEqualTo(String.join("|",options));
+        mvc.perform(post(collaboratorPath()+"/"+activity+"/submission").header("Authorization",token(collaborator))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"Actividad enviada\"}")).andExpect(status().isOk());
+        for(var values:java.util.List.of(java.util.List.of("No pertenece"),java.util.List.<String>of(),
+                java.util.List.of(options.getFirst(),options.getLast()),java.util.List.of(options.getFirst(),options.getFirst()),java.util.List.of("1"))) {
+            mvc.perform(post(surveyResponsePath(activity)).header("Authorization",token(collaborator)).contentType(MediaType.APPLICATION_JSON)
+                    .content(customChoiceAnswer(questionId,values))).andExpect(status().isBadRequest());
+        }
+        mvc.perform(post(surveyResponsePath(activity)).header("Authorization",token(collaborator)).contentType(MediaType.APPLICATION_JSON)
+                .content(customChoiceAnswer(uuid7(0xfd1).toString(),java.util.List.of(options.getLast())))).andExpect(status().isBadRequest());
+        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.activity_evaluation_responses where organization_id=?",Long.class,organization)).isZero();
+        mvc.perform(post(surveyResponsePath(activity)).header("Authorization",token(collaborator)).contentType(MediaType.APPLICATION_JSON)
+                .content(customChoiceAnswer(questionId,java.util.List.of(options.getLast())))).andExpect(status().isOk());
+        mvc.perform(put(adminPath("activities",activity)+"/survey").header("Authorization",token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(definition.replaceFirst("\\{","{\"version\":1,")))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CONTENT_HAS_SUBMISSIONS"));
+        mvc.perform(get(resultsPath()).param("activityId",activity.toString()).header("Authorization",token(consultant)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.summary.agreementAverage").isEmpty())
+                .andExpect(jsonPath("$.surveys[0].questions[0].average").isEmpty())
+                .andExpect(jsonPath("$.surveys[0].questions[0].distribution.length()").value(size))
+                .andExpect(jsonPath("$.surveys[0].questions[0].distribution[0].count").value(0))
+                .andExpect(jsonPath("$.surveys[0].questions[0].distribution["+(size-1)+"].count").value(1))
+                .andExpect(jsonPath("$.surveys[0].questions[0].distribution["+(size-1)+"].percentage").value(100.0));
+        var csv=mvc.perform(get(resultsPath()+"/export").param("activityId",activity.toString()).header("Authorization",token(consultant)))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(csv).contains(type,options.getLast());
+        var excel=mvc.perform(get(reportPath()+"/export").param("format","xlsx").header("Authorization",token(consultant)))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
+        try(var workbook=new org.apache.poi.xssf.usermodel.XSSFWorkbook(new java.io.ByteArrayInputStream(excel))) {
+            var text=new StringBuilder();for(var sheet:workbook)for(var row:sheet)for(var cell:row)text.append(cell.toString());
+            assertThat(text.toString()).contains(type,options.getLast());
+        }
+        tenantContext.activate(uuid7(0xfde));
+        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.activity_evaluation_questions where id=?",Long.class,UUID.fromString(questionId))).isZero();
+    }
+
+    @Test void customQuestionDefinitionsRejectInvalidOptionsBeforePersistingAnything() throws Exception {
+        var activity=createAdminActivity(true,1);
+        for(var options:java.util.List.of(java.util.List.<String>of(),java.util.List.of("Una"),java.util.List.of("Una"," una "),
+                java.util.List.of(" ","Dos"),java.util.List.of("x".repeat(201),"Dos"),
+                java.util.stream.IntStream.range(0,101).mapToObj(i->"Opción "+i).toList())) {
+            mvc.perform(post(evaluationPath(activity)).header("Authorization",token(consultant)).contentType(MediaType.APPLICATION_JSON)
+                    .content(customChoiceDefinition("SINGLE_CHOICE_WORDS",options))).andExpect(status().isBadRequest());
+        }
+        mvc.perform(post(evaluationPath(activity)).header("Authorization",token(consultant)).contentType(MediaType.APPLICATION_JSON)
+                .content(customChoiceDefinition("OPEN_TEXT",java.util.List.of("Una","Dos")))).andExpect(status().isBadRequest());
+        mvc.perform(post(evaluationPath(activity)).header("Authorization",token(collaborator)).contentType(MediaType.APPLICATION_JSON)
+                .content(customChoiceDefinition("SINGLE_CHOICE_WORDS",java.util.List.of("Una","Dos")))).andExpect(status().isForbidden());
+        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.activity_evaluations where activity_id=?",Long.class,activity)).isZero();
+        assertThat(jdbcTemplate.queryForObject("select rti.valid_question_options('SINGLE_CHOICE_WORDS',ARRAY['Una','una'])",Boolean.class)).isFalse();
+        assertThat(jdbcTemplate.queryForObject("select rti.valid_question_options('SINGLE_CHOICE_WORDS',ARRAY['Una',NULL])",Boolean.class)).isFalse();
+        assertThat(jdbcTemplate.queryForObject("select rti.valid_question_options('SINGLE_CHOICE_WORDS',ARRAY['Una','Dos'])",Boolean.class)).isTrue();
+    }
+    private String customChoiceDefinition(String type,java.util.List<String> options) {
+        return json.writeValueAsString(java.util.Map.of("title","Encuesta con opciones","questions",java.util.List.of(
+                java.util.Map.of("prompt","Elige una opción","type",type,"position",1,"options",options))));
+    }
+    private String customChoiceAnswer(String questionId,java.util.List<String> values) {
+        return json.writeValueAsString(java.util.Map.of("answers",java.util.List.of(java.util.Map.of("questionId",questionId,"values",values))));
+    }
+
     private String numericSurveyAnswers(tools.jackson.databind.JsonNode questions,java.util.List<String> values) {
         return json.writeValueAsString(java.util.Map.of("answers",java.util.List.of(
                 java.util.Map.of("questionId",questions.get(0).path("id").asText(),"values",values),

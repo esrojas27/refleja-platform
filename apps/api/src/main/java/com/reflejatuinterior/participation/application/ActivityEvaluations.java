@@ -13,8 +13,10 @@ public interface ActivityEvaluations {
     Evaluation replace(UUID org, UUID program, UUID activity, long version, String title, String instructions, List<QuestionInput> questions);
     void deleteUnassignedDefinitions(UUID org, UUID program, java.util.Collection<UUID> activityIds);
 
-    record QuestionInput(String prompt, EvaluationQuestionType type, int position) {}
-    record Question(UUID id, String prompt, EvaluationQuestionType type, int position, long version) {}
+    record QuestionInput(String prompt, EvaluationQuestionType type, int position, List<String> options) {}
+    record Question(UUID id, String prompt, EvaluationQuestionType type, int position, long version, List<String> options) {
+        public Question { options = List.copyOf(options); }
+    }
     record Evaluation(UUID id, UUID organizationId, UUID programId, UUID activityId, String title,
             String instructions, List<Question> questions, long version) {
         public Evaluation { questions = List.copyOf(questions); }

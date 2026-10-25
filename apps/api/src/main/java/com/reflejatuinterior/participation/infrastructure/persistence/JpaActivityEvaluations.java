@@ -5,6 +5,7 @@ import java.util.Optional;
 import java.util.UUID;
 import com.reflejatuinterior.participation.application.ActivityEvaluations;
 import com.reflejatuinterior.participation.domain.InvalidActivityEvaluation;
+import com.reflejatuinterior.participation.domain.QuestionOptions;
 import com.reflejatuinterior.program.ProgramActivities;
 import com.reflejatuinterior.program.ProgramContent;
 import com.reflejatuinterior.program.ProgramContentUsage;
@@ -59,7 +60,7 @@ class JpaActivityEvaluations implements ActivityEvaluations {
 
     private List<ActivityEvaluationQuestionJpaEntity> saveQuestions(UUID org, UUID program, UUID evaluation, List<QuestionInput> input) {
         return questions.saveAllAndFlush(input.stream().map(q -> new ActivityEvaluationQuestionJpaEntity(
-                org, program, evaluation, q.prompt().trim(), q.type(), q.position())).toList());
+                org, program, evaluation, q.prompt().trim(), q.type(), q.position(), q.options())).toList());
     }
 
     private static Texts validate(String title, String instructions, List<QuestionInput> inputQuestions) {
@@ -69,7 +70,7 @@ class JpaActivityEvaluations implements ActivityEvaluations {
         if (cleanInstructions != null && cleanInstructions.length() > 2000) {
             throw new InvalidActivityEvaluation("instructions");
         }
-        if (inputQuestions.isEmpty() || inputQuestions.size() > 20) {
+        if (inputQuestions == null || inputQuestions.isEmpty() || inputQuestions.size() > 20) {
             throw new InvalidActivityEvaluation("questions");
         }
         var positions = inputQuestions.stream().map(QuestionInput::position).collect(java.util.stream.Collectors.toSet());
@@ -82,6 +83,7 @@ class JpaActivityEvaluations implements ActivityEvaluations {
                     || question.prompt().trim().length() > 500 || question.type() == null) {
                 throw new InvalidActivityEvaluation("questions");
             }
+            QuestionOptions.clean(question.type(), question.options());
         }
         return new Texts(cleanTitle, cleanInstructions);
     }
@@ -109,6 +111,6 @@ class JpaActivityEvaluations implements ActivityEvaluations {
         return new Evaluation(evaluation.id(), evaluation.organizationId(), evaluation.programId(),
                 evaluation.activityId(), evaluation.title(), evaluation.instructions(), storedQuestions.stream()
                 .map(question -> new Question(question.id(), question.prompt(), question.type(),
-                        question.position(), question.version())).toList(), evaluation.version());
+                        question.position(), question.version(), question.options())).toList(), evaluation.version());
     }
 }

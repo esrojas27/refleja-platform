@@ -100,7 +100,7 @@ public class ContentAdministrationService {
         var created = activities.create(org, program, source.sessionId(), title, source.instructions(), source.youtubeUrl(), null, position);
         assignments.assignScheduledActivity(org, program, created.id());
         surveys.find(org, program, id).ifPresent(survey -> surveys.create(org, program, created.id(), survey.title(), survey.instructions(),
-                survey.questions().stream().map(q -> new ActivityEvaluations.QuestionInput(q.prompt(), q.type(), q.position())).toList()));
+                survey.questions().stream().map(q -> new ActivityEvaluations.QuestionInput(q.prompt(), q.type(), q.position(), q.options())).toList()));
         audit(actor, program, created.id(), "ACTIVITY_DUPLICATED", request); return created.id();
     }
 

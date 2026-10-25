@@ -254,7 +254,7 @@ public class ActivityService {
             ActivityAssignments.Data assignment, Instant completedAt) {
         return new SurveyResponse(evaluation.id(), evaluation.title(), evaluation.instructions(),
                 evaluation.questions().stream().map(question -> new SurveyQuestionResponse(
-                        question.id(), question.prompt(), question.type().name(), question.position())).toList(),
+                        question.id(), question.prompt(), question.type().name(), question.position(), question.options())).toList(),
                 surveyStatus(Optional.of(evaluation), assignment, completedAt), completedAt);
     }
 
@@ -310,5 +310,5 @@ public class ActivityService {
             List<SurveyQuestionResponse> questions, String status, Instant completedAt) {
         public SurveyResponse { questions = List.copyOf(questions); }
     }
-    public record SurveyQuestionResponse(UUID id, String prompt, String type, int position) {}
+    public record SurveyQuestionResponse(UUID id, String prompt, String type, int position, List<String> options) {}
 }

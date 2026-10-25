@@ -49,6 +49,15 @@ it("duplicates definitions without manual assignment targets and replaces survey
   expect(JSON.parse(fetcher.mock.calls[1][1].body).version).toBe(5);
 });
 
+it("includes ordered custom options when editing surveys", async () => {
+  const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "survey" }), { status: 200 }));
+  vi.stubGlobal("fetch", fetcher);
+  const options = ["Conectar", "Inspirar", "Escuchar", "Liderar", "Aprender", "Crear"];
+  await editSurvey("o", "p", "a", { title: "Encuesta", instructions: null, version: 0,
+    questions: [{ prompt: "Elige", type: "SINGLE_CHOICE_WORDS", position: 1, options }] });
+  expect(JSON.parse(fetcher.mock.calls[0][1].body).questions[0].options).toEqual(options);
+});
+
 it("preserves conflict codes without exposing arbitrary validation fields", async () => {
   const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: "CONTENT_HAS_SUBMISSIONS", message: "private detail" }), { status: 409 }));
   vi.stubGlobal("fetch", fetcher);

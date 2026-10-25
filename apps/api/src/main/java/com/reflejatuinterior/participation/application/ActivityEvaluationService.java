@@ -2,14 +2,13 @@ package com.reflejatuinterior.participation.application;
 
 import java.time.Instant;
 import java.util.Comparator;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import com.reflejatuinterior.identity.CollaboratorAccess;
 import com.reflejatuinterior.identity.OrganizationAccess;
 import com.reflejatuinterior.organization.OrganizationTenantContext;
-import com.reflejatuinterior.participation.domain.EvaluationQuestionType;
+import com.reflejatuinterior.participation.domain.QuestionAnswers;
 import com.reflejatuinterior.participation.domain.InvalidActivitySurveyResponse;
 import com.reflejatuinterior.program.ProgramActivities;
 import com.reflejatuinterior.program.ProgramDirectory;
@@ -126,27 +125,9 @@ public class ActivityEvaluationService {
 
     private static ActivityEvaluationResponses.AnswerInput clean(ActivityEvaluations.Question question,
             ActivityEvaluationResponses.AnswerInput answer) {
-        var values = answer.values() == null ? List.<String>of() : answer.values().stream()
-                .map(value -> value == null ? "" : value.trim()).toList();
-        var unique = new LinkedHashSet<>(values);
-        if (unique.size() != values.size() || values.stream().anyMatch(String::isEmpty)) {
-            throw new InvalidActivitySurveyResponse("answers");
-        }
-        if (question.type() == EvaluationQuestionType.OPEN_TEXT) {
-            if (values.size() != 1 || values.getFirst().length() > 5000) invalidAnswers();
-        } else if (question.type() == EvaluationQuestionType.EMOTION_MULTI_SELECT) {
-            if (values.isEmpty() || values.size() > 2 || !EMOTIONS.containsAll(values)) invalidAnswers();
-        } else if (values.size() != 1 || !SCALE_VALUES.contains(values.getFirst())) {
-            invalidAnswers();
-        }
-        return new ActivityEvaluationResponses.AnswerInput(question.id(), values);
+        return new ActivityEvaluationResponses.AnswerInput(question.id(),
+                QuestionAnswers.clean(question.type(), question.options(), answer.values()));
     }
-
-    private static void invalidAnswers() { throw new InvalidActivitySurveyResponse("answers"); }
-
-    private static final Set<String> SCALE_VALUES = Set.of("1", "2", "3", "4", "5");
-    private static final Set<String> EMOTIONS = Set.of("Inspirado(a)", "Motivado(a)", "Reflexivo(a)",
-            "Sorprendido(a)", "Retado(a)", "Confundido(a)", "Indiferente");
 
     private OrganizationAccess.Context authorize(String subject, UUID organizationId, UUID programId,
             String operation, String requestId) {

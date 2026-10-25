@@ -22,5 +22,7 @@ public record ProgramTemplateSnapshot(String sourceName, String sourceDescriptio
         public Survey { questions = List.copyOf(questions); }
     }
 
-    public record Question(String prompt, String type, int position) {}
+    public record Question(String prompt, String type, int position, List<String> options) {
+        public Question { options = options == null ? List.of() : List.copyOf(options); }
+    }
 }
