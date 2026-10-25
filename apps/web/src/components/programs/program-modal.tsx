@@ -12,9 +12,13 @@ export function ProgramModal({ children, onClose, titleId, closeLabel }: {
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     dialog.current?.focus();
+    return () => { document.body.style.overflow = previous; };
+  }, []);
+
+  useEffect(() => {
     function closeOnEscape(event: KeyboardEvent) { if (event.key === "Escape") onClose(); }
     document.addEventListener("keydown", closeOnEscape);
-    return () => { document.body.style.overflow = previous; document.removeEventListener("keydown", closeOnEscape); };
+    return () => { document.removeEventListener("keydown", closeOnEscape); };
   }, [onClose]);
 
   return <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/35 p-0 backdrop-blur-sm sm:items-center sm:p-6"

@@ -14,7 +14,7 @@ class ReflejaTuInteriorApplicationTests extends PostgreSqlIntegrationTestSupport
             List.of("202608240151", "202608240337", "20260909010000", "20260912010000", "20260913020000",
                     "20260914010000", "20260914030000", "20260914050000", "20260915010000", "20260920010000",
                     "20260920020000", "20260921010000", "20260921020000", "20260924010000",
-                    "20260924020000", "20261019010000", "20261019020000", "20261020010000", "20261022010000", "20261022020000", "20261023010000", "20261023020000", "20261025010000", "20261025020000");
+                    "20260924020000", "20261019010000", "20261019020000", "20261020010000", "20261022010000", "20261022020000", "20261023010000", "20261023020000", "20261025010000", "20261025020000", "20261025030000");
 
     private static final List<String> BUSINESS_TABLES = List.of(
             "activity_assignments",
@@ -36,6 +36,7 @@ class ReflejaTuInteriorApplicationTests extends PostgreSqlIntegrationTestSupport
             "program_sessions",
             "program_templates",
             "programs",
+            "questionnaire_templates",
             "session_closure_acknowledgements",
             "session_schedule_history",
             "session_schedule_notifications",
@@ -84,7 +85,7 @@ class ReflejaTuInteriorApplicationTests extends PostgreSqlIntegrationTestSupport
                         + "'activity_notifications', 'enrollment_changes', 'enrollments', 'membership_roles', "
                         + "'organization_memberships', 'organizations', 'program_activities', 'program_modules', "
                         + "'program_participant_disc_profile_revisions', 'program_participant_disc_profiles', 'program_sessions', "
-                        + "'program_templates', 'programs', 'session_schedule_history', 'session_schedule_notifications', 'session_schedules', 'user_invitations', 'users') "
+                        + "'program_templates', 'programs', 'questionnaire_templates', 'activity_form_response_revisions', 'session_closure_acknowledgements', 'session_schedule_history', 'session_schedule_notifications', 'session_schedules', 'user_invitations', 'users') "
                         + "and tableowner = 'rti_migrator'",
                 Integer.class);
 
@@ -92,11 +93,11 @@ class ReflejaTuInteriorApplicationTests extends PostgreSqlIntegrationTestSupport
         assertThat(runtimeRole).isEqualTo("rti_app");
         assertThat(successfulMigrations).containsExactlyElementsOf(MIGRATION_VERSIONS);
         assertThat(businessTables).containsExactlyElementsOf(BUSINESS_TABLES);
-        assertThat(uuidIdentifierCount).isEqualTo(22);
+        assertThat(uuidIdentifierCount).isEqualTo(23);
         assertThat(symbolicStatusCount).isEqualTo(10);
         assertThat(runtimeHasSchemaUsage).isTrue();
         assertThat(runtimeHasSchemaCreate).isFalse();
-        assertThat(migratorOwnedTableCount).isEqualTo(23);
+        assertThat(migratorOwnedTableCount).isEqualTo(26);
         assertThat(environment.getProperty("spring.flyway.default-schema")).isEqualTo("rti");
         assertThat(environment.getProperty("spring.jpa.hibernate.ddl-auto")).isEqualTo("validate");
         assertThat(environment.getProperty("spring.jpa.open-in-view", Boolean.class)).isFalse();

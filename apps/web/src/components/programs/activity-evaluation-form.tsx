@@ -6,6 +6,8 @@ import { editSurvey } from "@/lib/programs/content-administration-api";
 import { ProgramContentRequestError, programContentErrorMessage } from "@/lib/programs/program-content-api";
 import { QUESTION_TYPE_LABELS, MAX_QUESTION_OPTIONS, hasCustomOptions, parseQuestionOptions, questionOptionsError } from "@/lib/forms/question-catalog";
 import { SingleChoicePreview } from "@/components/forms/single-choice-options";
+import { QuestionnaireTemplatePicker } from "@/components/forms/questionnaire-template-picker";
+import type { EvaluationInput } from "@/lib/participation/evaluation-api";
 import {
   AGREEMENT_OPTIONS, createActivityEvaluation, EMOTION_OPTIONS, evaluationErrorMessage,
   EvaluationRequestError, LIKELIHOOD_OPTIONS, NUMERIC_SCALE_OPTIONS, saveSessionEvaluation, type ActivityEvaluation, type EvaluationQuestionType,
@@ -23,7 +25,7 @@ export function ActivityEvaluationForm({ organizationId, programId, activityId, 
   const formLabel=sessionId?"encuesta de cierre":"formulario";
   const actionLabel=`${initial?"Editar":"Crear"} ${formLabel}`;
   const [title, setTitle] = useState(initial?.title ?? `${sessionId?"Encuesta de cierre":"Formulario"} · ${activityTitle}`);
-  const [instructions, setInstructions] = useState(initial ? initial.instructions ?? "" : "Responde estas preguntas desde tu experiencia con la actividad.");
+  const [instructions, setInstructions] = useState(initial ? initial.instructions ?? "" : `Responde estas preguntas desde tu experiencia con la ${sessionId?"sesión":"actividad"}.`);
   const [questions, setQuestions] = useState<DraftQuestion[]>(initial ? [...initial.questions].sort((a, b) => a.position - b.position).map((q, key) => ({ key, prompt: q.prompt, type: q.type, optionsText: (q.options ?? []).join("\n") })) : [
     { key: 0, prompt: "", type: "AGREEMENT_SCALE", optionsText: "" },
   ]);
@@ -33,6 +35,13 @@ export function ActivityEvaluationForm({ organizationId, programId, activityId, 
   const [message, setMessage] = useState("");
   const [orderNotice, setOrderNotice] = useState("");
   useEffect(() => () => request.current?.abort(), []);
+
+  function loadTemplate(definition:EvaluationInput){
+    if(pending||blocked||submitting.current)return;
+    setTitle(definition.title);setInstructions(definition.instructions??"");
+    setQuestions([...definition.questions].sort((a,b)=>a.position-b.position).map(q=>({key:nextKey.current++,prompt:q.prompt,type:q.type,optionsText:(q.options??[]).join("\n")})));
+    setInvalid([]);setOrderNotice("");setMessage("Plantilla cargada. Revisa las preguntas y guarda el formulario para aplicar los cambios.");
+  }
 
   function addQuestion() {
     if (questions.length >= 20) return;
@@ -125,6 +134,7 @@ export function ActivityEvaluationForm({ organizationId, programId, activityId, 
     <div><p className="rti-kicker">{sessionId?"Cierre de sesión":"Entrega de la actividad"}</p>
       <h2 id="create-evaluation-title" className="mt-2 text-2xl font-semibold">{actionLabel}</h2>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">{sessionId?"Se habilita después de enviar todas las actividades y continuar desde el comentario de cierre.":"Estas preguntas constituyen la entrega de la actividad. No hay un envío de texto libre separado."}</p></div>
+    <QuestionnaireTemplatePicker organizationId={organizationId} disabled={pending||blocked} onSelect={loadTemplate}/>
     {message && <p role="status" className="rounded-xl bg-muted/60 px-3 py-2 text-sm">{message}</p>}
     <div><label htmlFor="evaluation-title" className="block text-sm font-medium">Nombre de la encuesta</label>
       <input id="evaluation-title" className="rti-field" maxLength={255} value={title}

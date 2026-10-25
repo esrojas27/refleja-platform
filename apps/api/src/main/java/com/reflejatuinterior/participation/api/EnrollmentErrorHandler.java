@@ -29,7 +29,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice(assignableTypes = {EnrollmentController.class, InvitationController.class, MyProgramController.class,
-        ActivityController.class, ActivityEvaluationController.class, SessionClosureController.class, DiscProfileController.class, ContentAdministrationController.class, SurveyResultsController.class, ProgramReportController.class, EnrollmentAdministrationController.class, NotificationController.class, SessionScheduleController.class})
+        ActivityController.class, ActivityEvaluationController.class, SessionClosureController.class, QuestionnaireTemplateController.class, DiscProfileController.class, ContentAdministrationController.class, SurveyResultsController.class, ProgramReportController.class, EnrollmentAdministrationController.class, NotificationController.class, SessionScheduleController.class})
 class EnrollmentErrorHandler {
     @ExceptionHandler(com.reflejatuinterior.participation.application.NotificationService.Missing.class)
     ResponseEntity<ErrorResponse> notificationMissing(HttpServletRequest request) { return error(request,404,"NOTIFICATION_NOT_FOUND",List.of()); }

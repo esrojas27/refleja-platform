@@ -19,6 +19,7 @@ import { ProgramModal } from "@/components/programs/program-modal";
 import { useProgramState } from "@/components/programs/program-state-context";
 import { editDimension, editSession } from "@/lib/programs/content-administration-api";
 import { ContentTools } from "./content-tools";
+import { SaveQuestionnaireTemplate } from "@/components/forms/save-questionnaire-template";
 
 type ContentDialog = { kind: "dimension"; initial?: ProgramDimension }
   | { kind: "session"; dimension: ProgramDimension; initial?: ProgramSession }
@@ -195,6 +196,7 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
                       {canEdit && <button type="button" className="rti-button-secondary mt-3" disabled={dimension.archived || session.archived || closingStarted}
                         onClick={()=>setDialog({kind:"session-evaluation",session,initial:closingSurvey})}>{closingSurvey?"Editar encuesta de cierre":"Crear encuesta de cierre"}</button>}
                       {closingStarted && <p className="mt-2 text-xs text-muted-foreground">El cierre ya comenzó; el comentario y la encuesta están protegidos.</p>}
+                      {closingSurvey&&<SaveQuestionnaireTemplate organizationId={organizationId} programId={programId} evaluation={closingSurvey}/>}
                       {sessionClosed && <p className="mt-2 text-sm font-semibold">Esta sesión ya tiene cierres completados. No admite nuevas actividades.</p>}
                     </div>
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
@@ -226,6 +228,7 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
                             className="text-xs text-muted-foreground">{question.position}. {question.prompt}</li>)}</ol>
                           {canEdit && <button type="button" className="rti-button-secondary mt-3" disabled={activity.archived || dimension.archived || session.archived || usage([activity]).hasSubmissions}
                             onClick={() => setDialog({ kind: "evaluation", activity, initial: evaluation })}>Editar formulario</button>}
+                          <SaveQuestionnaireTemplate organizationId={organizationId} programId={programId} evaluation={evaluation}/>
                         </div> : <button type="button" disabled={!canEdit || activity.archived || dimension.archived || session.archived || usage([activity]).hasSubmissions} className="rti-button-secondary mt-4 w-full"
                           onClick={() => setDialog({ kind: "evaluation", activity })}>
                           <BarChart3 aria-hidden="true" className="size-4" />Crear formulario
