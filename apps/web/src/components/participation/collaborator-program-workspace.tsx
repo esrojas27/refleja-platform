@@ -9,15 +9,18 @@ import { CollaboratorActivitiesContext } from "@/components/participation/collab
 import { activityErrorMessage, listMyProgramActivities, pendingAssignedActivities,
   type AssignedActivity } from "@/lib/participation/activity-api";
 import { getMyProgram, myProgramsPath, type MyProgram } from "@/lib/participation/participation-api";
+import { listMySessionClosures } from "@/lib/participation/session-closure-api";
 
 export function CollaboratorProgramWorkspace({ programId, children }: { programId: string; children: ReactNode }) {
   const pathname = usePathname();
   const summaryPath = myProgramsPath(programId);
-  const [result, setResult] = useState<{ programId: string; activities?: AssignedActivity[]; message: string; status?: MyProgram["status"]; enrollmentStatus?: MyProgram["enrollmentStatus"] }>();
+  const [result, setResult] = useState<{ programId: string; activities?: AssignedActivity[]; message: string; status?: MyProgram["status"]; enrollmentStatus?: MyProgram["enrollmentStatus"];closingPending?:number }>();
+  const [attempt,setAttempt]=useState(0);
+  useEffect(()=>{const reload=()=>setAttempt(a=>a+1);window.addEventListener("rti:session-work-changed",reload);return()=>window.removeEventListener("rti:session-work-changed",reload);},[]);
   const currentResult = result?.programId === programId ? result : undefined;
   const activities = currentResult?.activities;
   const message = currentResult?.message ?? "Cargando actividades asignadas…";
-  const pendingCount = activities && currentResult?.status === "ACTIVE" && currentResult.enrollmentStatus !== "COMPLETED" ? pendingAssignedActivities(activities).length : 0;
+  const pendingCount = activities && currentResult?.status === "ACTIVE" && currentResult.enrollmentStatus !== "COMPLETED" ? pendingAssignedActivities(activities).length+(currentResult.closingPending??0) : 0;
   const items = [
     { href: summaryPath, label: "Resumen", icon: BookOpenText },
     { href: `${summaryPath}/agenda`, label: "Mi agenda", icon: CalendarDays },
@@ -26,15 +29,15 @@ export function CollaboratorProgramWorkspace({ programId, children }: { programI
 
   useEffect(() => {
     const controller = new AbortController();
-    Promise.all([listMyProgramActivities(programId, controller.signal), getMyProgram(programId, controller.signal)]).then(([result, program]) => {
+    Promise.all([listMyProgramActivities(programId, controller.signal), getMyProgram(programId, controller.signal),listMySessionClosures(programId,controller.signal)]).then(([result, program,closures]) => {
       if (controller.signal.aborted) return;
-      setResult({ programId, activities: result.items, status: program.status, enrollmentStatus: program.enrollmentStatus,
+      setResult({ programId, activities: result.items, status: program.status, enrollmentStatus: program.enrollmentStatus,closingPending:closures.items.filter(s=>s.status==="COMMENT"||s.status==="PENDING").length,
         message: result.items.length ? "" : "Todavía no tienes actividades asignadas en este programa." });
     }).catch(error => {
       if (!controller.signal.aborted) setResult({ programId, message: activityErrorMessage(error) });
     });
     return () => controller.abort();
-  }, [programId]);
+  }, [programId,attempt]);
 
   const activityState = useMemo(() => ({ activities, message, updateActivity: (updated: AssignedActivity) => {
     setResult(current => current?.programId === programId ? { ...current,
@@ -58,7 +61,7 @@ export function CollaboratorProgramWorkspace({ programId, children }: { programI
             <Icon aria-hidden="true" className="size-4" />
             <span>{item.label}</span>
             {item.label === "Actividades" && pendingCount > 0 && <span
-              aria-label={`${pendingCount} ${pendingCount === 1 ? "actividad pendiente" : "actividades pendientes"}`}
+              aria-label={`${pendingCount} ${pendingCount === 1 ? "pendiente entre actividades y cierres" : "pendientes entre actividades y cierres"}`}
               className={`ml-auto inline-flex min-w-6 items-center justify-center rounded-full px-1.5 py-0.5 text-xs font-bold ${selected
                 ? "bg-white text-primary" : "bg-[var(--brand-pink)] text-[var(--brand-black)]"}`}>
               {pendingCount > 99 ? "99+" : pendingCount}

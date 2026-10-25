@@ -19,7 +19,8 @@ class ActivityEvaluationJpaEntity {
     @Column(name = "id", nullable = false, updatable = false) private UUID id;
     @Column(name = "organization_id", nullable = false, updatable = false) private UUID organizationId;
     @Column(name = "program_id", nullable = false, updatable = false) private UUID programId;
-    @Column(name = "activity_id", nullable = false, updatable = false) private UUID activityId;
+    @Column(name = "activity_id", updatable = false) private UUID activityId;
+    @Column(name = "session_id", updatable = false) private UUID sessionId;
     @Column(name = "title", nullable = false, length = 255) private String title;
     @Column(name = "instructions", columnDefinition = "text") private String instructions;
     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false) private Instant createdAt;
@@ -36,6 +37,8 @@ class ActivityEvaluationJpaEntity {
     UUID organizationId() { return organizationId; }
     UUID programId() { return programId; }
     UUID activityId() { return activityId; }
+    UUID sessionId() { return sessionId; }
+    void forSession(UUID value) { this.sessionId=value; }
     String title() { return title; }
     String instructions() { return instructions; }
     long version() { return version; }

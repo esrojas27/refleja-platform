@@ -8,6 +8,9 @@ public interface ActivitySurveyBlueprints {
     List<Survey> list(UUID organizationId, UUID programId);
 
     void create(UUID organizationId, UUID programId, UUID activityId, SurveyDraft survey);
+    List<SessionSurvey> listSessions(UUID org,UUID program);
+    void createForSession(UUID org,UUID program,UUID session,SurveyDraft survey);
+    record SessionSurvey(UUID sessionId,String title,String instructions,List<Question> questions){}
 
     record Survey(UUID activityId, String title, String instructions, List<Question> questions) {
         public Survey { questions = List.copyOf(questions); }

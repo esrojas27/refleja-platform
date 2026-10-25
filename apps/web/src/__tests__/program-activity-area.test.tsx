@@ -32,7 +32,8 @@ const activity: ProgramActivity = { id: "activity-a", organizationId: "org-a", p
   title: "Reflexión inicial", instructions: "Describe tu punto de partida.",
   youtubeUrl: "https://youtu.be/dQw4w9WgXcQ", dueDate: "2026-10-08",
   position: 1, version: 0, assignees: [{ assignmentId: "assignment-a", enrollmentId: "enrollment-a",
-    email: "ana@example.test", firstName: "Ana", lastName: "Prueba", status: "SUBMITTED", responseText: "Mi avance",
+    email: "ana@example.test", firstName: "Ana", lastName: "Prueba", status: "SUBMITTED", responseText: null,
+    answers: [{ questionId: "question-a", prompt: "Reflexión", type: "OPEN_TEXT", values: ["Mi avance"] }],
     submittedAt: "2026-10-07T12:00:00Z", reviewComment: null, reviewedAt: null,
     surveyStatus: "COMPLETED", completionPercentage: 100, version: 1 }] };
 
@@ -40,7 +41,7 @@ beforeEach(() => {
   vi.mocked(fetchCurrentIdentity).mockResolvedValue(identity);
   vi.mocked(listProgramDimensions).mockResolvedValue({ items: [{ id: "module-a", organizationId: "org-a", programId: "program-a",
     name: "Fundamentos", description: null, position: 1, version: 0, sessions: [{ id: "session-a", organizationId: "org-a",
-      programId: "program-a", dimensionId: "module-a", name: "Sesión inicial", objective: "Definir el punto de partida",
+      programId: "program-a", dimensionId: "module-a", name: "Sesión inicial", closingComment: "Definir el punto de partida",
       scheduledDate: "2026-10-01", position: 1, version: 0 }] }] });
   vi.mocked(listEnrollments).mockResolvedValue({ items: [enrollment], page: 0, size: 100, totalElements: 1, totalPages: 1 });
   vi.mocked(listProgramActivities).mockResolvedValue({ items: [activity] });
@@ -52,7 +53,7 @@ afterEach(() => { cleanup(); vi.resetAllMocks(); window.history.replaceState({},
 it("opens the notified delivery first and continues reviewing the remaining queue", async () => {
   const assignmentId = "01900000-0000-7000-8000-000000000001";
   window.history.replaceState({}, "", `/#review-${assignmentId}`);
-  const notified = { ...activity.assignees[0], assignmentId, responseText: "Entrega desde el aviso" };
+  const notified = { ...activity.assignees[0], assignmentId, answers: [{ questionId: "question-a", prompt: "Reflexión", type: "OPEN_TEXT" as const, values: ["Entrega desde el aviso"] }] };
   vi.mocked(listProgramActivities).mockResolvedValue({ items: [{ ...activity, assignees: [activity.assignees[0], notified] }] });
   vi.mocked(reviewActivityAssignment).mockResolvedValue({ ...notified, status: "COMPLETED" });
   render(<ProgramActivityArea organizationId="org-a" programId="program-a" />);

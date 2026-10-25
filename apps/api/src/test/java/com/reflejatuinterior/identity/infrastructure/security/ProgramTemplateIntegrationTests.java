@@ -80,6 +80,8 @@ class ProgramTemplateIntegrationTests extends PostgreSqlIntegrationTestSupport {
                      position, created_at, updated_at, version)
                 values (?, ?, ?, ?, '¿Qué tan de acuerdo estás?', 'AGREEMENT_SCALE', 1, now(), now(), 0)
                 """, question, organization, sourceProgram, evaluation);
+        jdbcTemplate.update("insert into rti.activity_evaluations(id,organization_id,program_id,session_id,title,created_at,updated_at,version) values(?,?,?,?,'Cierre de sesión',now(),now(),0)",uuid7(0x1750),organization,sourceProgram,session);
+        jdbcTemplate.update("insert into rti.activity_evaluation_questions(id,organization_id,program_id,evaluation_id,prompt,question_type,position,created_at,updated_at,version) values(?,?,?,?,'Reflexión final','OPEN_TEXT',1,now(),now(),0)",uuid7(0x1751),organization,sourceProgram,uuid7(0x1750));
         bearer = token();
     }
 
@@ -89,7 +91,7 @@ class ProgramTemplateIntegrationTests extends PostgreSqlIntegrationTestSupport {
         mvc.perform(get(programPath(sourceProgram) + "/template-readiness").header("Authorization", bearer))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.eligible").value(true))
                 .andExpect(jsonPath("$.dimensionCount").value(1)).andExpect(jsonPath("$.sessionCount").value(1))
-                .andExpect(jsonPath("$.activityCount").value(1)).andExpect(jsonPath("$.surveyCount").value(1));
+                .andExpect(jsonPath("$.activityCount").value(1)).andExpect(jsonPath("$.surveyCount").value(2));
 
         var templateResponse = mvc.perform(post(templatePath()).header("Authorization", bearer)
                         .contentType(MediaType.APPLICATION_JSON).content("""
@@ -122,8 +124,8 @@ class ProgramTemplateIntegrationTests extends PostgreSqlIntegrationTestSupport {
         assertThat(jdbcTemplate.queryForObject("select count(*) from rti.program_activities where program_id=?", Long.class,
                 clonedProgram)).isEqualTo(1);
         assertThat(jdbcTemplate.queryForObject("select count(*) from rti.activity_evaluations where program_id=?", Long.class,
-                clonedProgram)).isEqualTo(1);
-        assertThat(jdbcTemplate.queryForObject("select question_type from rti.activity_evaluation_questions where program_id=?",String.class,clonedProgram)).isEqualTo("NUMERIC_SCALE");
+                clonedProgram)).isEqualTo(2);
+        assertThat(jdbcTemplate.queryForObject("select question_type from rti.activity_evaluation_questions where program_id=? and evaluation_id in (select id from rti.activity_evaluations where activity_id is not null)",String.class,clonedProgram)).isEqualTo("NUMERIC_SCALE");
         assertThat(jdbcTemplate.queryForObject("select scheduled_date from rti.program_sessions where program_id=?",
                 java.time.LocalDate.class, clonedProgram)).isNull();
         assertThat(jdbcTemplate.queryForObject("select due_date from rti.program_activities where program_id=?",
@@ -149,8 +151,8 @@ class ProgramTemplateIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 .andExpect(status().isCreated()).andReturn().getResponse();
         var clonedProgram=UUID.fromString(json.readTree(clone.getContentAsString()).path("id").asText());
         tenantContext.activate(destinationOrganization);
-        assertThat(jdbcTemplate.queryForObject("select question_type from rti.activity_evaluation_questions where program_id=?",String.class,clonedProgram)).isEqualTo(type);
-        assertThat(jdbcTemplate.queryForObject("select array_to_string(options,'|') from rti.activity_evaluation_questions where program_id=?",String.class,clonedProgram))
+        assertThat(jdbcTemplate.queryForObject("select question_type from rti.activity_evaluation_questions where program_id=? and evaluation_id in (select id from rti.activity_evaluations where activity_id is not null)",String.class,clonedProgram)).isEqualTo(type);
+        assertThat(jdbcTemplate.queryForObject("select array_to_string(options,'|') from rti.activity_evaluation_questions where program_id=? and evaluation_id in (select id from rti.activity_evaluations where activity_id is not null)",String.class,clonedProgram))
                 .isEqualTo(String.join("|",options));
     }
 
@@ -193,14 +195,14 @@ class ProgramTemplateIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0,\"archived\":true}")).andExpect(status().isNoContent());
         mvc.perform(get(programPath(sourceProgram) + "/template-readiness").header("Authorization", bearer))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.eligible").value(false))
-                .andExpect(jsonPath("$.activityCount").value(0)).andExpect(jsonPath("$.surveyCount").value(0));
+                .andExpect(jsonPath("$.activityCount").value(0)).andExpect(jsonPath("$.surveyCount").value(1));
         var created = mvc.perform(post(templatePath() + "/" + template + "/programs").header("Authorization", bearer)
                 .contentType(MediaType.APPLICATION_JSON).content("""
                 {"name":"Desde snapshot","description":"Conservado","startDate":"2027-02-01","endDate":"2027-03-03"}
                 """)).andExpect(status().isCreated()).andReturn().getResponse();
         var cloned = UUID.fromString(json.readTree(created.getContentAsString()).path("id").asText());
         assertThat(jdbcTemplate.queryForObject("select count(*) from rti.program_activities where program_id=? and archived=false", Long.class, cloned)).isEqualTo(1);
-        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.activity_evaluations where program_id=?", Long.class, cloned)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("select count(*) from rti.activity_evaluations where program_id=?", Long.class, cloned)).isEqualTo(2);
     }
 
     private String token() {

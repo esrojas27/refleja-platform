@@ -17,10 +17,11 @@ import org.springframework.transaction.annotation.Transactional;
 class JpaActivityEvaluationResponses implements ActivityEvaluationResponses {
     private final ActivityEvaluationResponseJpaRepository responses;
     private final ActivityEvaluationAnswerJpaRepository answers;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     JpaActivityEvaluationResponses(ActivityEvaluationResponseJpaRepository responses,
-            ActivityEvaluationAnswerJpaRepository answers) {
-        this.responses = responses; this.answers = answers;
+            ActivityEvaluationAnswerJpaRepository answers, org.springframework.jdbc.core.JdbcTemplate jdbc) {
+        this.responses = responses; this.answers = answers; this.jdbc=jdbc;
     }
 
     @Override
@@ -28,12 +29,36 @@ class JpaActivityEvaluationResponses implements ActivityEvaluationResponses {
             UUID assignmentId, UUID enrollmentId, List<AnswerInput> input) {
         var saved = responses.saveAndFlush(new ActivityEvaluationResponseJpaEntity(organizationId, programId,
                 activityId, evaluationId, assignmentId, enrollmentId));
+        return saveAnswers(organizationId,programId,saved,input);
+    }
+    private Response saveAnswers(UUID organizationId,UUID programId,ActivityEvaluationResponseJpaEntity saved,List<AnswerInput> input) {
         var storedAnswers = input.stream().flatMap(answer -> java.util.stream.IntStream
                 .range(0, answer.values().size()).mapToObj(index -> new ActivityEvaluationAnswerJpaEntity(
                         organizationId, programId, saved.id(), answer.questionId(), answer.values().get(index), index + 1)))
                 .toList();
         answers.saveAllAndFlush(storedAnswers);
         return data(saved, storedAnswers);
+    }
+    @Override public Response replace(UUID org,UUID program,UUID assignment,List<AnswerInput> input) {
+        var stored=responses.findByOrganizationIdAndProgramIdAndAssignmentId(org,program,assignment).orElseThrow();
+        jdbc.update("""
+            INSERT INTO rti.activity_form_response_revisions(organization_id,program_id,response_id,response_version,completed_at,answers)
+            SELECT r.organization_id,r.program_id,r.id,r.version,r.completed_at,
+              coalesce((SELECT jsonb_agg(jsonb_build_object('questionId',a.question_id,'value',a.answer_value,'position',a.position) ORDER BY a.question_id,a.position)
+              FROM rti.activity_evaluation_answers a WHERE a.organization_id=r.organization_id AND a.response_id=r.id),'[]'::jsonb)
+            FROM rti.activity_evaluation_responses r WHERE r.organization_id=? AND r.program_id=? AND r.id=?
+            """,org,program,stored.id());
+        answers.deleteAll(answers.findByResponseIdInOrderByResponseIdAscQuestionIdAscPositionAsc(List.of(stored.id())));answers.flush();
+        stored.resubmit();responses.saveAndFlush(stored);
+        return saveAnswers(org,program,stored,input);
+    }
+    @Override public Response createForSession(UUID org,UUID program,UUID session,UUID evaluation,UUID enrollment,List<AnswerInput> input) {
+        var entity=new ActivityEvaluationResponseJpaEntity(org,program,null,evaluation,null,enrollment);entity.forSession(session);
+        return saveAnswers(org,program,responses.saveAndFlush(entity),input);
+    }
+    @Override public Optional<Response> findForSession(UUID org,UUID program,UUID session,UUID enrollment) {
+        return responses.findByOrganizationIdAndProgramIdAndSessionIdAndEnrollmentId(org,program,session,enrollment)
+            .map(r->data(r,answers.findByResponseIdInOrderByResponseIdAscQuestionIdAscPositionAsc(List.of(r.id()))));
     }
 
     @Override

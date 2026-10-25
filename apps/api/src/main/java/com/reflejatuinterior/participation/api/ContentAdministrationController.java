@@ -31,7 +31,7 @@ class ContentAdministrationController {
     ResponseEntity<Void> session(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID organizationId, @PathVariable UUID programId,
             @PathVariable UUID id, @Valid @RequestBody SessionRequest input, HttpServletRequest request) {
         var rid = EnrollmentController.requestId(request);
-        service.editSession(jwt.getSubject(), organizationId, programId, id, input.version(), input.name(), input.objective(), null, rid);
+        service.editSession(jwt.getSubject(), organizationId, programId, id, input.version(), input.name(), input.closingComment(), null, rid);
         return done(rid);
     }
     @PutMapping("/activities/{id}")
@@ -76,7 +76,7 @@ class ContentAdministrationController {
     }
     private ResponseEntity<Void> done(String rid) { return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).header("X-Request-ID", rid).build(); }
     record DimensionRequest(@NotBlank @Size(max=255) String name, @Size(max=10000) String description, @NotNull @PositiveOrZero Long version) {}
-    record SessionRequest(@NotBlank @Size(max=255) String name, @Size(max=10000) String objective, @NotNull @PositiveOrZero Long version) {}
+    record SessionRequest(@NotBlank @Size(max=255) String name, @Size(max=10000) String closingComment, @NotNull @PositiveOrZero Long version) {}
     record ActivityRequest(@NotBlank @Size(max=255) String title, @NotBlank @Size(max=10000) String instructions,
             @Size(max=2048) String youtubeUrl, @NotNull @PositiveOrZero Long version) {}
     record SurveyRequest(@NotBlank @Size(max=255) String title, @Size(max=2000) String instructions,

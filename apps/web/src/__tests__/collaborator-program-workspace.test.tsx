@@ -4,9 +4,12 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { CollaboratorProgramWorkspace } from "@/components/participation/collaborator-program-workspace";
 import { listMyProgramActivities, type AssignedActivity } from "@/lib/participation/activity-api";
 import { getMyProgram } from "@/lib/participation/participation-api";
+import { listMySessionClosures } from "@/lib/participation/session-closure-api";
 vi.mock("@/lib/participation/participation-api", async original => ({
   ...await original<typeof import("@/lib/participation/participation-api")>(), getMyProgram: vi.fn(),
 }));
+
+vi.mock("@/lib/participation/session-closure-api", () => ({ listMySessionClosures: vi.fn().mockResolvedValue({ items: [] }) }));
 
 const { usePathname, listActivities } = vi.hoisted(() => ({ usePathname: vi.fn(), listActivities: vi.fn() }));
 vi.mock("next/navigation", () => ({ usePathname }));
@@ -16,10 +19,18 @@ vi.mock("@/lib/participation/activity-api", async original => ({
 }));
 
 beforeEach(() => {
+  vi.mocked(listMySessionClosures).mockResolvedValue({ items: [] });
   vi.mocked(listMyProgramActivities).mockResolvedValue({ items: [] });
   vi.mocked(getMyProgram).mockResolvedValue({ id: "program-a", status: "ACTIVE" } as Awaited<ReturnType<typeof getMyProgram>>);
 });
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
+
+it("keeps a pending session closure in the navigation after all activities were submitted",async()=>{
+  vi.mocked(listMySessionClosures).mockResolvedValue({items:[{sessionId:"session",sessionName:"Interior",dimensionName:"Interior",status:"PENDING",
+    closingComment:null,activityCount:1,submittedCount:1,completionPercentage:80,survey:null,answers:[]}]});
+  render(<CollaboratorProgramWorkspace programId="program-a"><p>Resumen</p></CollaboratorProgramWorkspace>);
+  expect(await screen.findByLabelText("1 pendiente entre actividades y cierres")).toBeTruthy();
+});
 
 it("offers a compact collaborator workspace and marks the summary as active", () => {
   usePathname.mockReturnValue("/my-programs/program-a");
@@ -53,10 +64,10 @@ it.each(["ACTIVE", "COMPLETED"] as const)("only counts actionable activities for
 
   render(<CollaboratorProgramWorkspace programId="program-a"><p>Trabajo real</p></CollaboratorProgramWorkspace>);
 
-  if (enrollmentStatus === "ACTIVE") expect(await screen.findByLabelText("1 actividad pendiente")).toBeTruthy();
+  if (enrollmentStatus === "ACTIVE") expect(await screen.findByLabelText("1 pendiente entre actividades y cierres")).toBeTruthy();
   else {
     await waitFor(() => expect(getMyProgram).toHaveBeenCalled());
-    expect(screen.queryByLabelText("1 actividad pendiente")).toBeNull();
+    expect(screen.queryByLabelText("1 pendiente entre actividades y cierres")).toBeNull();
   }
   expect(listMyProgramActivities).toHaveBeenCalledWith("program-a", expect.any(AbortSignal));
 });

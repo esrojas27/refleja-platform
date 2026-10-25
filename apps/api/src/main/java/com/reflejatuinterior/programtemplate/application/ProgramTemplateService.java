@@ -77,6 +77,8 @@ public class ProgramTemplateService {
         var context = authorize(subject, organizationId);
         var template = templates.find(templateId).orElseThrow(ProgramTemplateNotFound::new);
         var snapshot = template.snapshot();
+        if(snapshot.dimensions().stream().flatMap(d->d.sessions().stream()).anyMatch(s->s.closingSurvey()==null))
+            throw new ProgramTemplateIncomplete(List.of("SESSION_WITHOUT_CLOSING_SURVEY"));
         List<ProgramBlueprints.DimensionDraft> dimensions;
         try {
             dimensions = snapshot.dimensions().stream().map(dimension -> new ProgramBlueprints.DimensionDraft(
@@ -94,8 +96,14 @@ public class ProgramTemplateService {
         }
         var created = programs.create(organizationId,
                 new ProgramBlueprints.ProgramDraft(name, description, startDate, endDate), dimensions);
+        var materialized=programs.find(organizationId,created.program().id()).orElseThrow(ProgramTemplateNotFound::new);
         for (var dimension : snapshot.dimensions()) {
             for (var session : dimension.sessions()) {
+                var createdSession=materialized.dimensions().stream().filter(d->d.position()==dimension.position()).findFirst().orElseThrow()
+                    .sessions().stream().filter(s->s.position()==session.position()).findFirst().orElseThrow();
+                var closing=session.closingSurvey();
+                surveys.createForSession(organizationId,created.program().id(),createdSession.id(),new ActivitySurveyBlueprints.SurveyDraft(closing.title(),closing.instructions(),
+                    closing.questions().stream().map(q->new ActivitySurveyBlueprints.Question(q.prompt(),q.type(),q.position(),q.options())).toList()));
                 for (var activity : session.activities()) {
                     var activityId = created.activityIds().get(activity.reference());
                     if (activityId == null) throw new IllegalStateException("Missing materialized activity");
@@ -116,6 +124,7 @@ public class ProgramTemplateService {
         if (source.startDate() == null || source.endDate() == null) issues.add("PROGRAM_WITHOUT_DATES");
         if (source.dimensions().isEmpty()) issues.add("MISSING_DIMENSIONS");
         var storedSurveys = surveys.list(source.organizationId(), source.id());
+        var closingBySession=surveys.listSessions(source.organizationId(),source.id()).stream().collect(Collectors.toMap(ActivitySurveyBlueprints.SessionSurvey::sessionId,Function.identity()));
         Map<UUID, ActivitySurveyBlueprints.Survey> surveyByActivity = storedSurveys.stream()
                 .collect(Collectors.toMap(ActivitySurveyBlueprints.Survey::activityId, Function.identity()));
         var dimensions = new ArrayList<ProgramTemplateSnapshot.Dimension>();
@@ -127,6 +136,9 @@ public class ProgramTemplateService {
             var sessions = new ArrayList<ProgramTemplateSnapshot.Session>();
             for (var session : dimension.sessions()) {
                 sessionCount++;
+                var closing=closingBySession.get(session.id());
+                if(closing==null)issues.add("SESSION_WITHOUT_CLOSING_SURVEY");else surveyCount++;
+                if(session.objective()==null||session.objective().isBlank())issues.add("SESSION_WITHOUT_CLOSING_COMMENT");
                 if (session.activities().isEmpty()) issues.add("SESSION_WITHOUT_ACTIVITIES");
                 var activities = new ArrayList<ProgramTemplateSnapshot.Activity>();
                 for (var activity : session.activities()) {
@@ -149,7 +161,8 @@ public class ProgramTemplateService {
                 if (source.startDate() != null) {
                     sessions.add(new ProgramTemplateSnapshot.Session(session.name(), session.description(),
                             session.objective(), 0,
-                            session.position(), activities));
+                            session.position(), activities,closing==null?null:new ProgramTemplateSnapshot.Survey(closing.title(),closing.instructions(),
+                                closing.questions().stream().map(q->new ProgramTemplateSnapshot.Question(q.prompt(),q.type(),q.position(),q.options())).toList())));
                 }
             }
             dimensions.add(new ProgramTemplateSnapshot.Dimension(dimension.name(), dimension.description(),
@@ -202,7 +215,7 @@ public class ProgramTemplateService {
                 .mapToInt(session -> session.activities().size()).sum();
         return new ProgramTemplateData(stored.id(), stored.sourceOrganizationId(), stored.sourceProgramId(),
                 stored.name(), stored.description(), snapshot.sourceName(), snapshot.durationDays(),
-                snapshot.dimensions().size(), sessions, activities, activities, stored.createdAt(), stored.version());
+                snapshot.dimensions().size(), sessions, activities, activities + sessions, stored.createdAt(), stored.version());
     }
 
     private static void audit(String action, UUID actor, UUID organizationId, UUID resourceId, String requestId) {

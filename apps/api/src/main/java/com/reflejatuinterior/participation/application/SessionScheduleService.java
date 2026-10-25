@@ -28,14 +28,16 @@ public class SessionScheduleService {
     private final SessionSchedules schedules;
     private final ActivityAssignments assignments;
     private final Clock clock;
+    private final SessionForms sessionForms;
     SessionScheduleService(OrganizationAccess access,OrganizationTenantContext tenant,OrganizationDirectory organizations,
             ProgramDirectory programs,ProgramContent content,ProgramParticipantVisibility visibility,CollaboratorAccess collaborators,
-            CollaboratorInvitations people,Enrollments enrollments,SessionSchedules schedules,ActivityAssignments assignments,Clock clock) {
+            CollaboratorInvitations people,Enrollments enrollments,SessionSchedules schedules,ActivityAssignments assignments,Clock clock,SessionForms sessionForms) {
         this.access=access;this.tenant=tenant;this.organizations=organizations;this.programs=programs;this.content=content;
         this.visibility=visibility;this.collaborators=collaborators;this.people=people;this.enrollments=enrollments;this.schedules=schedules;this.assignments=assignments;this.clock=clock;
+        this.sessionForms=sessionForms;
     }
     public record Target(UUID enrollmentId,Long version) {}
-    public record SessionView(SessionSchedules.Session session,List<SessionSchedules.Person> participants) {}
+    public record SessionView(SessionSchedules.Session session,List<SessionSchedules.Person> participants,String missingRequirement) {}
     public record Agenda(boolean canEdit,LocalDate today,LocalDate startDate,LocalDate endDate,List<SessionView> items) {}
     public record History(List<SessionSchedules.Revision> items,int page,int size,long totalElements,int totalPages) {}
 
@@ -43,13 +45,15 @@ public class SessionScheduleService {
         var actor=authorize(subject,org,program,false);
         var info=programs.find(org,program).orElseThrow(ProgramActivities.Missing::new);
         return new Agenda(actor.roles().contains("CONSULTANT")&&!Set.of("COMPLETED","CANCELLED").contains(info.status()),today(org),info.startDate(),info.endDate(),
-                schedules.sessions(org,program).stream().map(s->new SessionView(s,schedules.participants(org,program,s.id()))).toList());
+                schedules.sessions(org,program).stream().map(s->new SessionView(s,schedules.participants(org,program,s.id()),sessionForms.missing(org,program,s.id()))).toList());
     }
     @Transactional
     public Agenda schedule(String subject,UUID org,UUID program,UUID session,LocalDate date,List<Target> selected,String reason,String request) {
         var actor=authorize(subject,org,program,true);
         var info=programs.lock(org,program).orElseThrow(ProgramActivities.Missing::new);info.requireEditable();
         content.describe(org,program,ProgramContent.Kind.SESSION,session).requireVisible();
+        var missing=sessionForms.missing(org,program,session);
+        if(!missing.isEmpty())throw new ProgramContent.Conflict(missing);
         if(date==null||date.isBefore(today(org))||info.startDate()==null||date.isBefore(info.startDate())||date.isAfter(LocalDate.of(9999,12,28)))
             throw new ProgramActivities.InvalidInput("scheduledDate");
         if(selected==null||selected.isEmpty()||selected.size()>500||selected.stream().anyMatch(t->t==null||t.enrollmentId()==null)

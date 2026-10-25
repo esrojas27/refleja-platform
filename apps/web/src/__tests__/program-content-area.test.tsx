@@ -4,7 +4,7 @@ import { DimensionForm, ProgramContentArea, SessionForm } from "@/components/pro
 import { fetchCurrentIdentity } from "@/lib/auth/authenticated-api";
 import { listEnrollments } from "@/lib/participation/participation-api";
 import { createProgramActivity, listProgramActivities, type ProgramActivity } from "@/lib/participation/activity-api";
-import { createActivityEvaluation, listActivityEvaluations } from "@/lib/participation/evaluation-api";
+import { createActivityEvaluation, listActivityEvaluations, listSessionEvaluations, saveSessionEvaluation } from "@/lib/participation/evaluation-api";
 import { createProgramDimension, createProgramSession, listProgramDimensions, type ProgramDimension } from "@/lib/programs/program-content-api";
 import { archiveContent, deleteContent, duplicateActivity, editActivity, editDimension, editSession, editSurvey, moveContent } from "@/lib/programs/content-administration-api";
 import { ActivityForm } from "@/components/programs/program-activity-area";
@@ -33,14 +33,14 @@ vi.mock("@/lib/participation/activity-api", async original => ({
 }));
 vi.mock("@/lib/participation/evaluation-api", async original => ({
   ...await original<typeof import("@/lib/participation/evaluation-api")>(),
-  createActivityEvaluation: vi.fn(), listActivityEvaluations: vi.fn(),
+  createActivityEvaluation: vi.fn(), listActivityEvaluations: vi.fn(), listSessionEvaluations: vi.fn(), saveSessionEvaluation: vi.fn(),
 }));
 
 const identity = { cognitoSubject: "subject", user: { id: "user", email: "consultant@example.test", firstName: null, lastName: null },
   organizations: [{ id: "org-a", name: "Empresa A", roles: ["CONSULTANT"], profileStatus: "COMPLETE" as const }], activeOrganizationId: "org-a", roles: ["CONSULTANT"] };
 const dimensionData: ProgramDimension = { id: "module-a", organizationId: "org-a", programId: "program-a", name: "Fundamentos",
   description: "Contexto del proceso", position: 2, version: 0, sessions: [{ id: "session-a", organizationId: "org-a",
-    programId: "program-a", dimensionId: "module-a", name: "Sesión inicial", objective: "Definir el punto de partida",
+    programId: "program-a", dimensionId: "module-a", name: "Sesión inicial", closingComment: "Definir el punto de partida",
     scheduledDate: "2026-10-01", position: 3, version: 0 }] };
 const activity: ProgramActivity = { id: "activity-a", organizationId: "org-a", programId: "program-a",
   moduleId: "module-a", sessionId: "session-a", dimensionName: "Fundamentos", dimensionPosition: 1,
@@ -55,6 +55,7 @@ beforeEach(() => {
   vi.mocked(createProgramSession).mockResolvedValue({ ...dimensionData.sessions[0], id: "new-session", position: 4 });
   vi.mocked(listProgramActivities).mockResolvedValue({ items: [activity] });
   vi.mocked(listActivityEvaluations).mockResolvedValue({ items: [] });
+  vi.mocked(listSessionEvaluations).mockResolvedValue({ items: [], closedSessionIds: [], startedSessionIds: [] });
   vi.mocked(listEnrollments).mockResolvedValue({ items: [], page: 0, size: 100, totalElements: 0, totalPages: 0 });
   vi.mocked(createProgramActivity).mockResolvedValue({ ...activity, id: "new-activity", position: 2 });
   vi.mocked(createActivityEvaluation).mockResolvedValue({ id: "evaluation-a", organizationId: "org-a",
@@ -62,6 +63,32 @@ beforeEach(() => {
     questions: [{ id: "question-a", prompt: "¿Qué tan de acuerdo estás?", type: "AGREEMENT_SCALE", position: 1, version: 0 }] });
 });
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
+
+it("creates the session closing survey with the same question editor as activities", async () => {
+  vi.mocked(saveSessionEvaluation).mockResolvedValue({ id:"closing",organizationId:"org-a",programId:"program-a",activityId:null,
+    sessionId:"session-a",title:"Encuesta de cierre",instructions:null,version:0,
+    questions:[{id:"q",prompt:"¿Qué te llevas?",type:"OPEN_TEXT",position:1,version:0}] });
+  render(<ProgramContentArea organizationId="org-a" programId="program-a" />);
+  fireEvent.click(await screen.findByRole("button",{name:/Fundamentos/,expanded:false}));
+  fireEvent.click(screen.getByRole("button",{name:/Sesión inicial/,expanded:false}));
+  fireEvent.click(screen.getByRole("button",{name:"Crear encuesta de cierre"}));
+  const form=screen.getByRole("form",{name:"Crear encuesta de cierre"});
+  fireEvent.change(within(form).getByLabelText("Enunciado"),{target:{value:"¿Qué te llevas?"}});
+  fireEvent.change(within(form).getByLabelText("Tipo de respuesta"),{target:{value:"OPEN_TEXT"}});
+  fireEvent.submit(form);
+  await waitFor(()=>expect(saveSessionEvaluation).toHaveBeenCalledWith("org-a","program-a","session-a",expect.objectContaining({
+    questions:[{prompt:"¿Qué te llevas?",type:"OPEN_TEXT",position:1}]
+  }),expect.any(AbortSignal)));
+});
+
+it("disables new and duplicated activities once a participant has closed the session",async()=>{
+  vi.mocked(listSessionEvaluations).mockResolvedValue({items:[],closedSessionIds:["session-a"],startedSessionIds:["session-a"]});
+  render(<ProgramContentArea organizationId="org-a" programId="program-a" />);
+  fireEvent.click(await screen.findByRole("button",{name:/Fundamentos/,expanded:false}));
+  fireEvent.click(screen.getByRole("button",{name:/Sesión inicial/,expanded:false}));
+  expect(screen.getByRole<HTMLButtonElement>("button",{name:"Crear actividad"}).disabled).toBe(true);
+  expect(screen.getByRole<HTMLButtonElement>("button",{name:"Duplicar"}).disabled).toBe(true);
+});
 
 it("renders the ordered real dimension and session structure", async () => {
   render(<ProgramContentArea organizationId="org-a" programId="program-a" />);
@@ -105,20 +132,20 @@ it("appends sessions inside their module using the next visible position", async
   const form = await screen.findByRole("form", { name: "Crear sesión" });
   expect(screen.getByRole("dialog", { name: "Agregar sesión" })).toBeTruthy();
   fireEvent.change(within(form).getByLabelText("Nombre"), { target: { value: "Segunda sesión" } });
-  fireEvent.change(within(form).getByLabelText("Objetivo opcional"), { target: { value: "Practicar lo aprendido" } });
+  fireEvent.change(within(form).getByLabelText("Comentario de cierre"), { target: { value: "Practicar lo aprendido" } });
   expect(within(form).queryByLabelText("Fecha")).toBeNull();
   fireEvent.submit(form);
   await waitFor(() => expect(createProgramSession).toHaveBeenCalledWith("org-a", "program-a", "module-a",
-    { name: "Segunda sesión", objective: "Practicar lo aprendido", position: 4 }, expect.any(AbortSignal)));
+    { name: "Segunda sesión", closingComment: "Practicar lo aprendido", position: 4 }, expect.any(AbortSignal)));
 });
 
 it("creates a visual survey with the original four question types", async () => {
   render(<ProgramContentArea organizationId="org-a" programId="program-a" />);
   fireEvent.click(await screen.findByRole("button", { name: /Fundamentos/, expanded: false }));
   fireEvent.click(screen.getByRole("button", { name: /Sesión inicial/, expanded: false }));
-  fireEvent.click(await screen.findByRole("button", { name: "Crear encuesta" }));
-  const form = await screen.findByRole("form", { name: "Crear encuesta" });
-  expect(screen.getByRole("dialog", { name: "Crear encuesta" })).toBeTruthy();
+  fireEvent.click(await screen.findByRole("button", { name: "Crear formulario" }));
+  const form = await screen.findByRole("form", { name: "Crear formulario" });
+  expect(screen.getByRole("dialog", { name: "Crear formulario" })).toBeTruthy();
 
   fireEvent.change(within(form).getByLabelText("Enunciado"), { target: { value: "¿Qué tan de acuerdo estás?" } });
   const add = within(form).getByRole("button", { name: "Agregar pregunta" });
@@ -186,14 +213,14 @@ it("edits a dimension from a prefilled modal using the original version", async 
   expect(createProgramDimension).not.toHaveBeenCalled();
 });
 
-it("edits a session objective without recreating it", async () => {
+it("edits a session closingComment without recreating it", async () => {
   vi.mocked(editSession).mockResolvedValue();
   render(<SessionForm organizationId="org-a" programId="program-a" dimensionId="module-a" position={3}
     initial={dimensionData.sessions[0]} onSaved={vi.fn()} />);
-  fireEvent.change(screen.getByLabelText("Objetivo opcional"), { target: { value: "Objetivo revisado" } });
+  fireEvent.change(screen.getByLabelText("Comentario de cierre"), { target: { value: "Objetivo revisado" } });
   fireEvent.submit(screen.getByRole("form", { name: "Editar sesión" }));
   await waitFor(() => expect(editSession).toHaveBeenCalledWith("org-a", "program-a", "session-a",
-    expect.objectContaining({ objective: "Objetivo revisado", version: 0 }), expect.any(AbortSignal)));
+    expect.objectContaining({ closingComment: "Objetivo revisado", version: 0 }), expect.any(AbortSignal)));
   expect(createProgramSession).not.toHaveBeenCalled();
 });
 
@@ -220,7 +247,7 @@ it("loads survey questions for correction and sends survey version", async () =>
     activityTitle={activity.title} initial={survey} onSaved={vi.fn()} />);
   expect((screen.getByLabelText("Enunciado") as HTMLTextAreaElement).value).toBe("Pregunta original");
   fireEvent.change(screen.getByLabelText("Enunciado"), { target: { value: "Pregunta corregida" } });
-  fireEvent.submit(screen.getByRole("form", { name: "Editar encuesta" }));
+  fireEvent.submit(screen.getByRole("form", { name: "Editar formulario" }));
   await waitFor(() => expect(editSurvey).toHaveBeenCalledWith("org-a", "program-a", "activity-a",
     expect.objectContaining({ version: 3, questions: [{ prompt: "Pregunta corregida", type: "OPEN_TEXT", position: 1 }] }), expect.any(AbortSignal)));
 });

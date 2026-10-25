@@ -84,7 +84,7 @@ public final class ProgramReportExport {
         info.add(row("Inicio", r.startDate())); info.add(row("Fin", r.endDate()));
         info.add(row("Generado UTC", r.generatedAt())); info.add(row("Fecha de corte", r.asOfDate())); info.add(row("Zona horaria", r.timeZone()));
         info.add(row("Alcance", r.enrollmentId() == null ? "Programa completo" : "Individual: " + r.enrollmentId()));
-        info.add(row("Avance", "Promedio del trabajo enviado: entrega 50% y encuesta 50% cuando existe. Sin encuesta, envío 100%. No equivale a aprobación."));
+        info.add(row("Avance", "Promedio por sesión y participante: formularios de actividades 80% y encuesta de cierre 20%. No equivale a aprobación."));
         info.add(row("Aprobación", "Asignaciones aprobadas por el consultor / todas las asignaciones vigentes."));
         info.add(row("Participación", "Personas con al menos una entrega / todas las inscripciones del alcance, incluidas invitadas, suspendidas y retiradas."));
         info.add(row("Cumplimiento de fecha", "Asignaciones cuyo plazo ya terminó, con última entrega y encuesta (si aplica) enviadas dentro de la fecha límite / asignaciones cuyo plazo ya terminó. No mide la primera entrega ni la fecha de aprobación."));

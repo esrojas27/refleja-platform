@@ -51,9 +51,9 @@ class ActivityEvaluationController {
                 .header("X-Request-ID", id).body(result);
     }
 
-    @PostMapping(path = "/api/v1/me/programs/{programId}/activities/{activityId}/survey-response",
+    @PostMapping(path = "/api/v1/me/programs/{programId}/activities/{activityId}/submission",
             consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    @Operation(summary = "Complete the authenticated collaborator's survey after submitting the activity")
+    @Operation(summary = "Submit all answers as the activity deliverable in one transaction")
     @ApiResponse(responseCode = "200", description = "Survey completed")
     ResponseEntity<ActivityEvaluationService.SurveySubmission> submitSurvey(@AuthenticationPrincipal Jwt jwt,
             @PathVariable UUID programId, @PathVariable UUID activityId,
@@ -61,7 +61,7 @@ class ActivityEvaluationController {
         var id = EnrollmentController.requestId(request);
         var result = service.submit(jwt.getSubject(), programId, activityId, input.answers().stream()
                 .map(answer -> new com.reflejatuinterior.participation.application.ActivityEvaluationResponses.AnswerInput(
-                        answer.questionId(), answer.values())).toList(), id);
+                        answer.questionId(), answer.values())).toList(), input.version(), id);
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("X-Request-ID", id).body(result);
     }
 
@@ -72,7 +72,8 @@ class ActivityEvaluationController {
                            @NotNull EvaluationQuestionType type,
                            @Positive int position,
                            @Size(max = 100) List<@NotBlank @Size(max = 200) String> options) {}
-    record SubmitSurveyRequest(@NotNull @Size(min = 1, max = 20) List<@Valid SurveyAnswerRequest> answers) {}
+    record SubmitSurveyRequest(@NotNull @Size(min = 1, max = 20) List<@NotNull @Valid SurveyAnswerRequest> answers,
+                               @NotNull @PositiveOrZero Long version) {}
     record SurveyAnswerRequest(@NotNull UUID questionId,
                                @NotNull @Size(min = 1, max = 2) List<@NotBlank @Size(max = 5000) String> values) {}
     record EvaluationListResponse(List<ActivityEvaluations.Evaluation> items) {}

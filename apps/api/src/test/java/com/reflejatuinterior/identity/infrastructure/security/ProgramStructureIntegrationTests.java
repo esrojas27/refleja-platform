@@ -53,7 +53,7 @@ class ProgramStructureIntegrationTests extends PostgreSqlIntegrationTestSupport 
         var sessionResponse = mvc.perform(post(path(organization, program) + "/" + moduleId + "/sessions")
                 .header("Authorization", bearer).contentType(MediaType.APPLICATION_JSON).content(sessionBody(1)))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.moduleId").value(moduleId.toString()))
-                .andExpect(jsonPath("$.objective").value("Definir el punto de partida"))
+                .andExpect(jsonPath("$.closingComment").value("Definir el punto de partida"))
                 .andExpect(jsonPath("$.description").doesNotExist())
                 .andExpect(jsonPath("$.scheduledDate").isEmpty()).andExpect(jsonPath("$.position").value(1))
                 .andReturn().getResponse();
@@ -65,7 +65,7 @@ class ProgramStructureIntegrationTests extends PostgreSqlIntegrationTestSupport 
                 .andExpect(jsonPath("$.items[0].id").value(moduleId.toString()))
                 .andExpect(jsonPath("$.items[0].sessions.length()").value(1))
                 .andExpect(jsonPath("$.items[0].sessions[0].id").value(sessionId.toString()))
-                .andExpect(jsonPath("$.items[0].sessions[0].objective").value("Definir el punto de partida"));
+                .andExpect(jsonPath("$.items[0].sessions[0].closingComment").value("Definir el punto de partida"));
         tenantContext.activate(organization);
         assertThat(jdbcTemplate.queryForObject("select count(*) from rti.program_modules where organization_id=?", Long.class, organization)).isEqualTo(1);
         assertThat(jdbcTemplate.queryForObject("select count(*) from rti.program_sessions where organization_id=?", Long.class, organization)).isEqualTo(1);
@@ -120,7 +120,7 @@ class ProgramStructureIntegrationTests extends PostgreSqlIntegrationTestSupport 
         return "{\"name\":\" Fundamentos \",\"description\":\"Contexto\",\"position\":" + position + "}";
     }
     private String sessionBody(int position) {
-        return "{\"name\":\" Sesión inicial \",\"objective\":\" Definir el punto de partida \","
+        return "{\"name\":\" Sesión inicial \",\"closingComment\":\" Definir el punto de partida \","
                 + "\"scheduledDate\":\"2026-10-01\",\"position\":" + position + "}";
     }
     private String token(String subject) {

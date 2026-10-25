@@ -43,7 +43,7 @@ it.each(["SINGLE_CHOICE_LETTERS", "SINGLE_CHOICE_WORDS"] as const)("creates %s w
   fireEvent.change(screen.getByLabelText("Opciones de respuesta"), { target: { value: words.join("\n") } });
   expect(screen.getByText("Palabra 30")).toBeTruthy();
   if (type === "SINGLE_CHOICE_LETTERS") expect(screen.getByText("ad.")).toBeTruthy();
-  fireEvent.submit(screen.getByRole("form", { name: "Crear encuesta" }));
+  fireEvent.submit(screen.getByRole("form", { name: "Crear formulario" }));
   await waitFor(() => expect(createActivityEvaluation).toHaveBeenCalledWith("org", "program", "activity", expect.objectContaining({
     questions: [{ prompt: question.prompt, type, position: 1, options: words }],
   }), expect.any(AbortSignal)));
@@ -53,12 +53,12 @@ it("highlights missing and duplicate choices and focuses the options editor", as
   render(<ActivityEvaluationForm {...props} />);
   fireEvent.change(screen.getByLabelText("Enunciado"), { target: { value: "Elige" } });
   fireEvent.change(screen.getByLabelText("Tipo de respuesta"), { target: { value: "SINGLE_CHOICE_LETTERS" } });
-  fireEvent.submit(screen.getByRole("form", { name: "Crear encuesta" }));
+  fireEvent.submit(screen.getByRole("form", { name: "Crear formulario" }));
   const options = screen.getByLabelText("Opciones de respuesta");
   expect(options.getAttribute("aria-invalid")).toBe("true");
   await waitFor(() => expect(document.activeElement).toBe(options));
   fireEvent.change(options, { target: { value: "Una\nuna" } });
-  fireEvent.submit(screen.getByRole("form", { name: "Crear encuesta" }));
+  fireEvent.submit(screen.getByRole("form", { name: "Crear formulario" }));
   expect(screen.getByText(/Hay opciones repetidas/)).toBeTruthy();
   expect(createActivityEvaluation).not.toHaveBeenCalled();
 });
@@ -70,7 +70,7 @@ it("loads, edits and reorders a custom question without losing its choices", asy
   fireEvent.click(screen.getByRole("button", { name: "Agregar pregunta" }));
   fireEvent.change(screen.getAllByLabelText("Enunciado")[1], { target: { value: "Abierta" } });
   fireEvent.click(screen.getByRole("button", { name: "Bajar pregunta 1" }));
-  fireEvent.submit(screen.getByRole("form", { name: "Editar encuesta" }));
+  fireEvent.submit(screen.getByRole("form", { name: "Editar formulario" }));
   await waitFor(() => expect(editSurvey).toHaveBeenCalledWith("org", "program", "activity", expect.objectContaining({
     version: 2, questions: [{ prompt: "Abierta", type: "OPEN_TEXT", position: 1 },
       { prompt: question.prompt, type: "SINGLE_CHOICE_WORDS", position: 2, options: ["Primera", "Segunda"] }],
@@ -81,15 +81,15 @@ it("does not send custom choices after changing the question to a fixed type", a
   render(<ActivityEvaluationForm {...props} initial={definition} />);
   fireEvent.change(screen.getByLabelText("Tipo de respuesta"), { target: { value: "NUMERIC_SCALE" } });
   expect(screen.queryByLabelText("Opciones de respuesta")).toBeNull();
-  fireEvent.submit(screen.getByRole("form", { name: "Editar encuesta" }));
+  fireEvent.submit(screen.getByRole("form", { name: "Editar formulario" }));
   await waitFor(() => expect(editSurvey).toHaveBeenCalledWith("org", "program", "activity", expect.objectContaining({
     questions: [{ prompt: question.prompt, type: "NUMERIC_SCALE", position: 1 }],
   }), expect.any(AbortSignal)));
 });
 
 it.each(["SINGLE_CHOICE_LETTERS", "SINGLE_CHOICE_WORDS"] as const)("%s requires exactly one selected option and sends its label", async type => {
-  render(<ActivitySurveyForm programId="program" activityId="activity" survey={{ ...survey, questions: [{ ...question, type }] }} onCompleted={vi.fn()} />);
-  fireEvent.click(screen.getByRole("button", { name: "Enviar encuesta" }));
+  render(<ActivitySurveyForm version={0} programId="program" activityId="activity" survey={{ ...survey, questions: [{ ...question, type }] }} onCompleted={vi.fn()} />);
+  fireEvent.click(screen.getByRole("button", { name: "Enviar actividad" }));
   expect(screen.getByText("Esta pregunta es obligatoria.")).toBeTruthy();
   expect(submitMyActivitySurvey).not.toHaveBeenCalled();
   expect(screen.getAllByRole("radio")).toHaveLength(30);
@@ -97,15 +97,15 @@ it.each(["SINGLE_CHOICE_LETTERS", "SINGLE_CHOICE_WORDS"] as const)("%s requires 
   fireEvent.click(screen.getByRole("radio", { name: "Palabra 1" }));
   fireEvent.click(screen.getByRole("radio", { name: "Palabra 30" }));
   expect(screen.getAllByRole<HTMLInputElement>("radio").filter(r => r.checked).map(r => r.value)).toEqual(["Palabra 30"]);
-  fireEvent.click(screen.getByRole("button", { name: "Enviar encuesta" }));
-  await waitFor(() => expect(submitMyActivitySurvey).toHaveBeenCalledWith("program", "activity", [{ questionId: question.id, values: ["Palabra 30"] }]));
+  fireEvent.click(screen.getByRole("button", { name: "Enviar actividad" }));
+  await waitFor(() => expect(submitMyActivitySurvey).toHaveBeenCalledWith("program", "activity", [{ questionId: question.id, values: ["Palabra 30"] }], 0));
 });
 
 it("disables custom radio choices while the submission is pending", async () => {
   vi.mocked(submitMyActivitySurvey).mockReturnValue(new Promise(() => {}));
-  render(<ActivitySurveyForm programId="program" activityId="activity" survey={survey} onCompleted={vi.fn()} />);
+  render(<ActivitySurveyForm version={0} programId="program" activityId="activity" survey={survey} onCompleted={vi.fn()} />);
   fireEvent.click(screen.getByRole("radio", { name: "Palabra 1" }));
-  fireEvent.click(screen.getByRole("button", { name: "Enviar encuesta" }));
+  fireEvent.click(screen.getByRole("button", { name: "Enviar actividad" }));
   await waitFor(() => expect(submitMyActivitySurvey).toHaveBeenCalledOnce());
   expect(screen.getAllByRole<HTMLInputElement>("radio").every(r => r.disabled)).toBe(true);
 });

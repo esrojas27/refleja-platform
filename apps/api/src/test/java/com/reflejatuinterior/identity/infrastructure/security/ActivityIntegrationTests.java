@@ -138,13 +138,13 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
 
         mvc.perform(post(collaboratorPath() + "/" + activityId + "/submission")
                 .header("Authorization", token(firstCollaborator)).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"responseText\":\"  Mi reflexión final.  \"}"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.assignmentStatus").value("SUBMITTED"))
-                .andExpect(jsonPath("$.responseText").value("Mi reflexión final."));
+                .content(deliverableBody(activityId,firstCollaborator,"Mi reflexión final.")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.status").value("COMPLETED"));
 
         mvc.perform(post(collaboratorPath() + "/" + activityId + "/submission")
                 .header("Authorization", token(firstCollaborator)).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"responseText\":\"Duplicada\"}"))
+                .content(deliverableBody(activityId,firstCollaborator,"Duplicada")))
                 .andExpect(status().isConflict());
 
         mvc.perform(post(reviewPath(activityId, assignmentId)).header("Authorization", token(consultant))
@@ -155,8 +155,8 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
 
         mvc.perform(post(collaboratorPath() + "/" + activityId + "/submission")
                 .header("Authorization", token(firstCollaborator)).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"responseText\":\"Reflexión con ejemplo.\"}"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.assignmentStatus").value("SUBMITTED"))
+                .content(deliverableBody(activityId,firstCollaborator,"Reflexión con ejemplo.")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("COMPLETED"))
                 .andExpect(jsonPath("$.reviewComment").doesNotExist());
 
         mvc.perform(post(reviewPath(activityId, assignmentId)).header("Authorization", token(consultant))
@@ -166,7 +166,7 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
 
         mvc.perform(get(collaboratorPath()).header("Authorization", token(firstCollaborator)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].assignmentStatus").value("COMPLETED"))
-                .andExpect(jsonPath("$.items[0].responseText").value("Reflexión con ejemplo."));
+                .andExpect(jsonPath("$.items[0].answers[0].values[0]").value("Reflexión con ejemplo."));
     }
 
     @Test void consultantCreatesProgramContentBeforeAnyParticipantIsScheduled() throws Exception {
@@ -187,73 +187,17 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
     }
 
     @Test void consultantCreatesAndListsAnEvaluationWithEverySupportedQuestionType() throws Exception {
-        var activityResponse = mvc.perform(post(consultantPath()).header("Authorization", token(consultant))
-                .contentType(MediaType.APPLICATION_JSON).content(allBody()))
-                .andExpect(status().isCreated()).andReturn().getResponse();
-        var activityTree = json.readTree(activityResponse.getContentAsString());
-        var activityId = UUID.fromString(activityTree.path("id").asText());
-        var collaboratorAssignment = java.util.stream.StreamSupport.stream(
-                activityTree.path("assignees").spliterator(), false)
-                .filter(item -> item.path("enrollmentId").asText().equals(enrollment.toString()))
-                .findFirst().orElseThrow();
-        var assignmentId = UUID.fromString(collaboratorAssignment.path("assignmentId").asText());
-        var evaluationBody = """
-                {"title":"Encuesta de cierre","instructions":"Responde desde tu experiencia.","questions":[
-                  {"prompt":"¿Qué tan de acuerdo estás?","type":"AGREEMENT_SCALE","position":1},
-                  {"prompt":"¿Qué tan probable es que lo apliques?","type":"LIKELIHOOD_SCALE","position":2},
-                  {"prompt":"¿Qué te llevas de la actividad?","type":"OPEN_TEXT","position":3},
-                  {"prompt":"¿Cómo te sentiste?","type":"EMOTION_MULTI_SELECT","position":4}
-                ]}
-                """;
-
-        var evaluationResponse = mvc.perform(post(evaluationPath(activityId)).header("Authorization", token(consultant))
-                .contentType(MediaType.APPLICATION_JSON).content(evaluationBody))
-                .andExpect(status().isCreated()).andExpect(header().string("Cache-Control", "no-store"))
-                .andExpect(jsonPath("$.activityId").value(activityId.toString()))
-                .andExpect(jsonPath("$.questions.length()").value(4))
-                .andExpect(jsonPath("$.questions[0].type").value("AGREEMENT_SCALE"))
-                .andExpect(jsonPath("$.questions[3].type").value("EMOTION_MULTI_SELECT"))
-                .andReturn().getResponse();
-        var evaluationTree = json.readTree(evaluationResponse.getContentAsString());
-
-        mvc.perform(get(evaluationsPath()).header("Authorization", token(consultant)))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(1))
-                .andExpect(jsonPath("$.items[0].title").value("Encuesta de cierre"));
-        mvc.perform(get(evaluationsPath()).header("Authorization", token(collaborator)))
-                .andExpect(status().isForbidden());
-        mvc.perform(post(surveyResponsePath(activityId)).header("Authorization", token(collaborator))
-                .contentType(MediaType.APPLICATION_JSON).content(surveyResponseBody(evaluationTree)))
-                .andExpect(status().isConflict());
-
-        mvc.perform(post(collaboratorPath() + "/" + activityId + "/submission")
-                .header("Authorization", token(collaborator)).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"responseText\":\"Mi reflexión para la encuesta.\"}"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.assignmentStatus").value("SUBMITTED"))
-                .andExpect(jsonPath("$.survey.status").value("PENDING"))
-                .andExpect(jsonPath("$.completionPercentage").value(50));
-
-        mvc.perform(post(reviewPath(activityId, assignmentId)).header("Authorization", token(consultant))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"decision\":\"APPROVE\",\"comment\":\"Buen trabajo.\"}"))
-                .andExpect(status().isConflict());
-
-        mvc.perform(post(surveyResponsePath(activityId)).header("Authorization", token(collaborator))
-                .contentType(MediaType.APPLICATION_JSON).content(surveyResponseBody(evaluationTree)))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("COMPLETED"));
-        mvc.perform(post(surveyResponsePath(activityId)).header("Authorization", token(collaborator))
-                .contentType(MediaType.APPLICATION_JSON).content(surveyResponseBody(evaluationTree)))
-                .andExpect(status().isConflict());
-
-        mvc.perform(get(collaboratorPath()).header("Authorization", token(collaborator)))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].survey.status").value("COMPLETED"))
-                .andExpect(jsonPath("$.items[0].completionPercentage").value(100));
-        mvc.perform(post(reviewPath(activityId, assignmentId)).header("Authorization", token(consultant))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"decision\":\"APPROVE\",\"comment\":\"Buen trabajo.\"}"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("COMPLETED"));
-        mvc.perform(post(evaluationPath(activityId)).header("Authorization", token(consultant))
-                .contentType(MediaType.APPLICATION_JSON).content(evaluationBody))
-                .andExpect(status().isConflict());
+        var activity=createAdminActivity(true,1);var survey=createResultsSurvey(activity);
+        mvc.perform(get(evaluationsPath()).header("Authorization",token(consultant))).andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[0].questions.length()").value(4));
+        mvc.perform(get(evaluationsPath()).header("Authorization",token(collaborator))).andExpect(status().isForbidden());
+        mvc.perform(post(surveyResponsePath(activity)).header("Authorization",token(collaborator)).contentType(MediaType.APPLICATION_JSON)
+            .content(surveyResponseBody(survey))).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("COMPLETED"));
+        mvc.perform(get(collaboratorPath()).header("Authorization",token(collaborator))).andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[0].assignmentStatus").value("SUBMITTED")).andExpect(jsonPath("$.items[0].completionPercentage").value(100))
+            .andExpect(jsonPath("$.items[0].sessionProgressPercentage").value(80.0));
+        mvc.perform(post(surveyResponsePath(activity)).header("Authorization",token(collaborator)).contentType(MediaType.APPLICATION_JSON)
+            .content(surveyResponseBody(survey))).andExpect(status().isConflict());
     }
 
     @Test void draftHidesAssignedContentAndRefusesCollaboratorWrites() throws Exception {
@@ -265,10 +209,10 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
         mvc.perform(get(collaboratorPath()).header("Authorization", token(collaborator)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.items").isEmpty());
         mvc.perform(post(collaboratorPath() + "/" + id + "/submission").header("Authorization", token(collaborator))
-                .contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"No debe guardarse\"}"))
+                .contentType(MediaType.APPLICATION_JSON).content(deliverableBody(id,collaborator,"No debe guardarse")))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PROGRAM_NOT_ACTIVE"));
         mvc.perform(post(surveyResponsePath(id)).header("Authorization", token(collaborator))
-                .contentType(MediaType.APPLICATION_JSON).content("{\"answers\":[{\"questionId\":\"" + uuid7(0xdff) + "\",\"values\":[\"Respuesta\"]}]}"))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0,\"answers\":[{\"questionId\":\"" + uuid7(0xdff) + "\",\"values\":[\"Respuesta\"]}]}"))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PROGRAM_NOT_ACTIVE"));
         mvc.perform(post("/api/v1/organizations/" + organization + "/programs/" + program + "/status")
                 .header("Authorization", token(consultant)).contentType(MediaType.APPLICATION_JSON)
@@ -292,8 +236,8 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
         mvc.perform(post(evaluationPath(id)).header("Authorization", token(consultant))
                 .contentType(MediaType.APPLICATION_JSON).content(survey)).andExpect(status().isCreated());
         mvc.perform(post(collaboratorPath() + "/" + id + "/submission").header("Authorization", token(collaborator))
-                .contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"Entrega conservada\"}"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.completionPercentage").value(50));
+                .contentType(MediaType.APPLICATION_JSON).content(deliverableBody(id,collaborator,"Entrega conservada")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("COMPLETED"));
 
         var base = "/api/v1/organizations/" + organization + "/programs/" + program;
         mvc.perform(post(base + "/status").header("Authorization", token(consultant))
@@ -301,14 +245,14 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 .andExpect(status().isOk());
 
         mvc.perform(get(collaboratorPath()).header("Authorization", token(collaborator)))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].responseText").value("Entrega conservada"))
-                .andExpect(jsonPath("$.items[0].survey.status").value("PENDING"))
-                .andExpect(jsonPath("$.items[0].completionPercentage").value(50));
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].answers[0].values[0]").value("Entrega conservada"))
+                .andExpect(jsonPath("$.items[0].survey.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.items[0].completionPercentage").value(100));
         mvc.perform(post(collaboratorPath() + "/" + id + "/submission").header("Authorization", token(collaborator))
-                .contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"No guardar\"}"))
+                .contentType(MediaType.APPLICATION_JSON).content(deliverableBody(id,collaborator,"No guardar")))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PROGRAM_NOT_ACTIVE"));
         mvc.perform(post(surveyResponsePath(id)).header("Authorization", token(collaborator))
-                .contentType(MediaType.APPLICATION_JSON).content("{\"answers\":[{\"questionId\":\"" + uuid7(0xdff) + "\",\"values\":[\"Respuesta\"]}]}"))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0,\"answers\":[{\"questionId\":\"" + uuid7(0xdff) + "\",\"values\":[\"Respuesta\"]}]}"))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PROGRAM_NOT_ACTIVE"));
         mvc.perform(post(reviewPath(id, assignmentId)).header("Authorization", token(consultant))
                 .contentType(MediaType.APPLICATION_JSON).content("{\"decision\":\"APPROVE\"}"))
@@ -447,7 +391,7 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
         var activity = createAdminActivity(true, 1);
         createAdminSurvey(activity);
         mvc.perform(post(collaboratorPath() + "/" + activity + "/submission").header("Authorization", token(collaborator))
-                .contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"Entrega conservada\"}"))
+                .contentType(MediaType.APPLICATION_JSON).content(deliverableBody(activity,collaborator,"Entrega conservada")))
                 .andExpect(status().isOk());
         mvc.perform(put(adminPath("activities", activity)).header("Authorization", token(consultant))
                 .contentType(MediaType.APPLICATION_JSON).content(editBody(0, "Cambiar instrucciones")))
@@ -467,7 +411,7 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 .contentType(MediaType.APPLICATION_JSON).content("{\"version\":1,\"archived\":true}"))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CONTENT_HAS_SUBMISSIONS"));
         mvc.perform(get(collaboratorPath()).header("Authorization", token(collaborator)))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].responseText").value("Entrega conservada"));
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].answers[0].values[0]").value("Entrega conservada"));
     }
 
     @Test void editsSurveyBeforeDeliveryAndAdvancesVersionEvenWhenOnlyQuestionsChange() throws Exception {
@@ -508,7 +452,7 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
         mvc.perform(get(agendaBase()+"/evaluations").header("Authorization",token(consultant))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].questions[0].prompt").value("Reflexión final"));
         mvc.perform(post(collaboratorPath()+"/"+activity+"/submission").header("Authorization",token(collaborator))
-                .contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"Actividad realizada\"}")).andExpect(status().isOk());
+                .contentType(MediaType.APPLICATION_JSON).content(deliverableBody(activity,collaborator,"Actividad realizada"))).andExpect(status().isOk());
         mvc.perform(get(collaboratorPath()).header("Authorization",token(collaborator))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].survey.questions[0].prompt").value("Reflexión final"))
                 .andExpect(jsonPath("$.items[0].survey.questions[1].prompt").value("Nivel de acuerdo"));
@@ -524,7 +468,7 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
         var activity = createAdminActivity(true, 1);
         var survey = createAdminSurvey(activity);
         mvc.perform(post(collaboratorPath() + "/" + activity + "/submission").header("Authorization", token(collaborator))
-                .contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"No copiar\"}")).andExpect(status().isOk());
+                .contentType(MediaType.APPLICATION_JSON).content(deliverableBody(activity,collaborator,"No copiar"))).andExpect(status().isOk());
         var response = mvc.perform(post(adminPath("activities", activity) + "/duplicate").header("Authorization", token(consultant))
                 .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0}"))
                 .andExpect(status().isCreated()).andReturn().getResponse();
@@ -591,25 +535,22 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(1))
                 .andExpect(jsonPath("$.items[0].id").value(visible.toString()));
         mvc.perform(post(collaboratorPath() + "/" + archived + "/submission").header("Authorization", token(collaborator))
-                .contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"No guardar en archivada\"}"))
+                .contentType(MediaType.APPLICATION_JSON).content(deliverableBody(archived,collaborator,"No guardar en archivada")))
                 .andExpect(status().isNotFound());
         assertThat(jdbcTemplate.queryForObject("select count(*) from rti.activity_assignments where activity_id=? and submitted_at is not null", Long.class, archived)).isZero();
     }
 
-    @Test void cannotAddASurveyRetroactivelyAfterTheFirstSubmission() throws Exception {
-        var activity = createAdminActivity(true, 1);
-        mvc.perform(post(collaboratorPath() + "/" + activity + "/submission").header("Authorization", token(collaborator))
-                .contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"Entrega sin encuesta\"}")).andExpect(status().isOk());
-        mvc.perform(post(evaluationPath(activity)).header("Authorization", token(consultant))
-                .contentType(MediaType.APPLICATION_JSON).content(adminSurveyBody()))
-                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("CONTENT_HAS_SUBMISSIONS"));
-        mvc.perform(post(adminPath("activities", activity) + "/duplicate").header("Authorization", token(consultant))
-                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0}"))
-                .andExpect(status().isCreated());
-        mvc.perform(get(consultantPath()).header("Authorization", token(consultant)))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.items[1].assignees.length()").value(2))
-                .andExpect(jsonPath("$.items[1].assignees[0].status").value("ASSIGNED"))
-                .andExpect(jsonPath("$.items[1].assignees[0].submittedAt").doesNotExist());
+    @Test void activityCannotBeDeliveredAsFreeTextOrWithoutItsForm() throws Exception {
+        var activity=createAdminActivity(true,1);
+        mvc.perform(post(surveyResponsePath(activity)).header("Authorization",token(collaborator)).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"responseText\":\"El texto libre ya no es una entrega\"}")).andExpect(status().isBadRequest());
+        mvc.perform(post(surveyResponsePath(activity)).header("Authorization",token(collaborator)).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"version\":0,\"answers\":[{\"questionId\":\""+uuid7(0xdff)+"\",\"values\":[\"Respuesta\"]}]}")).andExpect(status().isNotFound());
+        createAdminSurvey(activity);
+        submitNotificationActivity(activity);
+        mvc.perform(put(adminPath("activities",activity)+"/survey").header("Authorization",token(consultant)).contentType(MediaType.APPLICATION_JSON)
+            .content(adminSurveyBody().replaceFirst("\\{","{\"version\":0,"))).andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("CONTENT_HAS_SUBMISSIONS"));
     }
 
     @Test void numericScaleSupportsEditingDuplicationStrictAnswersAndNumericResultsAndExports() throws Exception {
@@ -635,9 +576,7 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0}")).andExpect(status().isCreated()).andReturn().getResponse();
         var copy=UUID.fromString(json.readTree(copyResponse.getContentAsString()).path("id").asText());
         assertThat(jdbcTemplate.queryForObject("select count(*) from rti.activity_evaluation_questions q join rti.activity_evaluations e on e.id=q.evaluation_id where e.activity_id=? and q.question_type='NUMERIC_SCALE'",Long.class,copy)).isEqualTo(1);
-        for(var person:java.util.List.of(collaborator,otherCollaborator))
-            mvc.perform(post(collaboratorPath()+"/"+activity+"/submission").header("Authorization",token(person))
-                    .contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"Actividad terminada\"}")).andExpect(status().isOk());
+
         var invalid=java.util.List.of(java.util.List.of("0"),java.util.List.of("6"),java.util.List.of("4.5"),java.util.List.of("texto"),
                 java.util.List.of(""),java.util.List.of("1","2"),java.util.List.<String>of());
         for(var values:invalid) mvc.perform(post(surveyResponsePath(activity)).header("Authorization",token(collaborator))
@@ -693,8 +632,7 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
         var copy=UUID.fromString(json.readTree(copyResult.getContentAsString()).path("id").asText());
         assertThat(jdbcTemplate.queryForObject("select array_to_string(q.options,'|') from rti.activity_evaluation_questions q join rti.activity_evaluations e on e.id=q.evaluation_id where e.activity_id=?",String.class,copy))
                 .isEqualTo(String.join("|",options));
-        mvc.perform(post(collaboratorPath()+"/"+activity+"/submission").header("Authorization",token(collaborator))
-                .contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"Actividad enviada\"}")).andExpect(status().isOk());
+
         for(var values:java.util.List.of(java.util.List.of("No pertenece"),java.util.List.<String>of(),
                 java.util.List.of(options.getFirst(),options.getLast()),java.util.List.of(options.getFirst(),options.getFirst()),java.util.List.of("1"))) {
             mvc.perform(post(surveyResponsePath(activity)).header("Authorization",token(collaborator)).contentType(MediaType.APPLICATION_JSON)
@@ -750,11 +688,11 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 java.util.Map.of("prompt","Elige una opción","type",type,"position",1,"options",options))));
     }
     private String customChoiceAnswer(String questionId,java.util.List<String> values) {
-        return json.writeValueAsString(java.util.Map.of("answers",java.util.List.of(java.util.Map.of("questionId",questionId,"values",values))));
+        return json.writeValueAsString(java.util.Map.of("version",0,"answers",java.util.List.of(java.util.Map.of("questionId",questionId,"values",values))));
     }
 
     private String numericSurveyAnswers(tools.jackson.databind.JsonNode questions,java.util.List<String> values) {
-        return json.writeValueAsString(java.util.Map.of("answers",java.util.List.of(
+        return json.writeValueAsString(java.util.Map.of("version",0,"answers",java.util.List.of(
                 java.util.Map.of("questionId",questions.get(0).path("id").asText(),"values",values),
                 java.util.Map.of("questionId",questions.get(1).path("id").asText(),"values",java.util.List.of("5")),
                 java.util.Map.of("questionId",questions.get(2).path("id").asText(),"values",java.util.List.of("1")))));
@@ -875,10 +813,10 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
         mvc.perform(get(collaboratorPath()).header("Authorization",token(collaborator))).andExpect(status().isNotFound());
         mvc.perform(get("/api/v1/me/programs/"+program).header("Authorization",token(collaborator))).andExpect(status().isNotFound());
         mvc.perform(post(collaboratorPath()+"/"+activity+"/submission").header("Authorization",token(collaborator))
-                .contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"No guardar\"}")).andExpect(status().isNotFound());
+                .contentType(MediaType.APPLICATION_JSON).content(deliverableBody(activity,collaborator,"No guardar"))).andExpect(status().isNotFound());
         changeParticipant(enrollment,1,"REINSTATE").andExpect(status().isOk()).andExpect(jsonPath("$.status").value("ACTIVE"));
         mvc.perform(get(collaboratorPath()).header("Authorization",token(collaborator))).andExpect(status().isOk())
-                .andExpect(jsonPath("$.items[0].responseText").value("Entrega privada para revisión"))
+                .andExpect(jsonPath("$.items[0].answers[0].values[0]").value("4"))
                 .andExpect(jsonPath("$.items[0].completionPercentage").value(100));
         changeParticipant(enrollment,2,"WITHDRAW").andExpect(status().isOk()).andExpect(jsonPath("$.status").value("WITHDRAWN"));
         mvc.perform(get(collaboratorPath()).header("Authorization",token(collaborator))).andExpect(status().isNotFound());
@@ -889,22 +827,18 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 .andExpect(jsonPath("$.items[0].previousStatus").value("ACTIVE")).andExpect(jsonPath("$.items[0].actorLabel").isNotEmpty());
     }
 
-    @Test void completingWithPendingSurveyIsReadOnlyAndReinstatementPreservesTheFiftyPercent() throws Exception {
-        var activity=createAdminActivity(true,1); var survey=createResultsSurvey(activity);
-        mvc.perform(post(collaboratorPath()+"/"+activity+"/submission").header("Authorization",token(collaborator))
-                .contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"Mi entrega\"}")).andExpect(status().isOk());
-        changeParticipant(enrollment,0,"COMPLETE").andExpect(status().isOk()).andExpect(jsonPath("$.status").value("COMPLETED"));
-        mvc.perform(get("/api/v1/me/programs/"+program).header("Authorization",token(collaborator))).andExpect(status().isOk())
-                .andExpect(jsonPath("$.enrollmentStatus").value("COMPLETED"));
+    @Test void completingWithPendingFormIsReadOnlyAndReinstatementPreservesProgress() throws Exception {
+        var activity=createAdminActivity(true,1);var survey=createResultsSurvey(activity);
+        changeParticipant(enrollment,0,"COMPLETE").andExpect(status().isOk());
         mvc.perform(get(collaboratorPath()).header("Authorization",token(collaborator))).andExpect(status().isOk())
-                .andExpect(jsonPath("$.items[0].completionPercentage").value(50));
+            .andExpect(jsonPath("$.items[0].completionPercentage").value(0));
         mvc.perform(post(surveyResponsePath(activity)).header("Authorization",token(collaborator)).contentType(MediaType.APPLICATION_JSON)
-                .content(surveyResponseBody(survey))).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PARTICIPATION_READ_ONLY"));
-        changeParticipant(enrollment,1,"REINSTATE").andExpect(status().isOk()).andExpect(jsonPath("$.status").value("ACTIVE"));
+            .content(surveyResponseBody(survey))).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PARTICIPATION_READ_ONLY"));
+        changeParticipant(enrollment,1,"REINSTATE").andExpect(status().isOk());
         mvc.perform(post(surveyResponsePath(activity)).header("Authorization",token(collaborator)).contentType(MediaType.APPLICATION_JSON)
-                .content(surveyResponseBody(survey))).andExpect(status().isOk());
+            .content(surveyResponseBody(survey))).andExpect(status().isOk());
         mvc.perform(get(collaboratorPath()).header("Authorization",token(collaborator))).andExpect(status().isOk())
-                .andExpect(jsonPath("$.items[0].completionPercentage").value(100));
+            .andExpect(jsonPath("$.items[0].sessionProgressPercentage").value(80.0));
     }
 
     @Test void aSuspendedCompletedEnrollmentRestoresReadOnlyRatherThanActiveAccess() throws Exception {
@@ -1013,7 +947,7 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
         sendResults(otherCollaborator, activity, survey, "2", "1", "Respuesta ajena", java.util.List.of("Retado(a)"));
         mvc.perform(get(reportPath()).header("Authorization", token(consultant))).andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store")).andExpect(jsonPath("$.summary.assigned").value(2))
-                .andExpect(jsonPath("$.summary.progressPercentage").value(100.0)).andExpect(jsonPath("$.summary.approvalPercentage").value(0.0))
+                .andExpect(jsonPath("$.summary.progressPercentage").value(80.0)).andExpect(jsonPath("$.summary.approvalPercentage").value(0.0))
                 .andExpect(jsonPath("$.surveys.summary.agreementAverage").value(3.0));
         var individual = mvc.perform(get(reportPath()).param("enrollmentId", enrollment.toString()).header("Authorization", token(consultant)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.participants.length()").value(1))
@@ -1051,12 +985,10 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 .andExpect(jsonPath("$.programStatus").value("COMPLETED"));
     }
 
-    @Test void reportProgressUsesHalfForPendingSurveyAndTimezoneAtDeadline() throws Exception {
+    @Test void reportProgressUsesEightyPercentForPendingSessionClosureAndTimezoneAtDeadline() throws Exception {
         var activity = createAdminActivity(true, 1); var survey = createResultsSurvey(activity);
-        mvc.perform(post(collaboratorPath() + "/" + activity + "/submission").header("Authorization", token(collaborator))
-                .contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"Mi entrega\"}")).andExpect(status().isOk());
         mvc.perform(get(reportPath()).param("enrollmentId", enrollment.toString()).header("Authorization", token(consultant)))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.summary.progressPercentage").value(50.0))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.summary.progressPercentage").value(0.0))
                 .andExpect(jsonPath("$.summary.surveysCompleted").value(0));
         mvc.perform(post(surveyResponsePath(activity)).header("Authorization", token(collaborator))
                 .contentType(MediaType.APPLICATION_JSON).content(surveyResponseBody(survey))).andExpect(status().isOk());
@@ -1065,7 +997,7 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
         entityManager.clear();
         mvc.perform(get(reportPath()).param("enrollmentId", enrollment.toString()).header("Authorization", token(consultant)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.timeZone").value("America/Bogota"))
-                .andExpect(jsonPath("$.work[0].onTime").value(true)).andExpect(jsonPath("$.summary.progressPercentage").value(100.0));
+                .andExpect(jsonPath("$.work[0].onTime").value(true)).andExpect(jsonPath("$.summary.progressPercentage").value(80.0));
         jdbcTemplate.update("update rti.activity_assignments set submitted_at='2026-10-09T05:00:00Z' where activity_id=? and enrollment_id=?", activity, enrollment);
         entityManager.clear();
         mvc.perform(get(reportPath()).param("enrollmentId", enrollment.toString()).header("Authorization", token(consultant)))
@@ -1101,12 +1033,10 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
         return json.readTree(response.getContentAsString());
     }
     private void sendResults(UUID actor, UUID activity, tools.jackson.databind.JsonNode survey, String agreement, String likelihood, String open, java.util.List<String> emotions) throws Exception {
-        mvc.perform(post(collaboratorPath() + "/" + activity + "/submission").header("Authorization", token(actor))
-                .contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"Entrega privada para revisión\"}")).andExpect(status().isOk());
         var values = java.util.List.of(java.util.List.of(agreement), java.util.List.of(likelihood), java.util.List.of(open), emotions);
         var answers = java.util.stream.IntStream.range(0, 4).mapToObj(i -> java.util.Map.of("questionId", survey.path("questions").get(i).path("id").asText(), "values", values.get(i))).toList();
         mvc.perform(post(surveyResponsePath(activity)).header("Authorization", token(actor))
-                .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(java.util.Map.of("answers", answers)))).andExpect(status().isOk());
+                .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(java.util.Map.of("answers", answers, "version", 0)))).andExpect(status().isOk());
     }
 
     @Test void notificationsArePrivatePersistentAndReadIdempotently() throws Exception {
@@ -1156,16 +1086,10 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
         assertThat(inbox(otherCollaborator).toString()).doesNotContain("ACTIVITY_APPROVED","CHANGES_REQUESTED");
     }
 
-    @Test void surveyReminderDisappearsWhenSurveyIsCompleted() throws Exception {
-        var activity=createAdminActivity(true,1);
-        var survey=createAdminSurvey(activity);
-        submitNotificationActivity(activity);
-        assertThat(inbox(collaborator).toString()).contains("SURVEY_PENDING");
-        var question=survey.path("questions").get(0).path("id").asText();
-        mvc.perform(post(surveyResponsePath(activity)).header("Authorization",token(collaborator))
-                .contentType(MediaType.APPLICATION_JSON).content("{\"answers\":[{\"questionId\":\""+question+"\",\"values\":[\"Aprendizaje\"]}]}"))
-                .andExpect(status().isOk());
+    @Test void formSubmissionDoesNotCreateAnObsoletePostActivitySurveyReminder() throws Exception {
+        var activity=createAdminActivity(true,1);createAdminSurvey(activity);submitNotificationActivity(activity);
         assertThat(inbox(collaborator).toString()).doesNotContain("SURVEY_PENDING");
+        assertThat(inbox(consultant).toString()).contains("SUBMISSION_RECEIVED");
     }
 
     @Test void notificationsRespectDraftClosedArchivedAndSuspendedStates() throws Exception {
@@ -1247,7 +1171,7 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
     }
     private void submitNotificationActivity(UUID activity) throws Exception {
         mvc.perform(post(collaboratorPath()+"/"+activity+"/submission").header("Authorization",token(collaborator))
-                .contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"Respuesta privada\"}"))
+                .contentType(MediaType.APPLICATION_JSON).content(deliverableBody(activity,collaborator,"Respuesta privada")))
                 .andExpect(status().isOk());
     }
 
@@ -1285,7 +1209,7 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
         return consultantPath() + "/" + activityId + "/evaluation";
     }
     private String surveyResponsePath(UUID activityId) {
-        return collaboratorPath() + "/" + activityId + "/survey-response";
+        return collaboratorPath() + "/" + activityId + "/submission";
     }
     private String reviewPath(UUID activityId, UUID assignmentId) {
         return consultantPath() + "/" + activityId + "/assignments/" + assignmentId + "/review";
@@ -1300,7 +1224,7 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
         mvc.perform(get(collaboratorPath()).header("Authorization",token(otherCollaborator))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.items").isEmpty());
         mvc.perform(post(collaboratorPath()+"/"+first+"/submission").header("Authorization",token(collaborator))
-                .contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"No sobrescribir\"}")).andExpect(status().isOk());
+                .contentType(MediaType.APPLICATION_JSON).content(deliverableBody(first,collaborator,"No sobrescribir"))).andExpect(status().isOk());
         var before=jdbcTemplate.queryForList("select id,status,response_text,version,due_date from rti.activity_assignments where program_id=? order by id",program);
         long notices=jdbcTemplate.queryForObject("select count(*) from rti.activity_notifications where organization_id=?",Long.class,organization);
         setAgenda(date,0L,"",enrollment).andExpect(status().isOk());
@@ -1363,7 +1287,7 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
         agendaDates(); var activity=createAdminActivity(true,1);
         mvc.perform(get(collaboratorPath()).header("Authorization",token(collaborator))).andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(0));
         mvc.perform(get("/api/v1/me/programs/"+program+"/sessions").header("Authorization",token(collaborator))).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
-        mvc.perform(post(collaboratorPath()+"/"+activity+"/submission").header("Authorization",token(collaborator)).contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"No debe enviarse\"}"))
+        mvc.perform(post(collaboratorPath()+"/"+activity+"/submission").header("Authorization",token(collaborator)).contentType(MediaType.APPLICATION_JSON).content(deliverableBody(activity,collaborator,"No debe enviarse")))
                 .andExpect(status().isNotFound());
         var date=agendaToday().plusDays(2);
         setAgenda(date,null,"",enrollment).andExpect(status().isOk());
@@ -1378,7 +1302,7 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
     @Test void sessionAgendaReschedulesSubgroupsAndFreezesDeliveredDeadlinesWithPrivateNotification() throws Exception {
         agendaDates(); var first=createAdminActivity(true,1); var second=createAdminActivity(true,2);
         var date=agendaToday().plusDays(1);setAgenda(date,null,"",enrollment,otherEnrollment).andExpect(status().isOk());
-        mvc.perform(post(collaboratorPath()+"/"+first+"/submission").header("Authorization",token(collaborator)).contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"Entrega conservada\"}"))
+        mvc.perform(post(collaboratorPath()+"/"+first+"/submission").header("Authorization",token(collaborator)).contentType(MediaType.APPLICATION_JSON).content(deliverableBody(first,collaborator,"Entrega conservada")))
                 .andExpect(status().isOk());
         setAgenda(date.plusDays(3),0L,"Cambio acordado con el colaborador",enrollment).andExpect(status().isOk());
         mvc.perform(get(collaboratorPath()).header("Authorization",token(collaborator))).andExpect(status().isOk())
@@ -1416,7 +1340,7 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
         setAgenda(date,null,"",enrollment).andExpect(status().isOk());
         mvc.perform(get(collaboratorPath()).header("Authorization",token(collaborator))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].dueDate").value(date.plusDays(3).toString()));
-        mvc.perform(post(collaboratorPath()+"/"+activity+"/submission").header("Authorization",token(collaborator)).contentType(MediaType.APPLICATION_JSON).content("{\"responseText\":\"Entrega conservada\"}"))
+        mvc.perform(post(collaboratorPath()+"/"+activity+"/submission").header("Authorization",token(collaborator)).contentType(MediaType.APPLICATION_JSON).content(deliverableBody(activity,collaborator,"Entrega conservada")))
                 .andExpect(status().isOk());
         var pending=createAdminActivity(true,2);
         setAgenda(date.plusDays(10),0L,"Cambio posterior al fin previsto",enrollment).andExpect(status().isOk())
@@ -1436,8 +1360,7 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
     }
 
     @Test void sessionAgendaReadersCannotWriteAndSuspendedPeopleLoseAccess() throws Exception {
-        agendaDates(); var date=agendaToday().plusDays(30);setAgenda(date,null,"",enrollment).andExpect(status().isOk());
-        var activity=createAdminActivity(true,1);
+        agendaDates(); var activity=createAdminActivity(true,1);var date=agendaToday().plusDays(30);setAgenda(date,null,"",enrollment).andExpect(status().isOk());
         mvc.perform(get(collaboratorPath()).header("Authorization",token(collaborator))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].dueDate").value(date.plusDays(3).toString()));
         mvc.perform(get(agendaBase()+"/session-schedules")).andExpect(status().isUnauthorized());
@@ -1455,10 +1378,40 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
         mvc.perform(get(agendaBase().replace(organization.toString(),uuid7(0xeeee).toString())+"/session-schedules").header("Authorization",token(consultant))).andExpect(status().isNotFound());
     }
 
+
+    private String deliverableBody(UUID activity,UUID actor,String text) throws Exception {
+        var evaluations=jdbcTemplate.queryForList("select id from rti.activity_evaluations where activity_id=?",UUID.class,activity);
+        if(evaluations.isEmpty()) {
+            var archived=jdbcTemplate.queryForObject("select archived from rti.program_activities where id=?",Boolean.class,activity);
+            if(Boolean.TRUE.equals(archived))return json.writeValueAsString(java.util.Map.of("version",0,"answers",java.util.List.of(java.util.Map.of("questionId",uuid7(0xdff),"values",java.util.List.of(text)))));
+            createAdminSurvey(activity);
+            evaluations=jdbcTemplate.queryForList("select id from rti.activity_evaluations where activity_id=?",UUID.class,activity);
+        }
+        var answers=jdbcTemplate.query("select id,question_type,options from rti.activity_evaluation_questions where evaluation_id=? order by position",(row,n)->{
+            var type=row.getString("question_type");
+            var value=switch(type){case "OPEN_TEXT"->text.trim();case "EMOTION_MULTI_SELECT"->"Inspirado(a)";
+                case "SINGLE_CHOICE_LETTERS","SINGLE_CHOICE_WORDS"->((String[])row.getArray("options").getArray())[0];default->"4";};
+            return java.util.Map.of("questionId",row.getObject("id",UUID.class),"values",java.util.List.of(value));
+        },evaluations.getFirst());
+        var target=actor.equals(collaborator)?enrollment:otherEnrollment;
+        var versions=jdbcTemplate.queryForList("select version from rti.activity_assignments where activity_id=? and enrollment_id=?",Long.class,activity,target);
+        return json.writeValueAsString(java.util.Map.of("answers",answers,"version",versions.isEmpty()?0L:versions.getFirst()));
+    }
+    private void readyForAgenda() throws Exception {
+        var activities=jdbcTemplate.queryForList("select id from rti.program_activities where session_id=? and not archived",UUID.class,session);
+        if(activities.isEmpty())activities=java.util.List.of(createAdminActivity(true,1));
+        for(var id:activities)if(jdbcTemplate.queryForObject("select count(*) from rti.activity_evaluations where activity_id=?",Long.class,id)==0)createAdminSurvey(id);
+        jdbcTemplate.update("update rti.program_sessions set objective='Comentario de cierre' where id=?",session);
+        if(jdbcTemplate.queryForObject("select count(*) from rti.activity_evaluations where session_id=?",Long.class,session)==0)
+            mvc.perform(post(agendaBase()+"/sessions/"+session+"/survey").header("Authorization",token(consultant)).contentType(MediaType.APPLICATION_JSON).content(adminSurveyBody())).andExpect(status().isOk());
+        entityManager.clear();
+    }
+
     private java.time.LocalDate agendaToday() {return java.time.LocalDate.now(java.time.ZoneId.of("America/Bogota"));}
     private void agendaDates() {jdbcTemplate.update("update rti.programs set start_date=?,end_date=? where id=?",agendaToday(),agendaToday().plusDays(30),program);entityManager.clear();}
     private String agendaBase(){return "/api/v1/organizations/"+organization+"/programs/"+program;}
     private org.springframework.test.web.servlet.ResultActions setAgenda(java.time.LocalDate date,Long version,String reason,UUID... selected) throws Exception {
+        readyForAgenda();
         var targets=java.util.Arrays.stream(selected).map(id->version==null?java.util.Map.of("enrollmentId",id.toString()):java.util.Map.of("enrollmentId",id.toString(),"version",version)).toList();
         var result=mvc.perform(post(agendaBase()+"/sessions/"+session+"/schedules").header("Authorization",token(consultant)).contentType(MediaType.APPLICATION_JSON)
                 .content(json.writeValueAsString(java.util.Map.of("scheduledDate",date.toString(),"participants",targets,"reason",reason))));
@@ -1474,7 +1427,7 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 + "\"instructions\":\"Describe tu avance.\",\"youtubeUrl\":null,\"position\":1}";
     }
     private String surveyResponseBody(tools.jackson.databind.JsonNode evaluation) {
-        return "{\"answers\":["
+        return "{\"version\":0,\"answers\":["
                 + "{\"questionId\":\"" + evaluation.path("questions").get(0).path("id").asText() + "\",\"values\":[\"4\"]},"
                 + "{\"questionId\":\"" + evaluation.path("questions").get(1).path("id").asText() + "\",\"values\":[\"5\"]},"
                 + "{\"questionId\":\"" + evaluation.path("questions").get(2).path("id").asText() + "\",\"values\":[\"Aprendí a reconocer mis fortalezas.\"]},"

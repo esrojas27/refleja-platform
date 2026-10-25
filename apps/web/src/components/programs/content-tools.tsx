@@ -7,10 +7,11 @@ import { programContentErrorMessage } from "@/lib/programs/program-content-api";
 import { ProgramModal } from "./program-modal";
 
 export function ContentTools({ organizationId, programId, kind, item, parentArchived = false, hasAssignments,
-  hasSubmissions, first, last, onEdit, onSaved }: {
+  hasSubmissions, first, last, duplicateBlocked = false, onEdit, onSaved }: {
   organizationId: string; programId: string; kind: ContentKind;
   item: { id: string; version: number; archived?: boolean; name?: string; title?: string };
   parentArchived?: boolean; hasAssignments: boolean; hasSubmissions: boolean; first: boolean; last: boolean;
+  duplicateBlocked?: boolean;
   onEdit: () => void; onSaved: (message: string) => void;
 }) {
   const name = item.name ?? item.title ?? "";
@@ -37,7 +38,7 @@ export function ContentTools({ organizationId, programId, kind, item, parentArch
         onClick={() => void perform(() => moveContent(organizationId, programId, kind, item.id, item.version, "UP"), "Orden actualizado.")}><ArrowUp aria-hidden="true" className="size-3.5" /></button>
       <button type="button" className={buttonClass} aria-label={`Bajar ${name}`} disabled={unavailable || !visible || last}
         onClick={() => void perform(() => moveContent(organizationId, programId, kind, item.id, item.version, "DOWN"), "Orden actualizado.")}><ArrowDown aria-hidden="true" className="size-3.5" /></button>
-      {kind === "activities" && <button type="button" className={buttonClass} disabled={unavailable || !visible} onClick={() => setDialog("duplicate")}><Copy aria-hidden="true" className="size-3.5" />Duplicar</button>}
+      {kind === "activities" && <button type="button" className={buttonClass} disabled={unavailable || !visible || duplicateBlocked} onClick={() => setDialog("duplicate")}><Copy aria-hidden="true" className="size-3.5" />Duplicar</button>}
       <button type="button" className={buttonClass} disabled={unavailable || parentArchived || (!item.archived && hasSubmissions)}
         onClick={() => item.archived ? void perform(() => archiveContent(organizationId, programId, kind, item.id, item.version, false), "Contenido restaurado.") : setDialog("archive")}>
         {item.archived ? <RotateCcw aria-hidden="true" className="size-3.5" /> : <Archive aria-hidden="true" className="size-3.5" />}{item.archived ? "Restaurar" : "Archivar"}

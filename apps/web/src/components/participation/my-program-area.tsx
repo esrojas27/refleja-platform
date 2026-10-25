@@ -14,11 +14,13 @@ import {
   type MyProgram,
   type PageResult,
 } from "@/lib/participation/participation-api";
-import { activityErrorMessage, listMyProgramActivities, submitMyActivity,
+import { activityErrorMessage, listMyProgramActivities,
   compareAssignedActivityOrder, pendingAssignedActivities, type AssignedActivity } from "@/lib/participation/activity-api";
 import { useCollaboratorActivities } from "@/components/participation/collaborator-activities-state";
 import { ActivityStatusBadges, CollaboratorProgressOverview } from "@/components/participation/progress-overview";
 import { ActivitySurveyForm } from "@/components/participation/activity-survey-form";
+import { QuestionnaireAnswers } from "@/components/forms/questionnaire-form";
+import { SessionClosuresArea } from "@/components/participation/session-closures-area";
 import { ActivityLinkTarget, revealActivityTarget } from "@/components/participation/activity-link-target";
 import { programStateMessage, programStatusLabels } from "@/lib/programs/program-lifecycle";
 
@@ -166,6 +168,7 @@ function AssignedActivityList({ programId, section, programStatus, enrollmentSta
       </ol>
     </div>}
     </section>}
+    {section === "activities" && !preparing && <SessionClosuresArea programId={programId} readOnly={readOnly} />}
   </div>;
 }
 
@@ -174,12 +177,12 @@ function NextActivityNotice({ activities }: { activities: AssignedActivity[] }) 
   const next = pending[0];
   if (!next) return <aside aria-label="Estado de tus actividades"
     className="mb-6 rounded-2xl border border-border bg-[var(--brand-mist)] px-5 py-4">
-    <p className="rti-kicker">Estás al día</p>
+    <p className="rti-kicker">Formularios enviados</p>
     <p className="mt-2 font-semibold">No tienes actividades pendientes por completar.</p>
+    <p className="mt-2 text-sm text-muted-foreground">Revisa abajo si tienes una encuesta de cierre de sesión pendiente.</p>
   </aside>;
 
-  const nextStep = next.survey?.status === "PENDING" ? "Completa la encuesta pendiente"
-    : next.assignmentStatus === "CHANGES_REQUESTED" ? "Realiza los cambios solicitados"
+  const nextStep = next.assignmentStatus === "CHANGES_REQUESTED" ? "Realiza los cambios solicitados"
       : "Completa esta actividad";
   return <aside aria-label="Tu próxima actividad"
     className="mb-6 overflow-hidden rounded-2xl border border-[var(--brand-pink)] bg-[var(--brand-mist)]">
@@ -199,7 +202,7 @@ function NextActivityNotice({ activities }: { activities: AssignedActivity[] }) 
           Después de esta tienes {pending.length - 1} {pending.length === 2 ? "actividad pendiente" : "actividades pendientes"}.
         </p>}
         <a href={`#activity-${next.id}`} onClick={() => revealActivityTarget(next.id)} className="rti-button-primary mt-4">
-          {next.survey?.status === "PENDING" ? "Continuar encuesta" : next.assignmentStatus === "CHANGES_REQUESTED" ? "Corregir actividad" : "Comenzar actividad"}
+          {next.assignmentStatus === "CHANGES_REQUESTED" ? "Corregir actividad" : "Comenzar actividad"}
           <ArrowRight aria-hidden="true" className="size-4 shrink-0" />
         </a>
       </div>
@@ -218,7 +221,7 @@ function AssignedActivityAccordion({ programId, activity, onSubmitted, readOnly 
       <span className="flex shrink-0 flex-wrap items-center justify-between gap-3 sm:justify-end">
         <ActivityStatusBadges status={activity.assignmentStatus} dueDate={activity.dueDate}
           surveyStatus={activity.survey?.status} />
-        <span className="text-sm font-semibold text-primary"><span className="group-open/activity:hidden">{readOnly || activity.completionPercentage === 100 ? "Ver actividad" : activity.survey?.status === "PENDING" ? "Continuar encuesta" : activity.assignmentStatus === "CHANGES_REQUESTED" ? "Corregir" : activity.assignmentStatus === "SUBMITTED" ? "Ver entrega" : "Comenzar"}</span><span className="hidden group-open/activity:inline">Cerrar</span></span>
+        <span className="text-sm font-semibold text-primary"><span className="group-open/activity:hidden">{readOnly || activity.completionPercentage === 100 ? "Ver actividad" : activity.assignmentStatus === "CHANGES_REQUESTED" ? "Corregir" : activity.assignmentStatus === "SUBMITTED" ? "Ver entrega" : "Comenzar"}</span><span className="hidden group-open/activity:inline">Cerrar</span></span>
         <ChevronDown aria-hidden="true" className="size-4 shrink-0 transition-transform group-open/activity:rotate-180" />
       </span>
     </summary>
@@ -231,65 +234,22 @@ function AssignedActivityAccordion({ programId, activity, onSubmitted, readOnly 
 function AssignedActivityCard({ programId, activity, onSubmitted, readOnly }: {
   programId: string; activity: AssignedActivity; onSubmitted: (activity: AssignedActivity) => void; readOnly: boolean;
 }) {
-  const [response, setResponse] = useState(activity.responseText ?? "");
-  const [pending, setPending] = useState(false);
-  const [message, setMessage] = useState("");
   const editable = !readOnly && (activity.assignmentStatus === "ASSIGNED" || activity.assignmentStatus === "CHANGES_REQUESTED");
-
-  async function submit() {
-    const clean = response.trim();
-    if (!clean) { setMessage("Escribe tu respuesta antes de completar la actividad."); return; }
-    setPending(true); setMessage("Enviando actividad…");
-    try {
-      const saved = await submitMyActivity(programId, activity.id, clean);
-      setMessage(saved.survey?.status === "PENDING"
-        ? "Entrega enviada. Completa la encuesta para finalizar la actividad."
-        : "Actividad enviada para revisión.");
-      onSubmitted(saved);
-    } catch (error) {
-      setMessage(activityErrorMessage(error));
-    } finally { setPending(false); }
-  }
-
   return <div>
     <p className="whitespace-pre-wrap text-sm text-muted-foreground">{activity.instructions}</p>
     {activity.youtubeUrl && <ActivityVideo url={activity.youtubeUrl} title={activity.title} />}
     <p className="mt-3 text-sm font-medium">Fecha límite: {activity.dueDate}</p>
-    <div className="mt-4 rounded-xl border border-border/70 bg-muted/35 p-3">
-      <div className="flex items-center justify-between gap-3 text-sm"><span className="font-medium">Avance de la actividad</span>
-        <strong className="text-primary">{activity.completionPercentage}%</strong></div>
-      <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted" role="progressbar"
-        aria-label={`Avance de ${activity.title}: ${activity.completionPercentage}%`}
-        aria-valuemin={0} aria-valuemax={100} aria-valuenow={activity.completionPercentage}>
-        <div className="h-full rounded-full bg-primary transition-[width] duration-500"
-          style={{ width: `${activity.completionPercentage}%` }} />
-      </div>
-      {activity.survey && <p className="mt-2 text-xs text-muted-foreground">
-        Entrega de la actividad: 50% · Encuesta: 50%
-      </p>}
-    </div>
-    {activity.reviewComment && <p className="mt-4 rounded-xl border border-primary/20 bg-accent/40 px-3 py-2 text-sm">
-      Comentario del consultor: {activity.reviewComment}</p>}
-    {editable ? <div className="mt-4 space-y-3">
-      <label htmlFor={`response-${activity.id}`} className="block text-sm font-medium">Tu respuesta</label>
-      <textarea id={`response-${activity.id}`} className="rti-field min-h-32 resize-y" maxLength={10000}
-        value={response} onChange={event => setResponse(event.target.value)} disabled={pending} />
-      <button type="button" className="rti-button-primary" disabled={pending} onClick={() => void submit()}>
-        {pending ? "Enviando…" : activity.assignmentStatus === "CHANGES_REQUESTED" ? "Enviar corrección"
-          : activity.survey ? "Enviar actividad (50%)" : "Completar actividad"}
-      </button>
-    </div> : activity.responseText && <div className="mt-4 text-sm"><p className="font-medium">Tu respuesta</p>
-      <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{activity.responseText}</p></div>}
-    {message && <p role="status" className="mt-3 rounded-xl bg-muted/60 px-3 py-2 text-sm">{message}</p>}
-    {!readOnly && activity.survey?.status === "LOCKED" && <p className="mt-4 rounded-xl border border-border/70 bg-muted/45 px-3 py-3 text-sm text-muted-foreground">
-      La encuesta se habilitará después de enviar la actividad y completará el 50% restante.
-    </p>}
-    {!readOnly && activity.survey?.status === "PENDING" && <ActivitySurveyForm programId={programId} activityId={activity.id}
-      survey={activity.survey} onCompleted={submission => onSubmitted({ ...activity,
-        survey: { ...activity.survey!, status: "COMPLETED", completedAt: submission.completedAt },
-        completionPercentage: 100 })} />}
-    {activity.survey?.status === "COMPLETED" && <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm font-medium text-emerald-900">
-      Encuesta completada. Cumpliste los dos pasos de la actividad.
-    </p>}
+    <p className="mt-2 text-sm text-muted-foreground">Responde el formulario y envíalo para completar esta actividad. Al enviar todas las actividades podrás realizar el cierre de la sesión.</p>
+    {activity.reviewComment && <p className="mt-4 rounded-xl bg-accent p-3 text-sm">Comentario del consultor: {activity.reviewComment}</p>}
+    {!activity.survey && <p className="mt-4 rounded-xl bg-muted p-3 text-sm">El consultor todavía debe configurar el formulario de esta actividad.</p>}
+    {editable && activity.survey && <ActivitySurveyForm key={activity.assignmentVersion} programId={programId} activityId={activity.id}
+      survey={activity.survey} version={activity.assignmentVersion} initialAnswers={activity.answers}
+      onCompleted={submission => onSubmitted({ ...activity, assignmentStatus: "SUBMITTED", assignmentVersion: activity.assignmentVersion + 1,
+        submittedAt: submission.completedAt, reviewComment: null, reviewedAt: null, responseText: null, answers: submission.answers,
+        survey: { ...activity.survey!, status: "COMPLETED", completedAt: submission.completedAt }, completionPercentage: 100 })} />}
+    {!editable && activity.survey && activity.submittedAt && <>
+      <p className="mt-4 rounded-xl bg-accent p-3 text-sm font-semibold">Formulario enviado. Puedes consultar tus respuestas.</p>
+      <QuestionnaireAnswers questions={activity.survey.questions} answers={activity.answers ?? []} />
+    </>}
   </div>;
 }

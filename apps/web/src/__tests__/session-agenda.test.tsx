@@ -9,6 +9,18 @@ const agenda:SessionAgenda={canEdit:true,today:"2026-10-23",startDate:"2026-10-2
   participants:[first,{...first,enrollmentId:"two",name:"Bea",email:"bea@example.test"}]}]};
 beforeEach(()=>{vi.mocked(listSessionAgenda).mockResolvedValue(agenda);vi.mocked(scheduleSession).mockResolvedValue(agenda);});
 afterEach(()=>{cleanup();vi.resetAllMocks();});
+it.each([
+ ["SESSION_MISSING_ACTIVITIES","Faltan actividades"],
+ ["SESSION_MISSING_ACTIVITY_FORM","Falta configurar el formulario"],
+ ["SESSION_MISSING_CLOSING_COMMENT","Falta el comentario"],
+ ["SESSION_MISSING_CLOSING_SURVEY","Falta la encuesta"],
+])("blocks scheduling and explains the missing prerequisite %s",async(code,message)=>{
+ vi.mocked(listSessionAgenda).mockResolvedValue({...agenda,items:[{...agenda.items[0],missingRequirement:code}]});
+ render(<SessionAgendaArea organizationId="org" programId="program"/>);
+ await screen.findByText("Sesión inicial");
+ expect(screen.getByText(new RegExp(message))).toBeTruthy();
+ expect(screen.getByRole<HTMLButtonElement>("button",{name:"Agendar participantes"}).disabled).toBe(true);
+});
 it("shows dates and unscheduled people and gives staff read-only access when appropriate",async()=>{
   vi.mocked(listSessionAgenda).mockResolvedValue({...agenda,canEdit:false});
   render(<SessionAgendaArea organizationId="org" programId="program"/>);

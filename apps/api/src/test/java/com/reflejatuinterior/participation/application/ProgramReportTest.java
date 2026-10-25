@@ -69,6 +69,6 @@ class ProgramReportTest {
     }
     private ProgramReport.Work work(String status, int progress, LocalDate due, boolean survey, boolean onTime) {
         return new ProgramReport.Work(UUID.randomUUID(), person, UUID.randomUUID(), "Reflexión", UUID.randomUUID(), "Interior", UUID.randomUUID(), "Sesión",
-                due, status, progress == 0 ? null : Instant.now(), survey, null, progress, !status.equals("COMPLETED") && due.isBefore(today), onTime && progress == 100);
+                due, status, progress == 0 ? null : Instant.now(), survey, null, progress, !status.equals("COMPLETED") && due.isBefore(today), onTime && progress == 100, progress);
     }
 }

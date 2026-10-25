@@ -10,4 +10,5 @@ interface ActivityEvaluationJpaRepository extends JpaRepository<ActivityEvaluati
             UUID organizationId, UUID programId);
     Optional<ActivityEvaluationJpaEntity> findByOrganizationIdAndProgramIdAndActivityId(
             UUID organizationId, UUID programId, UUID activityId);
+    Optional<ActivityEvaluationJpaEntity> findByOrganizationIdAndProgramIdAndSessionId(UUID org, UUID program, UUID session);
 }

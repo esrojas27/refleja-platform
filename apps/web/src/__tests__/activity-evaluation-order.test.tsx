@@ -34,7 +34,7 @@ it("reorders new questions without losing prompts or response types and saves se
   expect(screen.getByText(/Pregunta 1 movida a la posición 2/)).toBeTruthy();
   expect(createActivityEvaluation).not.toHaveBeenCalled();
   await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Subir pregunta 2" })));
-  fireEvent.submit(screen.getByRole("form", { name: "Crear encuesta" }));
+  fireEvent.submit(screen.getByRole("form", { name: "Crear formulario" }));
   await waitFor(() => expect(createActivityEvaluation).toHaveBeenCalledWith("org", "program", "activity", expect.objectContaining({
     questions: [ { prompt: "Probabilidad", type: "LIKELIHOOD_SCALE", position: 1 }, { prompt: "Acuerdo", type: "AGREEMENT_SCALE", position: 2 } ],
   }), expect.any(AbortSignal)));
@@ -48,7 +48,7 @@ it("loads saved positions, reorders existing questions and saves the survey vers
   fireEvent.click(screen.getByRole("button", { name: "Subir pregunta 3" }));
   fireEvent.click(screen.getByRole("button", { name: "Subir pregunta 2" }));
   expect(prompts()).toEqual(["Emociones", "Acuerdo", "Reflexión"]);
-  fireEvent.submit(screen.getByRole("form", { name: "Editar encuesta" }));
+  fireEvent.submit(screen.getByRole("form", { name: "Editar formulario" }));
   await waitFor(() => expect(editSurvey).toHaveBeenCalledWith("org", "program", "activity", {
     title: "Encuesta", instructions: null, version: 7,
     questions: [
@@ -70,7 +70,7 @@ it("keeps question identity when editing, deleting and adding after a reorder", 
   fireEvent.click(screen.getByRole("button", { name: "Subir pregunta 3" }));
   expect(prompts()).toEqual(["Acuerdo actualizado", "Nueva", "Emociones"]);
   expect(new Set(screen.getAllByLabelText("Enunciado").map(input => input.id)).size).toBe(3);
-  fireEvent.submit(screen.getByRole("form", { name: "Editar encuesta" }));
+  fireEvent.submit(screen.getByRole("form", { name: "Editar formulario" }));
   await waitFor(() => expect(editSurvey).toHaveBeenCalledWith("org", "program", "activity", expect.objectContaining({
     questions: [
       { prompt: "Acuerdo actualizado", type: "AGREEMENT_SCALE", position: 1 },
@@ -86,7 +86,7 @@ it("disables both directions for a single question and keeps validation attached
   expect(screen.getByRole<HTMLButtonElement>("button", { name: "Bajar pregunta 1" }).disabled).toBe(true);
   fireEvent.click(screen.getByRole("button", { name: "Agregar pregunta" }));
   fireEvent.change(screen.getAllByLabelText("Enunciado")[1], { target: { value: "Válida" } });
-  fireEvent.submit(screen.getByRole("form", { name: "Crear encuesta" }));
+  fireEvent.submit(screen.getByRole("form", { name: "Crear formulario" }));
   fireEvent.click(screen.getByRole("button", { name: "Bajar pregunta 1" }));
   const inputs = screen.getAllByLabelText("Enunciado");
   expect(inputs[0].getAttribute("aria-invalid")).toBeNull();
@@ -97,7 +97,7 @@ it("disables both directions for a single question and keeps validation attached
 it("blocks order changes while saving", async () => {
   vi.mocked(editSurvey).mockReturnValue(new Promise(() => {}));
   render(<ActivityEvaluationForm {...props} initial={survey} />);
-  fireEvent.submit(screen.getByRole("form", { name: "Editar encuesta" }));
+  fireEvent.submit(screen.getByRole("form", { name: "Editar formulario" }));
   expect(await screen.findByText("Guardando encuesta…")).toBeTruthy();
   for (const button of screen.getAllByRole<HTMLButtonElement>("button", { name: /^(Subir|Bajar|Eliminar) pregunta/ })) expect(button.disabled).toBe(true);
   fireEvent.click(screen.getByRole("button", { name: "Bajar pregunta 1" }));
@@ -107,7 +107,7 @@ it("blocks order changes while saving", async () => {
 it("does not allow further reordering after the API reports existing submissions", async () => {
   vi.mocked(editSurvey).mockRejectedValue(new ProgramContentRequestError(409, [], undefined, "CONTENT_HAS_SUBMISSIONS"));
   render(<ActivityEvaluationForm {...props} initial={survey} />);
-  fireEvent.submit(screen.getByRole("form", { name: "Editar encuesta" }));
+  fireEvent.submit(screen.getByRole("form", { name: "Editar formulario" }));
   expect(await screen.findByText(/Ya existen entregas/)).toBeTruthy();
   expect(screen.getByRole<HTMLButtonElement>("button", { name: "Bajar pregunta 1" }).disabled).toBe(true);
   expect(screen.getByRole<HTMLButtonElement>("button", { name: "Subir pregunta 3" }).disabled).toBe(true);

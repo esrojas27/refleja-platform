@@ -14,7 +14,7 @@ it("sends versioned edits with explicit fields, scoped paths and no cache", asyn
   const fetcher = vi.fn().mockImplementation(() => Promise.resolve(new Response(null, { status: 204 })));
   vi.stubGlobal("fetch", fetcher);
   await editDimension("org a", "program/a", "dim/a", { name: "Interior", description: "", version: 3 });
-  await editSession("org a", "program/a", "session", { name: "Sesión", objective: "Objetivo", version: 2 });
+  await editSession("org a", "program/a", "session", { name: "Sesión", closingComment: "Objetivo", version: 2 });
   const input = { title: "Actividad", instructions: "Instrucciones", youtubeUrl: null, dueDate: "2026-10-21", version: 4, assignees: ["never-send"] };
   await editActivity("org a", "program/a", "activity", input);
   expect(fetcher.mock.calls[0]).toEqual(["http://localhost:8081/api/v1/organizations/org%20a/programs/program%2Fa/content/dimensions/dim%2Fa",

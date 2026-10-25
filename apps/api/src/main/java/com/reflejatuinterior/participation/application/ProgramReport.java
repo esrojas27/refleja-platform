@@ -20,5 +20,5 @@ public record ProgramReport(UUID organizationId, String organizationName, UUID p
     public record Work(UUID assignmentId, UUID enrollmentId, UUID activityId, String activityTitle,
             UUID dimensionId, String dimensionName, UUID sessionId, String sessionName,
             LocalDate dueDate, String status, Instant submittedAt, boolean surveyRequired,
-            Instant surveyCompletedAt, int progressPercentage, boolean overdue, boolean onTime) {}
+            Instant surveyCompletedAt, int progressPercentage, boolean overdue, boolean onTime,double sessionProgressPercentage) {}
 }

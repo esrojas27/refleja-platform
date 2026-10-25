@@ -11,6 +11,19 @@ const base = {
 };
 
 describe("progress calculation", () => {
+  it("averages sessions rather than activities and keeps consultant approval separate from 80/20 progress", () => {
+    const activity: AssignedActivity = { ...base,assignmentId:"a",assignmentStatus:"SUBMITTED",responseText:null,
+      submittedAt:"2026-09-19T12:00:00Z",reviewComment:null,reviewedAt:null,assignmentVersion:1,
+      survey:null,completionPercentage:100,sessionProgressPercentage:80 };
+    const activities=[activity,{...activity,id:"second",assignmentId:"b"},{...activity,id:"third",assignmentId:"c",
+      sessionId:"session-b",sessionName:"Proyección",sessionProgressPercentage:100}];
+    expect(collaboratorProgress(activities,"2026-09-19").percentage).toBe(90);
+    const definition: ProgramActivity={...base,assignees:[{assignmentId:"a",enrollmentId:"person",email:"ana@example.test",firstName:"Ana",lastName:null,
+      status:"SUBMITTED",responseText:null,submittedAt:activity.submittedAt,reviewComment:null,reviewedAt:null,
+      surveyStatus:"COMPLETED",completionPercentage:100,sessionProgressPercentage:80,sessionCompleted:false,version:1}]};
+    const progress=consultantProgress([definition],"2026-09-19");
+    expect(progress.program.percentage).toBe(80);expect(progress.program.completed).toBe(0);
+  });
   it("derives collaborator totals and groups without persisting percentages", () => {
     const activities: AssignedActivity[] = [
       { ...base, assignmentId: "one", assignmentStatus: "COMPLETED", responseText: "Lista",

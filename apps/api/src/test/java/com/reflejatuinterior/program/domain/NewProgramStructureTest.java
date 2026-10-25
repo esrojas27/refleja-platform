@@ -23,11 +23,11 @@ class NewProgramStructureTest {
         assertThatThrownBy(() -> new NewProgramSession("Sesión", null, null, LocalDate.now(), -1)).isInstanceOf(InvalidProgramInput.class);
     }
 
-    @Test void keepsTheLegacySessionDescriptionAsAnObjectiveForCompatibility() {
+    @Test void doesNotTreatAnOldDescriptionAsAClosingComment() {
         var session = new NewProgramSession("Sesión", "Descripción anterior", null,
                 LocalDate.of(2026, 10, 1), 1);
         assertThat(session.description()).isEqualTo("Descripción anterior");
-        assertThat(session.objective()).isEqualTo("Descripción anterior");
+        assertThat(session.objective()).isNull();
     }
 
     @Test void validatesOptionalYoutubeVideoLinks() {

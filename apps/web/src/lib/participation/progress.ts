@@ -49,6 +49,7 @@ type ProgressItem = {
   dueDate: string | null;
   status: ActivityAssignmentStatus;
   completionPercentage?: number;
+  sessionProgressPercentage?:number; progressKey?:string;
 };
 
 type ParticipantItem = ProgressItem & {
@@ -84,6 +85,7 @@ export function collaboratorProgress(
     dueDate: activity.dueDate,
     status: activity.assignmentStatus,
     completionPercentage: activity.completionPercentage,
+    sessionProgressPercentage:activity.sessionProgressPercentage,progressKey:activity.sessionId,
   })), today);
 }
 
@@ -101,6 +103,7 @@ export function consultantProgress(
     enrollmentId: assignee.enrollmentId,
     name: [assignee.firstName, assignee.lastName].filter(Boolean).join(" ") || assignee.email,
     email: assignee.email,
+    sessionProgressPercentage:assignee.sessionProgressPercentage,progressKey:`${assignee.enrollmentId}/${activity.sessionId}`,
   })));
 
   const participantItems = groupBy(items, item => item.enrollmentId);
@@ -158,7 +161,8 @@ function summary(items: ProgressItem[], today: string): ProgressSummary {
   }
   const earned = items.reduce((total, item) => total
     + (item.completionPercentage ?? (item.status === "COMPLETED" ? 100 : 0)), 0);
-  return { ...counts, percentage: counts.total ? Math.round(earned / counts.total) : 0 };
+  const sessions=new Map(items.filter(i=>i.sessionProgressPercentage!==undefined).map(i=>[i.progressKey!,i.sessionProgressPercentage!]));
+  return { ...counts, percentage:sessions.size?Math.round([...sessions.values()].reduce((a,b)=>a+b,0)/sessions.size):counts.total ? Math.round(earned / counts.total) : 0 };
 }
 
 export function activityStatusLabel(status: ActivityAssignmentStatus) {

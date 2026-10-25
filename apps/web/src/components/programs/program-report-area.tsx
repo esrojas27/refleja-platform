@@ -100,7 +100,7 @@ function ReportContent({ organizationId, programId }: { organizationId: string; 
       <details className="rounded-2xl border border-border p-4 text-sm">
         <summary className="cursor-pointer font-semibold">Cómo interpretar estos datos</summary>
         <ul className="mt-3 list-disc space-y-2 pl-5 leading-6 text-muted-foreground">
-          <li><strong>Avance:</strong> entrega 50% y encuesta 50% cuando existe; sin encuesta, el envío aporta 100%. No equivale a aprobación.</li>
+          <li><strong>Avance:</strong> los formularios de actividades aportan el 80% de cada sesión y su encuesta de cierre el 20% restante. No equivale a aprobación del consultor.</li>
           <li><strong>Aprobación:</strong> actividades aprobadas por el consultor entre todas las asignaciones vigentes.</li>
           <li><strong>Participación:</strong> personas con al menos una entrega entre todas las inscripciones del alcance, incluidas invitadas, suspendidas y retiradas.</li>
           <li><strong>Cumplimiento de fecha:</strong> de los plazos que ya terminaron, cuántas asignaciones tienen su última entrega y encuesta enviadas dentro de la fecha límite. No mide la primera entrega ni la aprobación. El día del vencimiento aún no se incluye.</li>

@@ -1,5 +1,9 @@
 # Incremento 1: catálogo compartido y selección única
 
+> Documento histórico del incremento 1. El flujo 50/50 descrito aquí fue sustituido
+> por [formularios de actividad y cierre de sesión](activity-forms-session-closure.md)
+> en el incremento 2; usar ese documento para la validación actual.
+
 Fecha: 2026-10-25. Implementación validada por el usuario y autorizada para
 commit/push. La disponibilidad en DEV depende del pipeline y despliegue exitosos,
 no de esta validación local.

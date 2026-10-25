@@ -101,7 +101,6 @@ class JpaActivityAssignments implements ActivityAssignments {
             entity.submit(responseText);
             var saved=repository.saveAndFlush(entity);
             notifications.record(organizationId,saved.id(),Kind.SUBMISSION_RECEIVED);
-            notifications.record(organizationId,saved.id(),Kind.SURVEY_PENDING);
             return data(saved);
         });
     }

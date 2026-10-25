@@ -14,6 +14,8 @@ export type ActivityAssignee = {
   status: ActivityAssignmentStatus; responseText: string | null; submittedAt: string | null;
   reviewComment: string | null; reviewedAt: string | null; surveyStatus: ActivitySurveyStatus | "NOT_REQUIRED";
   completionPercentage: number; version: number; dueDate?: string | null;
+  answers?: Array<{ questionId: string; prompt: string; type: string; values: string[] }>;
+  sessionCompleted?: boolean; sessionProgressPercentage?: number;
 };
 export type ActivityAssignmentStatus = "ASSIGNED" | "SUBMITTED" | "CHANGES_REQUESTED" | "COMPLETED";
 export type ProgramActivity = {
@@ -26,6 +28,7 @@ export type AssignedActivity = Omit<ProgramActivity, "assignees"> & {
   assignmentId: string; assignmentStatus: ActivityAssignmentStatus; responseText: string | null;
   submittedAt: string | null; reviewComment: string | null; reviewedAt: string | null;
   assignmentVersion: number; survey: ActivitySurvey | null; completionPercentage: number;
+  answers?: ActivitySurveyAnswerInput[]; sessionProgressPercentage?: number;
 };
 export type ActivityInput = {
   sessionId: string; title: string; instructions: string; youtubeUrl: string | null; dueDate?: string;
@@ -33,7 +36,7 @@ export type ActivityInput = {
 };
 export type ActivityReviewInput = { decision: "APPROVE" | "REQUEST_CHANGES"; comment: string | null };
 export type ActivitySurveyAnswerInput = { questionId: string; values: string[] };
-export type ActivitySurveySubmission = { evaluationId: string; status: "COMPLETED"; completedAt: string };
+export type ActivitySurveySubmission = { evaluationId: string; status: "COMPLETED"; completedAt: string; answers?: ActivitySurveyAnswerInput[] };
 
 export function compareAssignedActivityOrder(left: AssignedActivity, right: AssignedActivity) {
   return left.dimensionPosition - right.dimensionPosition
@@ -46,8 +49,7 @@ export function compareAssignedActivityOrder(left: AssignedActivity, right: Assi
 
 export function needsCollaboratorAction(activity: AssignedActivity) {
   return activity.assignmentStatus === "ASSIGNED"
-    || activity.assignmentStatus === "CHANGES_REQUESTED"
-    || activity.survey?.status === "PENDING";
+    || activity.assignmentStatus === "CHANGES_REQUESTED";
 }
 
 export function pendingAssignedActivities(activities: AssignedActivity[]) {
@@ -67,7 +69,7 @@ export function programActivitiesPath(organizationId: string, programId: string)
   return `${programsPath(organizationId)}/${encodeURIComponent(programId)}/activities`;
 }
 
-async function request<T>(path: string, method: "GET" | "POST", expected: number,
+export async function activityRequest<T>(path: string, method: "GET" | "POST", expected: number,
   input?: unknown, signal?: AbortSignal): Promise<T> {
   signal?.throwIfAborted();
   const session = await fetchAuthSession();
@@ -93,9 +95,10 @@ async function request<T>(path: string, method: "GET" | "POST", expected: number
       ? body.requestId : undefined;
     throw new ActivityRequestError(response.status, fields, requestId, typeof body?.code === "string" ? body.code : undefined);
   }
-  if (method === "POST" && typeof window !== "undefined") window.dispatchEvent(new Event("rti:notifications-changed"));
+  if (method === "POST" && typeof window !== "undefined") {window.dispatchEvent(new Event("rti:notifications-changed"));window.dispatchEvent(new Event("rti:session-work-changed"));}
   return response.json() as Promise<T>;
 }
+const request=activityRequest;
 
 export const listProgramActivities = (organizationId: string, programId: string, signal?: AbortSignal, includeArchived = false) =>
   request<{ items: ProgramActivity[] }>(programActivitiesPath(organizationId, programId) + (includeArchived ? "?includeArchived=true" : ""), "GET", 200, undefined, signal);
@@ -108,15 +111,11 @@ export const listMyProgramActivities = (programId: string, signal?: AbortSignal)
   request<{ items: AssignedActivity[] }>(`/me/programs/${encodeURIComponent(programId)}/activities`,
     "GET", 200, undefined, signal);
 
-export const submitMyActivity = (programId: string, activityId: string, responseText: string,
-  signal?: AbortSignal) => request<AssignedActivity>(
-    `/me/programs/${encodeURIComponent(programId)}/activities/${encodeURIComponent(activityId)}/submission`,
-    "POST", 200, { responseText }, signal);
-
 export const submitMyActivitySurvey = (programId: string, activityId: string,
-  answers: ActivitySurveyAnswerInput[], signal?: AbortSignal) => request<ActivitySurveySubmission>(
-    `/me/programs/${encodeURIComponent(programId)}/activities/${encodeURIComponent(activityId)}/survey-response`,
-    "POST", 200, { answers }, signal);
+  answers: ActivitySurveyAnswerInput[], version: number, signal?: AbortSignal) => request<ActivitySurveySubmission>(
+    `/me/programs/${encodeURIComponent(programId)}/activities/${encodeURIComponent(activityId)}/submission`,
+    "POST", 200, { answers, version }, signal);
+export const submitMyActivity=submitMyActivitySurvey;
 
 export const reviewActivityAssignment = (organizationId: string, programId: string, activityId: string,
   assignmentId: string, input: ActivityReviewInput, signal?: AbortSignal) => request<ActivityAssignee>(
@@ -129,6 +128,8 @@ export function activityErrorMessage(error: unknown) {
   const status = error instanceof ActivityRequestError ? error.status : 0;
   const code = error instanceof ActivityRequestError ? error.code : undefined;
   const message = code === "PROGRAM_NOT_ACTIVE" ? "El programa no está activo. Actualiza la página para consultar su estado."
+    : code === "SESSION_ALREADY_COMPLETED" ? "La sesión ya fue completada. No permite correcciones ni nuevas actividades."
+    : code === "SESSION_CLOSURE_STARTED" ? "El cierre ya comenzó. Su comentario y encuesta están protegidos."
     : code === "PROGRAM_READ_ONLY" ? "El programa está cerrado y solo permite consulta."
     : code === "PARTICIPATION_READ_ONLY" ? "Tu participación está completada y solo permite consulta."
     : status === 401 ? "Tu sesión no está disponible. Inicia sesión de nuevo."

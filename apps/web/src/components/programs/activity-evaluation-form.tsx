@@ -8,19 +8,21 @@ import { QUESTION_TYPE_LABELS, MAX_QUESTION_OPTIONS, hasCustomOptions, parseQues
 import { SingleChoicePreview } from "@/components/forms/single-choice-options";
 import {
   AGREEMENT_OPTIONS, createActivityEvaluation, EMOTION_OPTIONS, evaluationErrorMessage,
-  EvaluationRequestError, LIKELIHOOD_OPTIONS, NUMERIC_SCALE_OPTIONS, type ActivityEvaluation, type EvaluationQuestionType,
+  EvaluationRequestError, LIKELIHOOD_OPTIONS, NUMERIC_SCALE_OPTIONS, saveSessionEvaluation, type ActivityEvaluation, type EvaluationQuestionType,
 } from "@/lib/participation/evaluation-api";
 
 type DraftQuestion = { key: number; prompt: string; type: EvaluationQuestionType; optionsText: string };
 
-export function ActivityEvaluationForm({ organizationId, programId, activityId, activityTitle, onSaved, initial }: {
-  organizationId: string; programId: string; activityId: string; activityTitle: string;
+export function ActivityEvaluationForm({ organizationId, programId, activityId, activityTitle, onSaved, initial, sessionId }: {
+  organizationId: string; programId: string; activityId?: string; sessionId?: string; activityTitle: string;
   onSaved: (evaluation: ActivityEvaluation) => void; initial?: ActivityEvaluation;
 }) {
   const nextKey = useRef(initial?.questions.length ?? 1);
   const request = useRef<AbortController | null>(null);
   const submitting = useRef(false);
-  const [title, setTitle] = useState(initial?.title ?? `Encuesta posterior · ${activityTitle}`);
+  const formLabel=sessionId?"encuesta de cierre":"formulario";
+  const actionLabel=`${initial?"Editar":"Crear"} ${formLabel}`;
+  const [title, setTitle] = useState(initial?.title ?? `${sessionId?"Encuesta de cierre":"Formulario"} · ${activityTitle}`);
   const [instructions, setInstructions] = useState(initial ? initial.instructions ?? "" : "Responde estas preguntas desde tu experiencia con la actividad.");
   const [questions, setQuestions] = useState<DraftQuestion[]>(initial ? [...initial.questions].sort((a, b) => a.position - b.position).map((q, key) => ({ key, prompt: q.prompt, type: q.type, optionsText: (q.options ?? []).join("\n") })) : [
     { key: 0, prompt: "", type: "AGREEMENT_SCALE", optionsText: "" },
@@ -102,8 +104,10 @@ export function ActivityEvaluationForm({ organizationId, programId, activityId, 
           ...(hasCustomOptions(question.type) ? { options: parseQuestionOptions(question.optionsText) } : {}),
         })),
       };
-      const saved = initial ? await editSurvey(organizationId, programId, activityId, { ...input, version: initial.version }, controller.signal)
-        : await createActivityEvaluation(organizationId, programId, activityId, input, controller.signal);
+      if(!sessionId&&!activityId)throw new EvaluationRequestError(0);
+      const saved = sessionId ? await saveSessionEvaluation(organizationId,programId,sessionId,{...input,...(initial?{version:initial.version}:{})},controller.signal)
+        : initial ? await editSurvey(organizationId, programId, activityId!, { ...input, version: initial.version }, controller.signal)
+        : await createActivityEvaluation(organizationId, programId, activityId!, input, controller.signal);
       if (!controller.signal.aborted) { setBlocked(true); setMessage(initial ? "Encuesta actualizada." : "Encuesta creada."); onSaved(saved); }
     } catch (error) {
       if (!controller.signal.aborted) {
@@ -117,10 +121,10 @@ export function ActivityEvaluationForm({ organizationId, programId, activityId, 
     } finally { submitting.current = false; if (!controller.signal.aborted) setPending(false); }
   }
 
-  return <form aria-label={initial ? "Editar encuesta" : "Crear encuesta"} onSubmit={submit} noValidate className="space-y-6">
-    <div><p className="rti-kicker">Después de la actividad</p>
-      <h2 id="create-evaluation-title" className="mt-2 text-2xl font-semibold">{initial ? "Editar encuesta" : "Crear encuesta"}</h2>
-      <p className="mt-2 text-sm leading-6 text-muted-foreground">El colaborador responderá esta encuesta después de realizar la actividad.</p></div>
+  return <form aria-label={actionLabel} onSubmit={submit} noValidate className="space-y-6">
+    <div><p className="rti-kicker">{sessionId?"Cierre de sesión":"Entrega de la actividad"}</p>
+      <h2 id="create-evaluation-title" className="mt-2 text-2xl font-semibold">{actionLabel}</h2>
+      <p className="mt-2 text-sm leading-6 text-muted-foreground">{sessionId?"Se habilita después de enviar todas las actividades y continuar desde el comentario de cierre.":"Estas preguntas constituyen la entrega de la actividad. No hay un envío de texto libre separado."}</p></div>
     {message && <p role="status" className="rounded-xl bg-muted/60 px-3 py-2 text-sm">{message}</p>}
     <div><label htmlFor="evaluation-title" className="block text-sm font-medium">Nombre de la encuesta</label>
       <input id="evaluation-title" className="rti-field" maxLength={255} value={title}
@@ -194,7 +198,7 @@ export function ActivityEvaluationForm({ organizationId, programId, activityId, 
         <Plus aria-hidden="true" className="size-4" />Agregar pregunta
       </button>
     </section>
-    <button className="rti-button-primary" disabled={pending || blocked}>{pending ? "Guardando…" : initial ? "Guardar cambios" : "Crear encuesta"}</button>
+    <button className="rti-button-primary" disabled={pending || blocked}>{pending ? "Guardando…" : initial ? "Guardar cambios" : actionLabel}</button>
   </form>;
 }
 

@@ -4,7 +4,7 @@ import { CalendarDays, History } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ProgramModal } from "./program-modal";
-import { listSessionAgenda, scheduleSession, sessionHistory, scheduleError, type SessionAgenda, type ScheduledPerson, type SessionHistory } from "@/lib/participation/session-schedule-api";
+import { listSessionAgenda, scheduleSession, sessionHistory, scheduleError, sessionRequirementMessage, type SessionAgenda, type ScheduledPerson, type SessionHistory } from "@/lib/participation/session-schedule-api";
 
 export function SessionAgendaArea({ organizationId, programId, sessionId }: { organizationId: string; programId: string; sessionId?: string }) {
   return <Agenda key={`${organizationId}/${programId}/${sessionId}`} organizationId={organizationId} programId={programId} sessionId={sessionId} />;
@@ -28,7 +28,8 @@ function Agenda({ organizationId, programId, sessionId }: { organizationId: stri
     {message && <p role="status" className="mt-4 rounded-xl bg-muted p-4 text-sm">{message}</p>}
     {agenda && <div className="mt-6 space-y-4">{agenda.items.filter(item => !sessionId || item.session.id === sessionId).map(item => <section key={item.session.id} className="rounded-2xl border border-border p-5">
       <p className="rti-kicker">{item.session.dimensionName}</p><h2 className="mt-2 text-xl font-semibold">{item.session.name}</h2>
-      {agenda.canEdit && <button className="rti-button-primary mt-4" onClick={() => setEditor(item.session.id)}>Agendar participantes</button>}
+      {item.missingRequirement&&<p className="mt-3 rounded-xl bg-muted p-3 text-sm">{sessionRequirementMessage(item.missingRequirement)} Completa el contenido antes de agendar.</p>}
+      {agenda.canEdit && <button disabled={!!item.missingRequirement} className="rti-button-primary mt-4" onClick={() => setEditor(item.session.id)}>Agendar participantes</button>}
       {item.participants.length === 0 && <p className="mt-4 text-sm text-muted-foreground">Agrega participantes al programa para asignar sus fechas.</p>}
       <ul className="mt-4 space-y-3">{item.participants.map(person => <li key={person.enrollmentId} className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-muted/40 p-3 text-sm">
         <div className="min-w-0"><p className="break-words font-medium">{person.name}</p><p className="break-all text-muted-foreground">{person.email}</p>
@@ -63,6 +64,7 @@ export function ScheduleForm({ organizationId, programId, agenda, sessionId, onS
   const afterProgramEnd = Boolean(agenda.endDate && date > agenda.endDate);
   async function submit(event: FormEvent) {
     event.preventDefault(); if (writing.current || blocked) return;
+    if (!agenda.canEdit || item.missingRequirement) { setMessage(sessionRequirementMessage(item.missingRequirement ?? "")); return; }
     if (!people.length || !date || date < min || date > "9999-12-28" || rescheduling && !reason.trim()) {
       setMessage(!people.length ? "Selecciona al menos una persona." : rescheduling && !reason.trim() ? "Escribe el motivo de la reprogramación." : "Selecciona una fecha válida, que no sea pasada ni anterior al inicio del programa."); return;
     }
@@ -87,7 +89,7 @@ export function ScheduleForm({ organizationId, programId, agenda, sessionId, onS
       ? `La sesión queda después del fin previsto del programa (${agenda.endDate}). Puedes guardar esta fecha; no cambiará las fechas del programa y sus actividades vencerán tres días después. Las entregas ya enviadas conservan su vencimiento.`
       : "Puedes agendar después del fin previsto del programa. No se permiten fechas pasadas ni anteriores a su inicio."}</p>
     {rescheduling && <label className="block text-sm font-medium">Motivo de la reprogramación<textarea required maxLength={1000} value={reason} disabled={pending || blocked} onChange={e => setReason(e.target.value)} className="rti-field min-h-24" /></label>}
-    <button className="rti-button-primary" disabled={pending || blocked || !agenda.canEdit}>{pending ? "Guardando…" : "Guardar fechas y asignar actividades"}</button>
+    <button className="rti-button-primary" disabled={pending || blocked || !agenda.canEdit || Boolean(item.missingRequirement)}>{pending ? "Guardando…" : "Guardar fechas y asignar actividades"}</button>
   </form>;
 }
 function ScheduleHistory({ organizationId, programId, sessionId, person }: { organizationId: string; programId: string; sessionId: string; person: ScheduledPerson }) {

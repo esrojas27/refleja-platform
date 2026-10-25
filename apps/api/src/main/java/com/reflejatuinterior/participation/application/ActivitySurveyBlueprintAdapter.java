@@ -32,4 +32,12 @@ class ActivitySurveyBlueprintAdapter implements ActivitySurveyBlueprints {
                         question.prompt(), EvaluationQuestionType.valueOf(question.type()), question.position(), question.options()))
                         .toList());
     }
+    @Override public List<SessionSurvey> listSessions(UUID org,UUID program){
+        return evaluations.listForSessions(org,program).stream().map(e->new SessionSurvey(e.sessionId(),e.title(),e.instructions(),
+            e.questions().stream().map(q->new Question(q.prompt(),q.type().name(),q.position(),q.options())).toList())).toList();
+    }
+    @Override public void createForSession(UUID org,UUID program,UUID session,SurveyDraft survey){
+        evaluations.createForSession(org,program,session,survey.title(),survey.instructions(),survey.questions().stream()
+            .map(q->new ActivityEvaluations.QuestionInput(q.prompt(),EvaluationQuestionType.valueOf(q.type()),q.position(),q.options())).toList());
+    }
 }

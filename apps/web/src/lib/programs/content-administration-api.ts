@@ -21,7 +21,7 @@ async function request<T = void>(org: string, program: string, suffix: string, m
   });
   if (result.status !== expected) {
     const body = await result.json().catch(() => null);
-    const allowed = ["name", "description", "objective", "scheduledDate", "title", "instructions", "youtubeUrl", "dueDate", "questions", "options"];
+    const allowed = ["name", "description", "closingComment", "scheduledDate", "title", "instructions", "youtubeUrl", "dueDate", "questions", "options"];
     const fields = body?.code === "VALIDATION_ERROR" && Array.isArray(body.errors)
       ? body.errors.map((e: { field?: unknown }) => e?.field).filter((f: unknown): f is string => typeof f === "string" && allowed.includes(f)) : [];
     const rid = typeof body?.requestId === "string" && /^[a-f0-9-]{36}$/i.test(body.requestId) ? body.requestId : undefined;
@@ -33,8 +33,8 @@ export const editDimension = (org: string, program: string, id: string,
   input: { name: string; description: string; version: number }, signal?: AbortSignal) =>
   request(org, program, `dimensions/${encodeURIComponent(id)}`, "PUT", { name: input.name, description: input.description, version: input.version }, signal);
 export const editSession = (org: string, program: string, id: string,
-  input: { name: string; objective: string; version: number }, signal?: AbortSignal) =>
-  request(org, program, `sessions/${encodeURIComponent(id)}`, "PUT", { name: input.name, objective: input.objective, version: input.version }, signal);
+  input: { name: string; closingComment: string; version: number }, signal?: AbortSignal) =>
+  request(org, program, `sessions/${encodeURIComponent(id)}`, "PUT", { name: input.name, closingComment: input.closingComment, version: input.version }, signal);
 export const editActivity = (org: string, program: string, id: string,
   input: { title: string; instructions: string; youtubeUrl: string | null; version: number }, signal?: AbortSignal) =>
   request(org, program, `activities/${encodeURIComponent(id)}`, "PUT", { title: input.title, instructions: input.instructions, youtubeUrl: input.youtubeUrl, version: input.version }, signal);

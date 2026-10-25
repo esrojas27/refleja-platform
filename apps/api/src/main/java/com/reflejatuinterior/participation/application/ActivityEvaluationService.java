@@ -29,14 +29,16 @@ public class ActivityEvaluationService {
     private final Enrollments enrollments;
     private final ActivityAssignments assignments;
     private final OrganizationTenantContext tenantContext;
+    private final SessionForms sessionForms;
 
     ActivityEvaluationService(OrganizationAccess organizationAccess, ProgramDirectory programs,
             ProgramActivities activities, ActivityEvaluations evaluations, ActivityEvaluationResponses responses,
             CollaboratorAccess collaboratorAccess, Enrollments enrollments, ActivityAssignments assignments,
-            OrganizationTenantContext tenantContext) {
+            OrganizationTenantContext tenantContext, SessionForms sessionForms) {
         this.organizationAccess = organizationAccess; this.programs = programs; this.activities = activities;
         this.evaluations = evaluations; this.responses = responses; this.collaboratorAccess = collaboratorAccess;
         this.enrollments = enrollments; this.assignments = assignments; this.tenantContext = tenantContext;
+        this.sessionForms=sessionForms;
     }
 
     @Transactional
@@ -65,17 +67,22 @@ public class ActivityEvaluationService {
 
     @Transactional
     public SurveySubmission submit(String subject, UUID programId, UUID activityId,
-            List<ActivityEvaluationResponses.AnswerInput> input, String requestId) {
+            List<ActivityEvaluationResponses.AnswerInput> input, long version, String requestId) {
         var owned = authorizeOwned(subject, programId, activityId, requestId);
         var evaluation = evaluations.find(owned.organizationId(), programId, activityId)
                 .orElseThrow(ProgramActivities.Missing::new);
-        if (owned.assignment().submittedAt() == null
-                || responses.findByAssignment(owned.organizationId(), programId, owned.assignment().id()).isPresent()) {
+        var activity=activities.findAll(owned.organizationId(),programId,List.of(activityId)).stream().findFirst().orElseThrow(ActivityAssignmentNotFound::new);
+        if(sessionForms.isClosed(owned.organizationId(),programId,activity.sessionId(),owned.enrollmentId()))
+            throw new com.reflejatuinterior.program.ProgramContent.Conflict("SESSION_ALREADY_COMPLETED");
+        if(version!=owned.assignment().version()) throw new com.reflejatuinterior.program.ProgramContent.Conflict("CONTENT_VERSION_CONFLICT");
+        if (!Set.of("ASSIGNED","CHANGES_REQUESTED").contains(owned.assignment().status())) {
             throw new ActivityWorkflowConflict();
         }
         var cleanAnswers = validate(evaluation, input);
-        var created = responses.create(owned.organizationId(), programId, activityId, evaluation.id(),
-                owned.assignment().id(), owned.enrollmentId(), cleanAnswers);
+        var previous=responses.findByAssignment(owned.organizationId(),programId,owned.assignment().id());
+        var created = previous.isPresent()?responses.replace(owned.organizationId(),programId,owned.assignment().id(),cleanAnswers)
+            :responses.create(owned.organizationId(), programId, activityId, evaluation.id(),owned.assignment().id(), owned.enrollmentId(), cleanAnswers);
+        assignments.submit(owned.organizationId(),programId,activityId,owned.enrollmentId(),null).orElseThrow(ActivityAssignmentNotFound::new);
         auditSurveyAfterCommit(owned.userId(), owned.organizationId(), created.id(), requestId);
         return new SurveySubmission(evaluation.id(), "COMPLETED", created.completedAt());
     }
@@ -106,7 +113,7 @@ public class ActivityEvaluationService {
         throw new ActivityAssignmentNotFound();
     }
 
-    private static List<ActivityEvaluationResponses.AnswerInput> validate(ActivityEvaluations.Evaluation evaluation,
+    static List<ActivityEvaluationResponses.AnswerInput> validate(ActivityEvaluations.Evaluation evaluation,
             List<ActivityEvaluationResponses.AnswerInput> input) {
         if (input == null || input.size() != evaluation.questions().size()) {
             throw new InvalidActivitySurveyResponse("answers");

@@ -35,11 +35,12 @@ public class ActivityService {
     private final ActivityEvaluations evaluations;
     private final ActivityEvaluationResponses evaluationResponses;
     private final OrganizationTenantContext tenantContext;
+    private final SessionForms sessionForms;
 
     ActivityService(OrganizationAccess organizationAccess, CollaboratorAccess collaboratorAccess,
             CollaboratorInvitations participants, ProgramDirectory programs, ProgramActivities activities,
             Enrollments enrollments, ActivityAssignments assignments, ActivityEvaluations evaluations,
-            ActivityEvaluationResponses evaluationResponses, OrganizationTenantContext tenantContext) {
+            ActivityEvaluationResponses evaluationResponses, OrganizationTenantContext tenantContext,SessionForms sessionForms) {
         this.organizationAccess = organizationAccess;
         this.collaboratorAccess = collaboratorAccess;
         this.participants = participants;
@@ -50,6 +51,7 @@ public class ActivityService {
         this.evaluations = evaluations;
         this.evaluationResponses = evaluationResponses;
         this.tenantContext = tenantContext;
+        this.sessionForms=sessionForms;
     }
 
     @Transactional
@@ -57,6 +59,7 @@ public class ActivityService {
             String title, String instructions, String youtubeUrl, LocalDate dueDate, int position, String requestId) {
         var context = authorizeConsultant(subject, organizationId, programId, "CREATE_ACTIVITY", requestId);
         programs.lock(context.organizationId(), programId).orElseThrow(ProgramActivities.Missing::new).requireEditable();
+        if(sessionForms.hasClosed(organizationId,programId,sessionId))throw new com.reflejatuinterior.program.ProgramContent.Conflict("SESSION_ALREADY_COMPLETED");
         var activity = activities.create(context.organizationId(), programId, sessionId,
                 title, instructions, youtubeUrl, dueDate, position);
         var createdAssignments = assignments.assignScheduledActivity(context.organizationId(), programId, activity.id());
@@ -121,43 +124,6 @@ public class ActivityService {
     }
 
     @Transactional
-    public AssignedActivityResponse submit(String subject, UUID programId, UUID activityId,
-            String responseText, String requestId) {
-        var cleanResponse = responseText == null ? "" : responseText.trim();
-        if (cleanResponse.isEmpty() || cleanResponse.length() > 10000) {
-            throw new InvalidActivityAssignment("responseText");
-        }
-        CollaboratorAccess.Context context;
-        try {
-            context = collaboratorAccess.resolve(subject);
-        } catch (CollaboratorAccess.Denied exception) {
-            denied(null, null, programId, "SUBMIT_ACTIVITY", requestId);
-            throw exception;
-        }
-        for (var membership : context.memberships().stream()
-                .sorted(Comparator.comparing(CollaboratorAccess.Membership::organizationId)).toList()) {
-            tenantContext.activate(membership.organizationId());
-            var enrollment = enrollments.findOwned(membership.organizationId(), membership.id(), programId);
-            if (enrollment.isEmpty()) continue;
-            programs.lock(membership.organizationId(), programId).orElseThrow(MyProgramNotFound::new).requireActive();
-            var currentEnrollment=enrollments.lock(membership.organizationId(),programId,enrollment.get().id());
-            if(!Set.of("ACTIVE","COMPLETED").contains(currentEnrollment.status())) throw new ActivityAssignmentNotFound();
-            if(!"ACTIVE".equals(currentEnrollment.status())) throw new EnrollmentAdministrationConflict("PARTICIPATION_READ_ONLY");
-            var activity = activities.findAll(membership.organizationId(), programId, List.of(activityId)).stream()
-                    .findFirst().orElseThrow(ActivityAssignmentNotFound::new);
-            var submitted = assignments.submit(membership.organizationId(), programId, activityId,
-                    enrollment.get().id(), cleanResponse).orElseThrow(ActivityAssignmentNotFound::new);
-            auditAfterCommit("PROGRAM_ACTIVITY_SUBMITTED", context.userId(), membership.organizationId(), activityId, requestId);
-            var evaluation = evaluations.find(membership.organizationId(), programId, activityId);
-            var completedAt = evaluationResponses.findByAssignment(membership.organizationId(), programId, submitted.id())
-                    .map(ActivityEvaluationResponses.Response::completedAt).orElse(null);
-            return assignedResponse(activity, submitted, evaluation, completedAt);
-        }
-        denied(context.userId(), null, programId, "SUBMIT_ACTIVITY", requestId);
-        throw new ActivityAssignmentNotFound();
-    }
-
-    @Transactional
     public AssigneeResponse review(String subject, UUID organizationId, UUID programId, UUID activityId,
             UUID assignmentId, ActivityReviewDecision decision, String comment, String requestId) {
         var context = authorizeConsultant(subject, organizationId, programId, "REVIEW_ACTIVITY", requestId);
@@ -170,6 +136,9 @@ public class ActivityService {
         var assignment = assignments.listByActivities(context.organizationId(), programId, List.of(activityId)).stream()
                 .filter(item -> item.id().equals(assignmentId)).findFirst()
                 .orElseThrow(ActivityAssignmentNotFound::new);
+        var definition=activities.findAll(organizationId,programId,List.of(activityId)).stream().findFirst().orElseThrow(ActivityAssignmentNotFound::new);
+        if(decision==ActivityReviewDecision.REQUEST_CHANGES&&sessionForms.isClosed(organizationId,programId,definition.sessionId(),assignment.enrollmentId()))
+            throw new com.reflejatuinterior.program.ProgramContent.Conflict("SESSION_ALREADY_COMPLETED");
         var evaluation = evaluations.find(context.organizationId(), programId, activityId);
         if (evaluation.isPresent()
                 && evaluationResponses.findByAssignment(context.organizationId(), programId, assignment.id()).isEmpty()) {
@@ -182,7 +151,7 @@ public class ActivityService {
                 context.userId(), context.organizationId(), activityId, requestId);
         var completedAt = evaluationResponses.findByAssignment(context.organizationId(), programId, reviewed.id())
                 .map(ActivityEvaluationResponses.Response::completedAt).orElse(null);
-        return assignee(context.organizationId(), programId, reviewed, evaluation, completedAt);
+        return assignee(context.organizationId(), programId, definition.sessionId(), reviewed, evaluation, completedAt);
     }
 
     private OrganizationAccess.Context authorizeConsultant(String subject, UUID organizationId, UUID programId,
@@ -214,7 +183,7 @@ public class ActivityService {
             Optional<ActivityEvaluations.Evaluation> evaluation, Map<UUID, Instant> completedAt) {
         var assignees = new ArrayList<AssigneeResponse>(activityAssignments.size());
         for (var assignment : activityAssignments) {
-            assignees.add(assignee(activity.organizationId(), activity.programId(), assignment,
+            assignees.add(assignee(activity.organizationId(), activity.programId(), activity.sessionId(), assignment,
                     evaluation, completedAt.get(assignment.id())));
         }
         return new ActivityResponse(activity.id(), activity.organizationId(), activity.programId(),
@@ -224,16 +193,18 @@ public class ActivityService {
                 activity.position(), activity.version(), assignees, activity.archived());
     }
 
-    private AssigneeResponse assignee(UUID organizationId, UUID programId, ActivityAssignments.Data assignment,
+    private AssigneeResponse assignee(UUID organizationId, UUID programId, UUID sessionId, ActivityAssignments.Data assignment,
             Optional<ActivityEvaluations.Evaluation> evaluation, Instant surveyCompletedAt) {
         var enrollment = enrollments.find(organizationId, programId, assignment.enrollmentId())
                 .orElseThrow(EnrollmentNotFound::new);
         var participant = participants.participant(organizationId, enrollment.membershipId());
+        var closure = sessionForms.state(organizationId, programId, sessionId, assignment.enrollmentId());
         return new AssigneeResponse(assignment.id(), enrollment.id(), participant.email(),
                 participant.firstName(), participant.lastName(), assignment.status(), assignment.responseText(),
                 assignment.submittedAt(), assignment.reviewComment(), assignment.reviewedAt(),
                 surveyStatus(evaluation, assignment, surveyCompletedAt),
-                completionPercentage(evaluation, assignment, surveyCompletedAt), assignment.version(),assignment.dueDate());
+                completionPercentage(evaluation, assignment, surveyCompletedAt), assignment.version(),assignment.dueDate(),
+                reviewedAnswers(organizationId,programId,assignment,evaluation),closure.completed(),closure.percentage());
     }
 
     private AssignedActivityResponse assignedResponse(ProgramActivities.Activity activity,
@@ -247,7 +218,9 @@ public class ActivityService {
                 assignment.responseText(), assignment.submittedAt(), assignment.reviewComment(),
                 assignment.reviewedAt(), assignment.version(),
                 evaluation.map(value -> survey(value, assignment, surveyCompletedAt)).orElse(null),
-                completionPercentage(evaluation, assignment, surveyCompletedAt));
+                completionPercentage(evaluation, assignment, surveyCompletedAt),
+                evaluationResponses.findByAssignment(activity.organizationId(),activity.programId(),assignment.id()).map(ActivityEvaluationResponses.Response::answers).orElse(List.of()),
+                sessionForms.state(activity.organizationId(),activity.programId(),activity.sessionId(),assignment.enrollmentId()).percentage());
     }
 
     private static SurveyResponse survey(ActivityEvaluations.Evaluation evaluation,
@@ -261,14 +234,13 @@ public class ActivityService {
     private static String surveyStatus(Optional<ActivityEvaluations.Evaluation> evaluation,
             ActivityAssignments.Data assignment, Instant completedAt) {
         if (evaluation.isEmpty()) return "NOT_REQUIRED";
-        if (completedAt != null) return "COMPLETED";
-        return assignment.submittedAt() == null ? "LOCKED" : "PENDING";
+        if (completedAt != null&&!"CHANGES_REQUESTED".equals(assignment.status())) return "COMPLETED";
+        return "PENDING";
     }
 
     private static int completionPercentage(Optional<ActivityEvaluations.Evaluation> evaluation,
             ActivityAssignments.Data assignment, Instant completedAt) {
-        if (assignment.submittedAt() == null) return 0;
-        return evaluation.isEmpty() || completedAt != null ? 100 : 50;
+        return completedAt!=null&&!"CHANGES_REQUESTED".equals(assignment.status())?100:0;
     }
 
     private static void auditAfterCommit(String action, UUID actor, UUID organizationId,
@@ -291,7 +263,8 @@ public class ActivityService {
     public record AssigneeResponse(UUID assignmentId, UUID enrollmentId, String email, String firstName,
             String lastName, String status, String responseText, Instant submittedAt,
             String reviewComment, Instant reviewedAt, String surveyStatus,
-            int completionPercentage, long version, LocalDate dueDate) {}
+            int completionPercentage, long version, LocalDate dueDate,List<ReviewedAnswer> answers,boolean sessionCompleted,double sessionProgressPercentage) {}
+    public record ReviewedAnswer(UUID questionId,String prompt,String type,List<String> values){}
     public record ActivityResponse(UUID id, UUID organizationId, UUID programId, UUID moduleId, UUID sessionId,
             String dimensionName, int dimensionPosition, String sessionName, int sessionPosition,
             String title, String instructions, String youtubeUrl,
@@ -305,10 +278,16 @@ public class ActivityService {
             String youtubeUrl, LocalDate dueDate, int position, long version,
             UUID assignmentId, String assignmentStatus, String responseText, Instant submittedAt,
             String reviewComment, Instant reviewedAt, long assignmentVersion,
-            SurveyResponse survey, int completionPercentage) {}
+            SurveyResponse survey, int completionPercentage,List<ActivityEvaluationResponses.Answer> answers,double sessionProgressPercentage) {}
     public record SurveyResponse(UUID id, String title, String instructions,
             List<SurveyQuestionResponse> questions, String status, Instant completedAt) {
         public SurveyResponse { questions = List.copyOf(questions); }
     }
     public record SurveyQuestionResponse(UUID id, String prompt, String type, int position, List<String> options) {}
+    private List<ReviewedAnswer> reviewedAnswers(UUID org,UUID program,ActivityAssignments.Data assignment,Optional<ActivityEvaluations.Evaluation> evaluation){
+        var answer=evaluationResponses.findByAssignment(org,program,assignment.id());
+        if(answer.isEmpty()||evaluation.isEmpty())return List.of();
+        return evaluation.get().questions().stream().map(q->new ReviewedAnswer(q.id(),q.prompt(),q.type().name(),
+            answer.get().answers().stream().filter(a->a.questionId().equals(q.id())).findFirst().map(ActivityEvaluationResponses.Answer::values).orElse(List.of()))).toList();
+    }
 }

@@ -25,13 +25,15 @@ public class ContentAdministrationService {
     private final ActivityAssignments assignments;
     private final ActivityEvaluations surveys;
     private final SessionSchedules schedules;
+    private final SessionForms sessionForms;
 
     ContentAdministrationService(OrganizationAccess access, OrganizationTenantContext tenant, ProgramDirectory programs,
             ProgramContent content, ProgramContentUsage usage, ProgramActivities activities,
-            ActivityAssignments assignments, ActivityEvaluations surveys, SessionSchedules schedules) {
+            ActivityAssignments assignments, ActivityEvaluations surveys, SessionSchedules schedules,SessionForms sessionForms) {
         this.access = access; this.tenant = tenant; this.programs = programs; this.content = content;
         this.usage = usage; this.activities = activities; this.assignments = assignments; this.surveys = surveys;
         this.schedules=schedules;
+        this.sessionForms=sessionForms;
     }
 
     public void editDimension(String subject, UUID org, UUID program, UUID id, long version, String name, String description, String request) {
@@ -43,6 +45,9 @@ public class ContentAdministrationService {
     public void editSession(String subject, UUID org, UUID program, UUID id, long version, String name, String objective, LocalDate date, String request) {
         var actor = authorize(subject, org, program);
         node(org, program, ProgramContent.Kind.SESSION, id, version).requireVisible();
+        var old=schedules.sessions(org,program).stream().filter(s->s.id().equals(id)).findFirst().orElseThrow(ProgramActivities.Missing::new);
+        if(sessionForms.hasStarted(org,program,id)&&!java.util.Objects.equals(old.objective(),objective==null||objective.isBlank()?null:objective.trim()))
+            throw new ProgramContent.Conflict("SESSION_CLOSURE_STARTED");
         content.editSession(org, program, id, name, objective, date);
         audit(actor, program, id, "SESSION_UPDATED", request);
     }
@@ -69,6 +74,8 @@ public class ContentAdministrationService {
         var node = node(org, program, kind, id, version);
         if (node.parentArchived()) throw new ProgramContent.Conflict("CONTENT_PARENT_ARCHIVED");
         if (archived && started(org, program, node.activityIds())) throw new ProgramContent.Conflict("CONTENT_HAS_SUBMISSIONS");
+        if(!archived&&node.activityIds().stream().map(activity->source(org,program,activity)).anyMatch(a->sessionForms.hasClosed(org,program,a.sessionId())))
+            throw new ProgramContent.Conflict("SESSION_ALREADY_COMPLETED");
         content.archive(org, program, kind, id, archived);
         if (!archived) node.activityIds().forEach(activity -> assignments.assignScheduledActivity(org,program,activity));
         audit(actor, program, id, archived ? "CONTENT_ARCHIVED" : "CONTENT_RESTORED", request);
@@ -87,6 +94,7 @@ public class ContentAdministrationService {
             throw new ProgramContent.Conflict("CONTENT_HAS_ASSIGNMENTS");
         if(kind!=ProgramContent.Kind.ACTIVITY&&schedules.hasSchedules(org,program,kindPath,id)) throw new ProgramContent.Conflict("CONTENT_HAS_SCHEDULES");
         surveys.deleteUnassignedDefinitions(org, program, node.activityIds());
+        surveys.deleteSessionDefinitions(org,program,sessionForms.containedSessions(org,program,kindPath,id));
         content.deleteUnassigned(org, program, kind, id);
         audit(actor, program, id, "UNASSIGNED_CONTENT_DELETED", request);
     }
@@ -94,6 +102,7 @@ public class ContentAdministrationService {
         var actor = authorize(subject, org, program);
         node(org, program, ProgramContent.Kind.ACTIVITY, id, version).requireVisible();
         var source = source(org, program, id);
+        if(sessionForms.hasClosed(org,program,source.sessionId()))throw new ProgramContent.Conflict("SESSION_ALREADY_COMPLETED");
         int position = activities.listIncludingArchived(org, program).stream().filter(a -> a.sessionId().equals(source.sessionId()))
                 .mapToInt(ProgramActivities.Activity::position).max().orElse(0) + 1;
         String title = source.title().substring(0, Math.min(247, source.title().length())) + " (copia)";

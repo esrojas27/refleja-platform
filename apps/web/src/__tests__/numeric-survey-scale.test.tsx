@@ -37,7 +37,7 @@ it("offers the numeric type when creating a question and saves its definition", 
   fireEvent.change(screen.getByLabelText("Tipo de respuesta"), { target: { value: "NUMERIC_SCALE" } });
   expect(screen.getByRole<HTMLOptionElement>("option", { name: "Escala numérica · 1–5" }).selected).toBe(true);
   expect(screen.getAllByText(/^[1-5]$/)).toHaveLength(5);
-  fireEvent.submit(screen.getByRole("form", { name: "Crear encuesta" }));
+  fireEvent.submit(screen.getByRole("form", { name: "Crear formulario" }));
   await waitFor(() => expect(createActivityEvaluation).toHaveBeenCalledWith("org", "program", "activity", expect.objectContaining({
     questions: [{ prompt: question.prompt, type: "NUMERIC_SCALE", position: 1 }],
   }), expect.any(AbortSignal)));
@@ -47,7 +47,7 @@ it("loads and edits an existing numeric question without changing its type", asy
   render(<ActivityEvaluationForm {...props} initial={definition} />);
   expect(screen.getByLabelText<HTMLSelectElement>("Tipo de respuesta").value).toBe("NUMERIC_SCALE");
   fireEvent.change(screen.getByLabelText("Enunciado"), { target: { value: "Nivel de avance" } });
-  fireEvent.submit(screen.getByRole("form", { name: "Editar encuesta" }));
+  fireEvent.submit(screen.getByRole("form", { name: "Editar formulario" }));
   await waitFor(() => expect(editSurvey).toHaveBeenCalledWith("org", "program", "activity", expect.objectContaining({
     version: 2, questions: [{ prompt: "Nivel de avance", type: "NUMERIC_SCALE", position: 1 }],
   }), expect.any(AbortSignal)));
@@ -55,7 +55,7 @@ it("loads and edits an existing numeric question without changing its type", asy
 
 it("lets the collaborator choose exactly one number and sends only that value", async () => {
   const completed = vi.fn();
-  const view=render(<ActivitySurveyForm programId="program" activityId="activity" survey={survey} onCompleted={completed} />);
+  const view=render(<ActivitySurveyForm version={0} programId="program" activityId="activity" survey={survey} onCompleted={completed} />);
   const radios=screen.getAllByRole<HTMLInputElement>("radio");
   expect(radios.map(input=>input.value)).toEqual(["1","2","3","4","5"]);
   expect(view.container.querySelectorAll("ol")).toHaveLength(1);
@@ -64,19 +64,19 @@ it("lets the collaborator choose exactly one number and sends only that value", 
   fireEvent.click(screen.getByRole("radio",{name:"5"}));
   fireEvent.click(screen.getByRole("radio",{name:"2"}));
   expect(radios.filter(input=>input.checked).map(input=>input.value)).toEqual(["2"]);
-  fireEvent.click(screen.getByRole("button",{name:"Enviar encuesta"}));
-  await waitFor(()=>expect(submitMyActivitySurvey).toHaveBeenCalledWith("program","activity",[{questionId:"numeric-question",values:["2"]}]));
+  fireEvent.click(screen.getByRole("button",{name:"Enviar actividad"}));
+  await waitFor(()=>expect(submitMyActivitySurvey).toHaveBeenCalledWith("program","activity",[{questionId:"numeric-question",values:["2"]}],0));
   expect(completed).toHaveBeenCalledOnce();
 });
 
 it("requires a numeric selection and disables the scale during submission", async () => {
   vi.mocked(submitMyActivitySurvey).mockReturnValue(new Promise(()=>{}));
-  render(<ActivitySurveyForm programId="program" activityId="activity" survey={survey} onCompleted={vi.fn()} />);
-  fireEvent.click(screen.getByRole("button",{name:"Enviar encuesta"}));
+  render(<ActivitySurveyForm version={0} programId="program" activityId="activity" survey={survey} onCompleted={vi.fn()} />);
+  fireEvent.click(screen.getByRole("button",{name:"Enviar actividad"}));
   expect(screen.getByText("Esta pregunta es obligatoria.")).toBeTruthy();
   expect(submitMyActivitySurvey).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("radio",{name:"1"}));
-  fireEvent.click(screen.getByRole("button",{name:"Enviar encuesta"}));
+  fireEvent.click(screen.getByRole("button",{name:"Enviar actividad"}));
   await waitFor(()=>expect(submitMyActivitySurvey).toHaveBeenCalledOnce());
   expect(screen.getAllByRole<HTMLInputElement>("radio").every(input=>input.disabled)).toBe(true);
 });

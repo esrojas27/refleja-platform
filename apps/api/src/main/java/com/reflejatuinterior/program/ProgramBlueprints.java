@@ -21,7 +21,7 @@ public interface ProgramBlueprints {
         public Dimension { sessions = List.copyOf(sessions); }
     }
 
-    record Session(String name, String description, String objective, LocalDate scheduledDate,
+    record Session(UUID id, String name, String description, String objective, LocalDate scheduledDate,
                    int position, List<Activity> activities) {
         public Session { activities = List.copyOf(activities); }
     }

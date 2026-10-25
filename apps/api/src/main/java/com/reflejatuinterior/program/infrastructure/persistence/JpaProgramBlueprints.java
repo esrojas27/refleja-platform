@@ -41,7 +41,7 @@ class JpaProgramBlueprints implements ProgramBlueprints {
                     organizationId, programId).stream().filter(d -> !d.archived()).map(dimension -> new Dimension(
                             dimension.name(), dimension.description(), dimension.position(),
                             storedSessions.stream().filter(session -> !session.archived() && session.moduleId().equals(dimension.id()))
-                                    .map(session -> new Session(session.name(), session.description(),
+                                    .map(session -> new Session(session.id(), session.name(), session.description(),
                                             session.objective(), session.scheduledDate(), session.position(),
                                             storedActivities.stream()
                                                     .filter(activity -> !activity.archived() && activity.sessionId().equals(session.id()))

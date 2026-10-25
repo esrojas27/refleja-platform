@@ -3,7 +3,8 @@ import { ParticipationRequestError } from "./participation-api";
 
 export type AgendaSession = { id: string; moduleId: string; dimensionName: string; name: string; objective: string | null; dimensionPosition: number; position: number };
 export type ScheduledPerson = { enrollmentId: string; email: string; name: string; status: string; enabled: boolean; scheduledDate: string | null; version: number | null };
-export type SessionAgenda = { canEdit: boolean; today: string; startDate: string | null; endDate: string | null; items: { session: AgendaSession; participants: ScheduledPerson[] }[] };
+export type SessionAgenda = { canEdit: boolean; today: string; startDate: string | null; endDate: string | null; items: { session: AgendaSession; participants: ScheduledPerson[];missingRequirement?:string }[] };
+export const sessionRequirementMessage=(code:string)=>({SESSION_MISSING_ACTIVITIES:"Faltan actividades.",SESSION_MISSING_ACTIVITY_FORM:"Falta configurar el formulario de alguna actividad.",SESSION_MISSING_CLOSING_COMMENT:"Falta el comentario de cierre.",SESSION_MISSING_CLOSING_SURVEY:"Falta la encuesta de cierre de sesión."}[code]??"Completa la configuración de la sesión.");
 export type OwnedSession = { session: AgendaSession; scheduledDate: string };
 export type SessionRevision = { id: string; enrollmentId: string; previousDate: string | null; scheduledDate: string; actorLabel: string; reason: string; source: string; recordedAt: string };
 export type SessionHistory = { items: SessionRevision[]; page: number; size: number; totalElements: number; totalPages: number };

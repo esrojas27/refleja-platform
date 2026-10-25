@@ -348,12 +348,14 @@ function addDays(date: string, days: number) {
 
 function primaryReadinessIssue(issues: string[]) {
   const priority = ["PROGRAM_WITHOUT_DATES", "MISSING_DIMENSIONS", "DIMENSION_WITHOUT_SESSIONS",
-    "SESSION_WITHOUT_ACTIVITIES", "ACTIVITY_WITHOUT_SURVEY"];
+    "SESSION_WITHOUT_ACTIVITIES", "ACTIVITY_WITHOUT_SURVEY", "SESSION_WITHOUT_CLOSING_COMMENT", "SESSION_WITHOUT_CLOSING_SURVEY"];
   const issue = priority.find(candidate => issues.includes(candidate)) ?? issues[0];
   return ({ PROGRAM_WITHOUT_DATES: "Faltan las fechas del programa.",
     MISSING_DIMENSIONS: "Faltan dimensiones.",
     DIMENSION_WITHOUT_SESSIONS: "Faltan sesiones.",
     SESSION_WITHOUT_ACTIVITIES: "Faltan actividades.",
-    ACTIVITY_WITHOUT_SURVEY: "Faltan encuestas." } as Record<string, string>)[issue]
+    ACTIVITY_WITHOUT_SURVEY: "Faltan formularios de actividades.",
+    SESSION_WITHOUT_CLOSING_COMMENT: "Faltan comentarios de cierre.",
+    SESSION_WITHOUT_CLOSING_SURVEY: "Faltan encuestas de cierre de sesión." } as Record<string, string>)[issue]
     ?? "Falta completar el contenido del programa.";
 }

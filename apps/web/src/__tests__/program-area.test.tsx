@@ -118,7 +118,7 @@ it("explains missing content and disables template creation", async () => {
   vi.mocked(getProgramTemplateReadiness).mockResolvedValue({ eligible: false, dimensionCount: 1,
     sessionCount: 1, activityCount: 1, surveyCount: 0, issues: ["ACTIVITY_WITHOUT_SURVEY"] });
   render(<ProgramArea organizationId="org-a" mode="detail" programId="program-a" />);
-  expect(await screen.findByText("Faltan encuestas.")).toBeTruthy();
+  expect(await screen.findByText("Faltan formularios de actividades.")).toBeTruthy();
   expect((screen.getByRole("button", { name: "Crear plantilla global" }) as HTMLButtonElement).disabled).toBe(true);
 });
 

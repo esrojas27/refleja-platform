@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ProgramReportService {
+    private final SessionForms sessionForms;
     private final OrganizationAccess access;
     private final OrganizationTenantContext tenant;
     private final OrganizationDirectory organizations;
@@ -37,10 +38,11 @@ public class ProgramReportService {
     ProgramReportService(OrganizationAccess access, OrganizationTenantContext tenant, OrganizationDirectory organizations,
             ProgramDirectory programs, ProgramActivities activities, ActivityAssignments assignments,
             ActivityEvaluations evaluations, ActivityEvaluationResponses responses, Enrollments enrollments,
-            CollaboratorInvitations people, SurveyResultsService surveys) {
+            CollaboratorInvitations people, SurveyResultsService surveys,SessionForms sessionForms) {
         this.access = access; this.tenant = tenant; this.organizations = organizations; this.programs = programs;
         this.activities = activities; this.assignments = assignments; this.evaluations = evaluations;
         this.responses = responses; this.enrollments = enrollments; this.people = people; this.surveys = surveys;
+        this.sessionForms=sessionForms;
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -76,14 +78,15 @@ public class ProgramReportService {
         for (var definition : definitions) for (var assignment : byActivity.getOrDefault(definition.id(), List.of())) {
             var surveyAt = completed.get(assignment.id());
             boolean required = surveyActivities.contains(definition.id());
-            int progress = assignment.submittedAt() == null ? 0 : required && surveyAt == null ? 50 : 100;
+            int progress = surveyAt!=null&&!"CHANGES_REQUESTED".equals(assignment.status())?100:0;
             // This is the latest submitted version, not a historical first-submission metric.
             boolean onTime = assignment.dueDate()!=null && assignment.submittedAt() != null && !assignment.submittedAt().atZone(zone).toLocalDate().isAfter(assignment.dueDate())
                     && (!required || surveyAt != null && !surveyAt.atZone(zone).toLocalDate().isAfter(assignment.dueDate()));
             work.add(new ProgramReport.Work(assignment.id(), assignment.enrollmentId(), definition.id(), definition.title(),
                     definition.moduleId(), definition.dimensionName(), definition.sessionId(), definition.sessionName(), assignment.dueDate(),
                     assignment.status(), assignment.submittedAt(), required, surveyAt, progress,
-                    assignment.dueDate()!=null && !"COMPLETED".equals(assignment.status()) && assignment.dueDate().isBefore(today), onTime));
+                    assignment.dueDate()!=null && !"COMPLETED".equals(assignment.status()) && assignment.dueDate().isBefore(today), onTime,
+                    sessionForms.state(org,program,definition.sessionId(),assignment.enrollmentId()).percentage()));
         }
         var byPerson = work.stream().collect(Collectors.groupingBy(ProgramReport.Work::enrollmentId));
         var personReports = participants.stream().map(p -> {
@@ -110,7 +113,7 @@ public class ProgramReportService {
         return new ProgramReport.Summary(participantCount, participating, work.size(), submitted, count(work, "ASSIGNED"), count(work, "SUBMITTED"),
                 count(work, "CHANGES_REQUESTED"), approved, (int) work.stream().filter(ProgramReport.Work::overdue).count(),
                 (int) work.stream().filter(ProgramReport.Work::surveyRequired).count(), (int) work.stream().filter(w -> w.surveyRequired() && w.surveyCompletedAt() != null).count(),
-                due, onTime, work.isEmpty() ? null : round(work.stream().mapToInt(ProgramReport.Work::progressPercentage).average().orElseThrow()),
+                due, onTime, work.isEmpty() ? null : round(work.stream().collect(Collectors.toMap(w->w.enrollmentId()+"/"+w.sessionId(),ProgramReport.Work::sessionProgressPercentage,(a,b)->a)).values().stream().mapToDouble(Double::doubleValue).average().orElseThrow()),
                 rate(approved, work.size()), rate(participating, participantCount), rate(onTime, due));
     }
     private static int count(List<ProgramReport.Work> work, String status) { return (int) work.stream().filter(w -> status.equals(w.status())).count(); }

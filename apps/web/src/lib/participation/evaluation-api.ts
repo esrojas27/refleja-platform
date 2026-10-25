@@ -6,7 +6,7 @@ export type { EvaluationQuestionType } from "@/lib/forms/question-catalog";
 export { AGREEMENT_OPTIONS, LIKELIHOOD_OPTIONS, NUMERIC_SCALE_OPTIONS, EMOTION_OPTIONS } from "@/lib/forms/question-catalog";
 export type EvaluationQuestion = FormQuestion & { version: number };
 export type ActivityEvaluation = {
-  id: string; organizationId: string; programId: string; activityId: string; title: string;
+  id: string; organizationId: string; programId: string; activityId: string | null; sessionId?: string | null; title: string;
   instructions: string | null; questions: EvaluationQuestion[]; version: number;
 };
 export type EvaluationInput = {
@@ -56,6 +56,10 @@ export const createActivityEvaluation = (organizationId: string, programId: stri
   input: EvaluationInput, signal?: AbortSignal) => request<ActivityEvaluation>(
     `${programActivitiesPath(organizationId, programId)}/${encodeURIComponent(activityId)}/evaluation`,
     "POST", 201, input, signal);
+export const listSessionEvaluations = (organizationId: string, programId: string, signal?: AbortSignal) =>
+  request<{items:ActivityEvaluation[];closedSessionIds:string[];startedSessionIds:string[]}>(programEvaluationsPath(organizationId,programId).replace(/\/evaluations$/,"/session-surveys"),"GET",200,undefined,signal);
+export const saveSessionEvaluation = (organizationId:string,programId:string,sessionId:string,input:EvaluationInput & {version?:number},signal?:AbortSignal) =>
+  request<ActivityEvaluation>(`${programActivitiesPath(organizationId,programId).replace(/\/activities$/,"")}/sessions/${encodeURIComponent(sessionId)}/survey`,"POST",200,input,signal);
 
 export function evaluationErrorMessage(error: unknown) {
   const status = error instanceof EvaluationRequestError ? error.status : 0;

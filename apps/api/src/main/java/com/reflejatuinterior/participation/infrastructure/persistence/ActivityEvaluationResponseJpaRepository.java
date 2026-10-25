@@ -7,6 +7,7 @@ import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 interface ActivityEvaluationResponseJpaRepository extends JpaRepository<ActivityEvaluationResponseJpaEntity, UUID> {
+    Optional<ActivityEvaluationResponseJpaEntity> findByOrganizationIdAndProgramIdAndSessionIdAndEnrollmentId(UUID org,UUID program,UUID session,UUID enrollment);
     boolean existsByOrganizationIdAndProgramIdAndActivityIdIn(UUID organizationId, UUID programId, Collection<UUID> activityIds);
     Optional<ActivityEvaluationResponseJpaEntity> findByOrganizationIdAndProgramIdAndAssignmentId(
             UUID organizationId, UUID programId, UUID assignmentId);

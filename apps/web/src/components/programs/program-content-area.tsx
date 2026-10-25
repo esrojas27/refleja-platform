@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import { fetchCurrentIdentity, IdentityRequestError } from "@/lib/auth/authenticated-api";
 import { ActivityRequestError, listProgramActivities, type ProgramActivity } from "@/lib/participation/activity-api";
-import { EvaluationRequestError, listActivityEvaluations, type ActivityEvaluation } from "@/lib/participation/evaluation-api";
+import { EvaluationRequestError, listActivityEvaluations, listSessionEvaluations, type ActivityEvaluation } from "@/lib/participation/evaluation-api";
 import {
   createProgramDimension, createProgramSession, listProgramDimensions, programContentErrorMessage,
   ProgramContentRequestError, type ProgramDimension, type ProgramDimensionInput, type ProgramSession,
@@ -23,7 +23,8 @@ import { ContentTools } from "./content-tools";
 type ContentDialog = { kind: "dimension"; initial?: ProgramDimension }
   | { kind: "session"; dimension: ProgramDimension; initial?: ProgramSession }
   | { kind: "activity"; dimensionName: string; session: ProgramSession; initial?: ProgramActivity }
-  | { kind: "evaluation"; activity: ProgramActivity; initial?: ActivityEvaluation };
+  | { kind: "evaluation"; activity: ProgramActivity; initial?: ActivityEvaluation }
+  | { kind: "session-evaluation"; session: ProgramSession; initial?: ActivityEvaluation };
 
 export function ProgramContentArea({ organizationId, programId }: { organizationId: string; programId: string }) {
   return <ProgramContent key={`${organizationId}/${programId}`} organizationId={organizationId} programId={programId} />;
@@ -34,6 +35,9 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
   const [dimensions, setDimensions] = useState<ProgramDimension[]>();
   const [activities, setActivities] = useState<ProgramActivity[]>();
   const [evaluations, setEvaluations] = useState<ActivityEvaluation[]>();
+  const [sessionEvaluations,setSessionEvaluations]=useState<ActivityEvaluation[]>([]);
+  const [closedSessions,setClosedSessions]=useState<string[]>([]);
+  const [startedSessions,setStartedSessions]=useState<string[]>([]);
   const [attempt, setAttempt] = useState(0);
   const [pending, setPending] = useState(true);
   const [message, setMessage] = useState("Comprobando acceso al contenido…");
@@ -53,15 +57,16 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
           setMessage("Sólo un consultor autorizado puede gestionar el contenido.");
           return;
         }
-        const [structure, activityList, evaluationList] = await Promise.all([
+        const [structure, activityList, evaluationList, sessionList] = await Promise.all([
           listProgramDimensions(organizationId, programId, controller.signal, true),
           listProgramActivities(organizationId, programId, controller.signal, true),
           listActivityEvaluations(organizationId, programId, controller.signal),
+          listSessionEvaluations(organizationId, programId, controller.signal),
         ]);
         if (!controller.signal.aborted) {
           setDimensions(structure.items);
           setActivities(activityList.items);
-          setEvaluations(evaluationList.items);
+          setEvaluations(evaluationList.items);setSessionEvaluations(sessionList.items);setClosedSessions(sessionList.closedSessionIds);setStartedSessions(sessionList.startedSessionIds);
           setMessage(structure.items.length ? "" : "Este programa todavía no tiene dimensiones.");
         }
       } catch (error) {
@@ -161,6 +166,9 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
             {dimension.sessions.length === 0 ? <p className="mt-4 text-sm text-muted-foreground">Esta dimensión todavía no tiene sesiones.</p>
               : <ol className="mt-4 space-y-3">{visibleSessions.map(session => {
                 const sessionOpen = openSessionId === session.id;
+                const closingSurvey=sessionEvaluations.find(s=>s.sessionId===session.id);
+                const sessionClosed=closedSessions.includes(session.id);
+                const closingStarted=startedSessions.includes(session.id);
                 const allSessionActivities = activitiesBySession.get(session.id) ?? [];
                 const sessionActivities = allSessionActivities.filter(a => showArchived || (!dimension.archived && !session.archived && !a.archived));
                 return <li key={session.id} className="overflow-hidden rounded-xl border border-border/70 bg-card">
@@ -180,10 +188,18 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
 
                   {sessionOpen && <div id={`session-panel-${session.id}`} className="border-t border-border/70 px-4 py-4">
                     <Link className="rti-button-secondary mb-4" href={`/organizations/${encodeURIComponent(organizationId)}/programs/${encodeURIComponent(programId)}/agenda?session=${encodeURIComponent(session.id)}`}>Agendar participantes</Link>
-                    {session.objective && <p className="whitespace-pre-wrap text-sm text-muted-foreground"><span className="font-medium text-foreground">Objetivo: </span>{session.objective}</p>}
+                    {session.closingComment && <p className="whitespace-pre-wrap text-sm text-muted-foreground"><span className="font-medium text-foreground">Comentario de cierre: </span>{session.closingComment}</p>}
+                    <div className="mt-4 rounded-xl border border-border bg-accent/30 p-4">
+                      <p className="font-semibold">Encuesta de cierre de sesión</p>
+                      <p className="mt-2 text-sm text-muted-foreground">{closingSurvey ? `${closingSurvey.title} · ${closingSurvey.questions.length} preguntas` : "Configura la encuesta que completa el 20% final de esta sesión."}</p>
+                      {canEdit && <button type="button" className="rti-button-secondary mt-3" disabled={dimension.archived || session.archived || closingStarted}
+                        onClick={()=>setDialog({kind:"session-evaluation",session,initial:closingSurvey})}>{closingSurvey?"Editar encuesta de cierre":"Crear encuesta de cierre"}</button>}
+                      {closingStarted && <p className="mt-2 text-xs text-muted-foreground">El cierre ya comenzó; el comentario y la encuesta están protegidos.</p>}
+                      {sessionClosed && <p className="mt-2 text-sm font-semibold">Esta sesión ya tiene cierres completados. No admite nuevas actividades.</p>}
+                    </div>
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                       <h4 className="font-semibold">Actividades</h4>
-                      <button type="button" disabled={!canEdit || dimension.archived || session.archived} className="rti-button-secondary"
+                      <button type="button" disabled={!canEdit || dimension.archived || session.archived || sessionClosed} className="rti-button-secondary"
                         onClick={() => setDialog({ kind: "activity", dimensionName: dimension.name, session })}>
                         <Plus aria-hidden="true" className="size-4" />Crear actividad
                       </button>
@@ -198,7 +214,7 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
                         <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{activity.instructions}</p>
                         <p className="mt-3 text-xs font-medium text-muted-foreground">Vence 3 días calendario después de la sesión de cada persona.</p>
                         <p className="mt-1 text-xs font-medium text-muted-foreground">Asignaciones: {activity.assignees.length}</p>
-                        {canEdit && <ContentTools {...toolsContext} kind="activities" item={activity} parentArchived={dimension.archived || session.archived}
+                        {canEdit && <ContentTools {...toolsContext} kind="activities" item={activity} parentArchived={dimension.archived || session.archived} duplicateBlocked={sessionClosed}
                           {...usage([activity])} {...bounds(activity, allSessionActivities)}
                           onEdit={() => setDialog({ kind: "activity", dimensionName: dimension.name, session, initial: activity })} />}
                         {activity.youtubeUrl && <ActivityVideo url={activity.youtubeUrl} title={activity.title} />}
@@ -209,10 +225,10 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
                           <ol className="mt-2 space-y-1">{evaluation.questions.map(question => <li key={question.id}
                             className="text-xs text-muted-foreground">{question.position}. {question.prompt}</li>)}</ol>
                           {canEdit && <button type="button" className="rti-button-secondary mt-3" disabled={activity.archived || dimension.archived || session.archived || usage([activity]).hasSubmissions}
-                            onClick={() => setDialog({ kind: "evaluation", activity, initial: evaluation })}>Editar encuesta</button>}
+                            onClick={() => setDialog({ kind: "evaluation", activity, initial: evaluation })}>Editar formulario</button>}
                         </div> : <button type="button" disabled={!canEdit || activity.archived || dimension.archived || session.archived || usage([activity]).hasSubmissions} className="rti-button-secondary mt-4 w-full"
                           onClick={() => setDialog({ kind: "evaluation", activity })}>
-                          <BarChart3 aria-hidden="true" className="size-4" />Crear encuesta
+                          <BarChart3 aria-hidden="true" className="size-4" />Crear formulario
                         </button>}
                       </li>;
                       })}</ol>}
@@ -254,6 +270,10 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
         onSaved={saved => { setDialog(null); refresh(`Encuesta “${saved.title}” ${dialog.initial ? "actualizada" : "creada"}.`); }} />
     </ProgramModal>}
 
+    {dialog?.kind === "session-evaluation" && <ProgramModal titleId="create-evaluation-title" closeLabel="Cerrar encuesta de sesión" onClose={()=>setDialog(null)}>
+      <ActivityEvaluationForm organizationId={organizationId} programId={programId} sessionId={dialog.session.id}
+        activityTitle={dialog.session.name} initial={dialog.initial} onSaved={()=>{setDialog(null);refresh("Encuesta de cierre guardada.");}} />
+    </ProgramModal>}
     <button className="rti-button-secondary mt-6" disabled={pending} onClick={() => refresh("")}>Actualizar contenido</button>
     {!ready && !pending && <p className="mt-6 text-sm text-muted-foreground">Vuelve al resumen del programa para comprobar el contexto.</p>}
     <nav aria-label="Navegación de contenido" className="mt-8 border-t border-border/70 pt-6 text-sm">
@@ -311,7 +331,7 @@ export function DimensionForm({ organizationId, programId, position, onSaved, in
 export function SessionForm({ organizationId, programId, dimensionId, position, onSaved, initial }: {
   organizationId: string; programId: string; dimensionId: string; position: number; onSaved: () => void; initial?: ProgramSession;
 }) {
-  const [input, setInput] = useState({ name: initial?.name ?? "", objective: initial?.objective ?? "" });
+  const [input, setInput] = useState({ name: initial?.name ?? "", closingComment: initial?.closingComment ?? "" });
   const [pending, setPending] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [message, setMessage] = useState("");
@@ -322,9 +342,9 @@ export function SessionForm({ organizationId, programId, dimensionId, position, 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (submitting.current || blocked) return;
-    const clean: ProgramSessionInput = { name: input.name.trim(), objective: input.objective.trim(), position };
-    if (!clean.name || clean.name.length > 255 || clean.objective.length > 10000) {
-      setMessage("Revisa el nombre y el objetivo."); return;
+    const clean: ProgramSessionInput = { name: input.name.trim(), closingComment: input.closingComment.trim(), position };
+    if (!clean.name || clean.name.length > 255 || clean.closingComment.length > 10000) {
+      setMessage("Revisa el nombre y el comentario de cierre."); return;
     }
     submitting.current = true; setPending(true); setMessage(initial ? "Guardando sesión…" : "Creando sesión…");
     const controller = new AbortController(); request.current = controller;
@@ -348,10 +368,10 @@ export function SessionForm({ organizationId, programId, dimensionId, position, 
     <div><label htmlFor={`${prefix}-name`} className="block text-sm font-medium">Nombre</label>
       <input id={`${prefix}-name`} className="rti-field" required maxLength={255} value={input.name}
         onChange={event => setInput({ ...input, name: event.target.value })} disabled={pending || blocked} /></div>
-    <p className="text-sm text-muted-foreground">Después de crear la sesión, asigna la fecha de cada participante desde Agenda. Sin fecha asignada, la sesión permanece oculta para esa persona.</p>
-    <div><label htmlFor={`${prefix}-objective`} className="block text-sm font-medium">Objetivo opcional</label>
-      <textarea id={`${prefix}-objective`} className="rti-field min-h-20 resize-y" maxLength={10000} value={input.objective}
-        onChange={event => setInput({ ...input, objective: event.target.value })} disabled={pending || blocked} /></div>
+    <p className="text-sm text-muted-foreground">Este comentario aparecerá al enviar todas las actividades. Después de crear la sesión, configura sus actividades y su encuesta de cierre antes de agendar participantes.</p>
+    <div><label htmlFor={`${prefix}-closingComment`} className="block text-sm font-medium">Comentario de cierre</label>
+      <textarea id={`${prefix}-closingComment`} className="rti-field min-h-20 resize-y" maxLength={10000} value={input.closingComment}
+        onChange={event => setInput({ ...input, closingComment: event.target.value })} disabled={pending || blocked} /></div>
     <button className="rti-button-primary" disabled={pending || blocked}>{pending ? "Guardando…" : initial ? "Guardar cambios" : "Agregar sesión"}</button>
   </form>;
 }

@@ -14,7 +14,7 @@ export function CollaboratorProgressOverview({ activities }: { activities: Assig
     <div>
       <p className="rti-kicker">Tu avance</p>
       <h2 id="collaborator-progress-title" className="mt-2 text-2xl font-semibold">Progreso del programa</h2>
-      <p className="mt-2 text-sm text-muted-foreground">Cada entrega aporta 50% y su encuesta completa el 50% restante.</p>
+      <p className="mt-2 text-sm text-muted-foreground">Cada sesión se completa con 80% de formularios de actividades y 20% de su encuesta de cierre.</p>
     </div>
     <ProgressSummaryCard progress={progress} subject="Tu progreso general"
       detail="El porcentaje refleja las entregas y encuestas completadas." />
@@ -68,9 +68,9 @@ export function ActivityStatusBadges({ status, dueDate, surveyStatus }: {
   return <div className="flex flex-wrap justify-end gap-2" aria-label="Estado de la actividad">
     <span className={`rounded-full px-3 py-1 text-xs font-semibold ${styles}`}>{activityStatusLabel(status)}</span>
     {surveyStatus === "PENDING" &&
-      <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-900">Encuesta pendiente</span>}
+      <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-900">Formulario pendiente</span>}
     {surveyStatus === "COMPLETED" &&
-      <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-900">Encuesta lista</span>}
+      <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-900">Formulario enviado</span>}
     {isActivityOverdue(dueDate, status) &&
       <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-900">Vencida</span>}
   </div>;

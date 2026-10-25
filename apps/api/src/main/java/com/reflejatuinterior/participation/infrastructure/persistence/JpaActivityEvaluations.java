@@ -19,10 +19,12 @@ class JpaActivityEvaluations implements ActivityEvaluations {
     private final ActivityEvaluationJpaRepository evaluations;
     private final ActivityEvaluationQuestionJpaRepository questions;
     private final ProgramContentUsage usage;
+    private final com.reflejatuinterior.participation.application.SessionForms sessionForms;
 
     JpaActivityEvaluations(ActivityEvaluationJpaRepository evaluations,
-            ActivityEvaluationQuestionJpaRepository questions, ProgramContentUsage usage) {
-        this.evaluations = evaluations; this.questions = questions; this.usage = usage;
+            ActivityEvaluationQuestionJpaRepository questions, ProgramContentUsage usage,
+            com.reflejatuinterior.participation.application.SessionForms sessionForms) {
+        this.evaluations = evaluations; this.questions = questions; this.usage = usage; this.sessionForms=sessionForms;
     }
 
     @Override
@@ -62,6 +64,13 @@ class JpaActivityEvaluations implements ActivityEvaluations {
         return questions.saveAllAndFlush(input.stream().map(q -> new ActivityEvaluationQuestionJpaEntity(
                 org, program, evaluation, q.prompt().trim(), q.type(), q.position(), q.options())).toList());
     }
+    @Override public void deleteSessionDefinitions(UUID org,UUID program,java.util.Collection<UUID> sessions){
+        var stored=evaluations.findByOrganizationIdAndProgramIdOrderByActivityIdAsc(org,program).stream().filter(e->sessions.contains(e.sessionId())).toList();
+        if(stored.isEmpty())return;
+        if(sessions.stream().anyMatch(s->sessionForms.hasStarted(org,program,s)||sessionForms.hasClosed(org,program,s)))throw new ProgramContent.Conflict("SESSION_CLOSURE_STARTED");
+        questions.deleteAll(questions.findByEvaluationIdInOrderByEvaluationIdAscPositionAsc(stored.stream().map(ActivityEvaluationJpaEntity::id).toList()));
+        questions.flush();evaluations.deleteAll(stored);evaluations.flush();
+    }
 
     private static Texts validate(String title, String instructions, List<QuestionInput> inputQuestions) {
         var cleanTitle = title == null ? "" : title.trim();
@@ -91,6 +100,9 @@ class JpaActivityEvaluations implements ActivityEvaluations {
 
     @Override
     public List<Evaluation> list(UUID organizationId, UUID programId) {
+        return listAll(organizationId,programId).stream().filter(e->e.activityId()!=null).toList();
+    }
+    private List<Evaluation> listAll(UUID organizationId, UUID programId) {
         var stored = evaluations.findByOrganizationIdAndProgramIdOrderByActivityIdAsc(organizationId, programId);
         if (stored.isEmpty()) return List.of();
         var storedQuestions = questions.findByEvaluationIdInOrderByEvaluationIdAscPositionAsc(
@@ -111,6 +123,29 @@ class JpaActivityEvaluations implements ActivityEvaluations {
         return new Evaluation(evaluation.id(), evaluation.organizationId(), evaluation.programId(),
                 evaluation.activityId(), evaluation.title(), evaluation.instructions(), storedQuestions.stream()
                 .map(question -> new Question(question.id(), question.prompt(), question.type(),
-                        question.position(), question.version(), question.options())).toList(), evaluation.version());
+                        question.position(), question.version(), question.options())).toList(), evaluation.version(), evaluation.sessionId());
+    }
+
+    @Override public Evaluation createForSession(UUID org, UUID program, UUID session, String title, String instructions, List<QuestionInput> input) {
+        var text=validate(title,instructions,input);
+        var entity=new ActivityEvaluationJpaEntity(org,program,null,text.title(),text.instructions()); entity.forSession(session);
+        var saved=evaluations.saveAndFlush(entity);
+        return data(saved,saveQuestions(org,program,saved.id(),input));
+    }
+    @Override public Optional<Evaluation> findForSession(UUID org, UUID program, UUID session) {
+        return evaluations.findByOrganizationIdAndProgramIdAndSessionId(org,program,session)
+            .map(e->data(e,questions.findByEvaluationIdOrderByPositionAsc(e.id())));
+    }
+    @Override public List<Evaluation> listForSessions(UUID org,UUID program) {
+        return listAll(org,program).stream().filter(e->e.sessionId()!=null).toList();
+    }
+    @Override public Evaluation replaceForSession(UUID org,UUID program,UUID session,long version,String title,String instructions,List<QuestionInput> input) {
+        if(sessionForms.hasStarted(org,program,session)) throw new ProgramContent.Conflict("SESSION_CLOSURE_STARTED");
+        var entity=evaluations.findByOrganizationIdAndProgramIdAndSessionId(org,program,session).orElseThrow(ProgramActivities.Missing::new);
+        if(entity.version()!=version) throw new ProgramContent.Conflict("CONTENT_VERSION_CONFLICT");
+        var text=validate(title,instructions,input);
+        questions.deleteAll(questions.findByEvaluationIdOrderByPositionAsc(entity.id()));questions.flush();
+        entity.edit(text.title(),text.instructions());evaluations.saveAndFlush(entity);
+        return data(entity,saveQuestions(org,program,entity.id(),input));
     }
 }

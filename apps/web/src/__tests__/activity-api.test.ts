@@ -43,16 +43,16 @@ describe("activity API", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ status: "COMPLETED" }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ status: "COMPLETED" }), { status: 200 }));
     vi.stubGlobal("fetch", fetcher);
-    await submitMyActivity("program/a", "activity a", "Mi respuesta");
-    await submitMyActivitySurvey("program/a", "activity a", [{ questionId: "question/a", values: ["5"] }]);
+    await submitMyActivity("program/a", "activity a", [{ questionId: "question/a", values: ["Mi respuesta"] }], 0);
+    await submitMyActivitySurvey("program/a", "activity a", [{ questionId: "question/a", values: ["5"] }], 2);
     await reviewActivityAssignment("org a", "program/a", "activity a", "assignment/a",
       { decision: "APPROVE", comment: "Buen trabajo" });
     expect(fetcher.mock.calls[0][0]).toBe("http://localhost:8082/api/v1/me/programs/program%2Fa/activities/activity%20a/submission");
     expect(fetcher.mock.calls[0][1]).toEqual(expect.objectContaining({ method: "POST",
-      body: JSON.stringify({ responseText: "Mi respuesta" }) }));
-    expect(fetcher.mock.calls[1][0]).toBe("http://localhost:8082/api/v1/me/programs/program%2Fa/activities/activity%20a/survey-response");
+      body: JSON.stringify({ answers: [{ questionId: "question/a", values: ["Mi respuesta"] }], version: 0 }) }));
+    expect(fetcher.mock.calls[1][0]).toBe("http://localhost:8082/api/v1/me/programs/program%2Fa/activities/activity%20a/submission");
     expect(fetcher.mock.calls[1][1]).toEqual(expect.objectContaining({ method: "POST",
-      body: JSON.stringify({ answers: [{ questionId: "question/a", values: ["5"] }] }) }));
+      body: JSON.stringify({ answers: [{ questionId: "question/a", values: ["5"] }], version: 2 }) }));
     expect(fetcher.mock.calls[2][0]).toBe("http://localhost:8082/api/v1/organizations/org%20a/programs/program%2Fa/activities/activity%20a/assignments/assignment%2Fa/review");
   });
 

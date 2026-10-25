@@ -3,17 +3,17 @@ import { programsPath } from "@/lib/programs/program-api";
 
 export type ProgramSession = {
   id: string; organizationId: string; programId: string; dimensionId: string;
-  name: string; objective: string | null; scheduledDate: string | null; position: number; version: number; archived?: boolean;
+  name: string; closingComment: string | null; scheduledDate: string | null; position: number; version: number; archived?: boolean;
 };
 export type ProgramDimension = {
   id: string; organizationId: string; programId: string; name: string;
   description: string | null; position: number; version: number; sessions: ProgramSession[]; archived?: boolean;
 };
 export type ProgramDimensionInput = { name: string; description: string; position: number };
-export type ProgramSessionInput = { name: string; objective: string; position: number };
+export type ProgramSessionInput = { name: string; closingComment: string; position: number };
 
-type LegacyProgramSession = Omit<ProgramSession, "dimensionId" | "objective"> & {
-  moduleId: string; description: string | null; objective?: string | null;
+type LegacyProgramSession = Omit<ProgramSession, "dimensionId" | "closingComment"> & {
+  moduleId: string; description: string | null; closingComment?: string | null;
 };
 type LegacyProgramDimension = Omit<ProgramDimension, "sessions"> & { sessions: LegacyProgramSession[] };
 
@@ -43,7 +43,7 @@ async function request<T>(path: string, method: "GET" | "POST", input?: ProgramD
   const expected = method === "POST" ? 201 : 200;
   if (response.status !== expected) {
     const body = await response.json().catch(() => null);
-    const allowed = ["name", "description", "objective", "scheduledDate", "position"];
+    const allowed = ["name", "description", "closingComment", "scheduledDate", "position"];
     const fields = body?.code === "VALIDATION_ERROR" && Array.isArray(body.errors)
       ? body.errors.map((error: { field?: unknown }) => error?.field)
         .filter((field: unknown): field is string => typeof field === "string" && allowed.includes(field))
@@ -59,7 +59,7 @@ function dimension(data: LegacyProgramDimension): ProgramDimension {
   return { ...data, sessions: data.sessions.map(session => ({
     id: session.id, organizationId: session.organizationId, programId: session.programId,
     dimensionId: session.moduleId, name: session.name,
-    objective: session.objective ?? session.description, scheduledDate: session.scheduledDate,
+    closingComment: session.closingComment ?? null, scheduledDate: session.scheduledDate,
     position: session.position, version: session.version, archived: session.archived ?? false,
   })) };
 }
@@ -81,7 +81,7 @@ export async function createProgramSession(organizationId: string, programId: st
   input: ProgramSessionInput, signal?: AbortSignal) {
   const created = await request<LegacyProgramSession>(
     `${programDimensionsPath(organizationId, programId)}/${encodeURIComponent(dimensionId)}/sessions`, "POST",
-    { name: input.name, objective: input.objective, position: input.position }, signal);
+    { name: input.name, closingComment: input.closingComment, position: input.position }, signal);
   return dimension({ id: dimensionId, organizationId, programId, name: "", description: null,
     position: 1, version: 0, sessions: [created] }).sessions[0];
 }

@@ -69,18 +69,6 @@ class ActivityController {
                 .body(new AssignedActivityListResponse(service.listOwned(jwt.getSubject(), programId, id)));
     }
 
-    @PostMapping(path = "/api/v1/me/programs/{programId}/activities/{activityId}/submission",
-            consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    @Operation(summary = "Submit the authenticated collaborator's textual activity response")
-    @ApiResponse(responseCode = "200", description = "Assignment moved to SUBMITTED")
-    ResponseEntity<ActivityService.AssignedActivityResponse> submit(@AuthenticationPrincipal Jwt jwt,
-            @PathVariable UUID programId, @PathVariable UUID activityId,
-            @Valid @RequestBody SubmitActivityRequest input, HttpServletRequest request) {
-        var id = EnrollmentController.requestId(request);
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("X-Request-ID", id)
-                .body(service.submit(jwt.getSubject(), programId, activityId, input.responseText(), id));
-    }
-
     @PostMapping(path = "/api/v1/organizations/{organizationId}/programs/{programId}/activities/{activityId}"
             + "/assignments/{assignmentId}/review",
             consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -101,7 +89,6 @@ class ActivityController {
                                  @NotBlank @Size(max = 10000) String instructions,
                                  @Size(max = 2048) String youtubeUrl,
                                  @Positive int position) {}
-    record SubmitActivityRequest(@NotBlank @Size(max = 10000) String responseText) {}
     record ReviewActivityRequest(@NotNull ActivityReviewDecision decision,
                                  @Size(max = 5000) String comment) {}
     record ActivityListResponse(List<ActivityService.ActivityResponse> items) {}

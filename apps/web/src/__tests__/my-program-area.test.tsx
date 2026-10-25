@@ -2,8 +2,9 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { MyProgramArea } from "@/components/participation/my-program-area";
+import { listMySessionClosures } from "@/lib/participation/session-closure-api";
 import { getMyProgram, listMyPrograms, ParticipationRequestError, type MyProgram } from "@/lib/participation/participation-api";
-import { listMyProgramActivities, submitMyActivity, submitMyActivitySurvey,
+import { listMyProgramActivities, submitMyActivitySurvey,
   type AssignedActivity } from "@/lib/participation/activity-api";
 
 vi.mock("@/lib/participation/participation-api", async original => ({
@@ -14,6 +15,8 @@ vi.mock("@/lib/participation/activity-api", async original => ({
   ...await original<typeof import("@/lib/participation/activity-api")>(),
   listMyProgramActivities: vi.fn(), submitMyActivity: vi.fn(), submitMyActivitySurvey: vi.fn(),
 }));
+
+vi.mock("@/lib/participation/session-closure-api", () => ({ listMySessionClosures: vi.fn().mockResolvedValue({ items: [] }) }));
 
 const program: MyProgram = {
   id: "program-a", organizationId: "org-a", organizationName: "Empresa A",
@@ -38,12 +41,10 @@ const assignedActivity: AssignedActivity = { id: "activity-a", organizationId: "
     ] } };
 
 beforeEach(() => {
+  vi.mocked(listMySessionClosures).mockResolvedValue({ items: [] });
   vi.mocked(listMyPrograms).mockResolvedValue(page);
   vi.mocked(getMyProgram).mockResolvedValue(program);
   vi.mocked(listMyProgramActivities).mockResolvedValue({ items: [assignedActivity] });
-  vi.mocked(submitMyActivity).mockResolvedValue({ ...assignedActivity, assignmentStatus: "SUBMITTED",
-    responseText: "Mi reflexión", submittedAt: "2026-10-07T12:00:00Z", assignmentVersion: 1,
-    completionPercentage: 50, survey: { ...assignedActivity.survey!, status: "PENDING" } });
   vi.mocked(submitMyActivitySurvey).mockResolvedValue({ evaluationId: "survey-a", status: "COMPLETED",
     completedAt: "2026-10-07T12:05:00Z" });
 });
@@ -79,7 +80,7 @@ it("shows a preparation notice and never renders a draft's activity forms", asyn
 it("keeps submitted work visible after closure but removes response and survey forms", async () => {
   vi.mocked(getMyProgram).mockResolvedValue({ ...program, status: "COMPLETED" });
   vi.mocked(listMyProgramActivities).mockResolvedValue({ items: [{ ...assignedActivity,
-    assignmentStatus: "SUBMITTED", responseText: "Mi entrega conservada", submittedAt: "2026-10-07T12:00:00Z",
+    assignmentStatus: "SUBMITTED", answers: [{ questionId: "question-3", values: ["Mi entrega conservada"] }], submittedAt: "2026-10-07T12:00:00Z",
     completionPercentage: 50, survey: { ...assignedActivity.survey!, status: "PENDING" } }] });
   render(<MyProgramArea mode="activities" programId="program-a" />);
   await screen.findByText(/Este programa ha finalizado/);
@@ -93,7 +94,7 @@ it("keeps submitted work visible after closure but removes response and survey f
 it("keeps a completed participation read-only in an otherwise active program without inflating progress", async () => {
   vi.mocked(getMyProgram).mockResolvedValue({ ...program, enrollmentStatus: "COMPLETED" });
   vi.mocked(listMyProgramActivities).mockResolvedValue({ items: [{ ...assignedActivity,
-    assignmentStatus: "SUBMITTED", responseText: "Mi entrega conservada", submittedAt: "2026-10-07T12:00:00Z",
+    assignmentStatus: "SUBMITTED", answers: [{ questionId: "question-3", values: ["Mi entrega conservada"] }], submittedAt: "2026-10-07T12:00:00Z",
     completionPercentage: 50, survey: { ...assignedActivity.survey!, status: "PENDING" } }] });
   render(<MyProgramArea mode="activities" programId="program-a" />);
   await screen.findByText(/Tu participación está completada/);await openAssignedActivity();
@@ -122,7 +123,7 @@ it("lists activities directly and opens the full activity in one click without d
   await openAssignedActivity();
   expect(screen.getByRole("link", { name: "Ver video en YouTube" }).getAttribute("href")).toBe("https://youtu.be/dQw4w9WgXcQ");
   expect(screen.getByTitle("Video de la actividad: Reflexión inicial").tagName).toBe("IFRAME");
-  expect(screen.getByLabelText("Tu respuesta").closest("details")?.open).toBe(true);
+  expect(screen.getByLabelText("Respuesta a ¿Qué aprendiste?").closest("details")?.open).toBe(true);
   expect(screen.queryByRole("heading", { name: "Progreso del programa" })).toBeNull();
   expect(listMyProgramActivities).toHaveBeenCalledWith("program-a", expect.any(AbortSignal));
 });
@@ -132,7 +133,7 @@ it("opens the next activity directly and reopens it even when its shortcut was a
   const start = await screen.findByRole("link", { name: "Comenzar actividad" });
   expect(start.getAttribute("href")).toBe("#activity-activity-a");
   fireEvent.click(start);
-  const response=screen.getByLabelText("Tu respuesta");
+  const response=screen.getByLabelText("Respuesta a ¿Qué aprendiste?");
   const details=response.closest("details")!;
   expect(details.open).toBe(true);
   expect(document.activeElement).toBe(details.querySelector("summary"));
@@ -142,15 +143,15 @@ it("opens the next activity directly and reopens it even when its shortcut was a
   expect(details.open).toBe(true);
 });
 
-it("offers a direct shortcut to the pending survey instead of starting a second delivery", async () => {
+it("does not offer a second activity survey after the form was submitted", async () => {
   vi.mocked(listMyProgramActivities).mockResolvedValue({items:[{...assignedActivity,assignmentStatus:"SUBMITTED",
-    responseText:"Mi entrega",completionPercentage:50,survey:{...assignedActivity.survey!,status:"PENDING"}}]});
+    submittedAt:"2026-10-07T12:00:00Z",
+    answers:[{questionId:"question-3",values:["Mi entrega"]}],completionPercentage:100,survey:{...assignedActivity.survey!,status:"COMPLETED"}}]});
   render(<MyProgramArea mode="activities" programId="program-a" />);
-  fireEvent.click(await screen.findByRole("link",{name:"Continuar encuesta"}));
-  const form=screen.getByRole("form",{name:"Completar encuesta de Encuesta de cierre"});
-  expect(form.closest("details")?.open).toBe(true);
-  expect(screen.queryByLabelText("Tu respuesta")).toBeNull();
-  expect(submitMyActivity).not.toHaveBeenCalled();
+  await openAssignedActivity();
+  expect(screen.getByText("Mi entrega")).toBeTruthy();
+  expect(screen.queryByRole("form")).toBeNull();
+  expect(screen.queryByRole("link",{name:"Continuar encuesta"})).toBeNull();
 });
 
 it("highlights the first actionable activity in program structure order instead of due-date order", async () => {
@@ -185,39 +186,32 @@ it("shows overdue as a visual activity label without replacing its workflow stat
   expect(screen.getByText("Vencida")).toBeTruthy();
 });
 
-it("lets the collaborator complete an assigned activity with a textual response", async () => {
+it("requires all activity answers and submits them as the deliverable with its version", async () => {
   render(<MyProgramArea mode="activities" programId="program-a" />);
   await openAssignedActivity();
-  fireEvent.change(await screen.findByLabelText("Tu respuesta"), { target: { value: " Mi reflexión " } });
-  fireEvent.click(screen.getByRole("button", { name: "Enviar actividad (50%)" }));
-  await waitFor(() => expect(submitMyActivity).toHaveBeenCalledWith("program-a", "activity-a", "Mi reflexión"));
-  expect(within(screen.getByLabelText("Estado de la actividad")).getByText("En revisión")).toBeTruthy();
-  expect(screen.getByText("Encuesta pendiente")).toBeTruthy();
-  expect(await screen.findByRole("form", { name: "Completar encuesta de Encuesta de cierre" })).toBeTruthy();
+  const form=screen.getByRole("form",{name:"Formulario de Encuesta de cierre"});
+  fireEvent.submit(form);
+  expect(submitMyActivitySurvey).not.toHaveBeenCalled();
+  expect(screen.getByText("Responde todas las preguntas antes de enviar.")).toBeTruthy();
+  const radios=within(form).getAllByRole("radio");
+  fireEvent.click(radios[3]);fireEvent.click(radios[7]);
+  fireEvent.change(within(form).getByLabelText("Respuesta a ¿Qué aprendiste?"),{target:{value:"Aprendí a reconocer mis fortalezas."}});
+  fireEvent.click(within(form).getByRole("checkbox",{name:"Inspirado(a)"}));
+  fireEvent.click(within(form).getByRole("button",{name:"Enviar actividad"}));
+  await waitFor(()=>expect(submitMyActivitySurvey).toHaveBeenCalledWith("program-a","activity-a",[
+    {questionId:"question-1",values:["4"]},{questionId:"question-2",values:["3"]},
+    {questionId:"question-3",values:["Aprendí a reconocer mis fortalezas."]},{questionId:"question-4",values:["Inspirado(a)"]}
+  ],0));
+  await waitFor(()=>expect(screen.queryByRole("form")).toBeNull());
+  expect(screen.getByText("Aprendí a reconocer mis fortalezas.")).toBeTruthy();
 });
 
-it("completes the remaining 50% when the collaborator answers the survey", async () => {
-  vi.mocked(listMyProgramActivities).mockResolvedValue({ items: [{ ...assignedActivity,
-    assignmentStatus: "SUBMITTED", responseText: "Mi reflexión", submittedAt: "2026-10-07T12:00:00Z",
-    completionPercentage: 50, survey: { ...assignedActivity.survey!, status: "PENDING" } }] });
-  render(<MyProgramArea mode="activities" programId="program-a" />);
-  await openAssignedActivity();
-  const form = await screen.findByRole("form", { name: "Completar encuesta de Encuesta de cierre" });
-  const radios = within(form).getAllByRole("radio");
-  fireEvent.click(radios[3]);
-  fireEvent.click(radios[7]);
-  fireEvent.change(within(form).getByLabelText("Respuesta a ¿Qué aprendiste?"),
-    { target: { value: "Aprendí a reconocer mis fortalezas." } });
-  fireEvent.click(within(form).getByRole("checkbox", { name: "Inspirado(a)" }));
-  fireEvent.click(within(form).getByRole("button", { name: "Enviar encuesta" }));
-  await waitFor(() => expect(submitMyActivitySurvey).toHaveBeenCalledWith("program-a", "activity-a", [
-    { questionId: "question-1", values: ["4"] },
-    { questionId: "question-2", values: ["3"] },
-    { questionId: "question-3", values: ["Aprendí a reconocer mis fortalezas."] },
-    { questionId: "question-4", values: ["Inspirado(a)"] },
-  ]));
-  expect(screen.getByText("Encuesta completada. Cumpliste los dos pasos de la actividad.")).toBeTruthy();
-  expect(screen.getByRole("progressbar", { name: "Avance de Reflexión inicial: 100%" })).toBeTruthy();
+it("prefills a requested correction without permitting unsolicited resubmission", async () => {
+  vi.mocked(listMyProgramActivities).mockResolvedValue({items:[{...assignedActivity,assignmentStatus:"CHANGES_REQUESTED",
+    assignmentVersion:2,reviewComment:"Amplía tu ejemplo",answers:[{questionId:"question-3",values:["Mi respuesta original"]}]}]});
+  render(<MyProgramArea mode="activities" programId="program-a" />);await openAssignedActivity();
+  expect((screen.getByLabelText("Respuesta a ¿Qué aprendiste?") as HTMLTextAreaElement).value).toBe("Mi respuesta original");
+  expect(screen.getByText(/Amplía tu ejemplo/)).toBeTruthy();
 });
 
 it.each([

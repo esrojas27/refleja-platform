@@ -123,7 +123,7 @@ function ActivityContent({ organizationId, programId }: { organizationId: string
                 <p className="mt-2 text-xs">{person.dueDate ? `Fecha límite: ${person.dueDate}` : "Sesión sin agendar"}</p>
                 <div className="mt-2"><ActivityStatusBadges status={person.status} dueDate={person.dueDate ?? null}
                   surveyStatus={person.surveyStatus === "NOT_REQUIRED" ? undefined : person.surveyStatus} /></div>
-                <p className="mt-3 whitespace-pre-wrap break-words">{person.responseText ?? "Sin entrega."}</p>
+                <ReviewedFormAnswers answers={person.answers} />
                 {person.reviewComment && <p className="mt-2 whitespace-pre-wrap break-words text-muted-foreground">Comentario del consultor: {person.reviewComment}</p>}
                 <p className="mt-2 text-muted-foreground">Avance conservado: {person.completionPercentage}%</p>
               </li>)}</ul>
@@ -370,8 +370,7 @@ function ReviewCard({ organizationId, programId, item, leaving, onReviewed }: {
       <div><p className="font-medium">{name}</p><p className="text-muted-foreground">{assignee.email}</p></div>
       <ActivityStatusBadges status={assignee.status} dueDate={assignee.dueDate ?? null} />
     </div>
-    {assignee.responseText && <div className="mt-3"><p className="font-medium">Respuesta</p>
-      <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{assignee.responseText}</p></div>}
+    <ReviewedFormAnswers answers={assignee.answers} />
     {assignee.reviewComment && <p className="mt-3 text-muted-foreground">Comentario de revisión: {assignee.reviewComment}</p>}
     <div className="mt-4 space-y-3">
       <label className="block font-medium" htmlFor={`review-${assignee.assignmentId}`}>Comentario de revisión</label>
@@ -381,11 +380,19 @@ function ReviewCard({ organizationId, programId, item, leaving, onReviewed }: {
       <div className="flex flex-wrap gap-3">
         <button type="button" className="rti-button-primary" disabled={pending || leaving}
           onClick={() => void review("APPROVE")}>Aprobar actividad</button>
-        <button type="button" className="rti-button-secondary" disabled={pending || leaving}
+        <button type="button" className="rti-button-secondary" disabled={pending || leaving || assignee.sessionCompleted}
           onClick={() => void review("REQUEST_CHANGES")}>Solicitar cambios</button>
       </div>
+      {assignee.sessionCompleted && <p className="mt-3 text-sm text-muted-foreground">La sesión está completada al 100%. No se pueden solicitar correcciones.</p>}
     </div>
   </article>;
+}
+
+function ReviewedFormAnswers({ answers }: { answers: ActivityAssignee["answers"] }) {
+  if (!answers?.length) return <p className="mt-3 text-muted-foreground">Sin formulario enviado.</p>;
+  return <ol className="mt-3 space-y-3">{answers.map(answer => <li key={answer.questionId} className="rounded-xl bg-muted/40 p-3">
+    <p className="font-medium">{answer.prompt}</p><p className="mt-1 whitespace-pre-wrap break-words">{answer.values.join(" · ")}</p>
+  </li>)}</ol>;
 }
 
 function assignmentSummary(activity: ProgramActivity) {

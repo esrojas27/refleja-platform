@@ -16,11 +16,12 @@ class ActivityEvaluationResponseJpaEntity {
     @Column(name = "id", nullable = false, updatable = false) private UUID id;
     @Column(name = "organization_id", nullable = false, updatable = false) private UUID organizationId;
     @Column(name = "program_id", nullable = false, updatable = false) private UUID programId;
-    @Column(name = "activity_id", nullable = false, updatable = false) private UUID activityId;
+    @Column(name = "activity_id", updatable = false) private UUID activityId;
+    @Column(name = "session_id", updatable = false) private UUID sessionId;
     @Column(name = "evaluation_id", nullable = false, updatable = false) private UUID evaluationId;
-    @Column(name = "assignment_id", nullable = false, updatable = false) private UUID assignmentId;
+    @Column(name = "assignment_id", updatable = false) private UUID assignmentId;
     @Column(name = "enrollment_id", nullable = false, updatable = false) private UUID enrollmentId;
-    @Column(name = "completed_at", nullable = false, updatable = false) private Instant completedAt;
+    @Column(name = "completed_at", nullable = false) private Instant completedAt;
     @CreationTimestamp @Column(name = "created_at", nullable = false, updatable = false) private Instant createdAt;
     @UpdateTimestamp @Column(name = "updated_at", nullable = false) private Instant updatedAt;
     @Version @Column(name = "version", nullable = false) private long version;
@@ -33,6 +34,8 @@ class ActivityEvaluationResponseJpaEntity {
         this.completedAt = Instant.now();
     }
     UUID id() { return id; }
+    void forSession(UUID value) { sessionId=value; }
+    void resubmit() { completedAt=Instant.now(); }
     UUID evaluationId() { return evaluationId; }
     UUID assignmentId() { return assignmentId; }
     UUID enrollmentId() { return enrollmentId; }
