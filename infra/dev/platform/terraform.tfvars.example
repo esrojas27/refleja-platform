@@ -18,9 +18,9 @@ ses_identity_arns = [
 ]
 invitation_sender_email = "marcayconexion@paularojas.com.co"
 
-# Temporary external DNS. A future corporate Route 53 zone can replace it.
+# External DNS managed in Hostinger; no Route 53 zone is needed.
 route53_zone_id = null
-dev_hostname    = "rti-dev.18-210-172-252.nip.io"
+dev_hostname    = "reflejati.com"
 
 # DEV is available from 08:00 to 20:00, Monday through Friday, Bogota time.
 schedule_enabled   = true

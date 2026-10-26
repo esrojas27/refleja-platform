@@ -1,24 +1,35 @@
 {$DEV_SITE_ADDRESS:http://localhost} {
-    encode zstd gzip
+	encode zstd gzip
 
-    @health path /health
-    handle @health {
-        rewrite * /actuator/health
-        reverse_proxy api:8080
-    }
+	route {
+		# OAuth codes/PKCE state from the old origin cannot be reused on the new one.
+		@previousAccount {
+			not host {$DEV_CANONICAL_HOST:localhost}
+			path /account
+		}
+		redir @previousAccount {$DEV_PUBLIC_URL:http://localhost:8088}/login 302
 
-    @api path /api/*
-    handle @api {
-        reverse_proxy api:8080
-    }
+		@alias not host {$DEV_CANONICAL_HOST:localhost}
+		redir @alias {$DEV_PUBLIC_URL:http://localhost:8088}{uri} 302
+		@health path /health
+		handle @health {
+			rewrite * /actuator/health
+			reverse_proxy api:8080
+		}
 
-    handle {
-        reverse_proxy web:3000
-    }
+		@api path /api/*
+		handle @api {
+			reverse_proxy api:8080
+		}
 
-    header {
-        -Server
-        X-Content-Type-Options nosniff
-        Referrer-Policy strict-origin-when-cross-origin
-    }
+		handle {
+			reverse_proxy web:3000
+		}
+	}
+
+	header {
+		-Server
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+	}
 }

@@ -55,6 +55,12 @@ The deployment phase must add automated `pg_dump`, retention verification, and a
 
 ## Temporary public endpoint
 
+Update 2026-10-25: the user purchased `reflejati.com`, whose root A record points
+to the same Elastic IP. The canonical URL is being migrated to
+`https://reflejati.com`, retaining nip.io as a redirect. See
+[domain migration](reflejati-domain-migration.md) for configuration and checks.
+The paragraphs below describe the original temporary setup.
+
 DEV initially uses `rti-dev.18-210-172-252.nip.io`, which resolves to the
 reserved Elastic IP. Caddy requests and renews an individual public TLS
 certificate for that hostname. The hostname is temporary and must not be used

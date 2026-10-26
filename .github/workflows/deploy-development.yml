@@ -34,6 +34,7 @@ jobs:
       BACKUP_BUCKET: ${{ vars.RTI_DEV_BACKUP_BUCKET }}
       PUBLIC_URL: ${{ vars.RTI_DEV_PUBLIC_URL }}
       HOSTNAME: ${{ vars.RTI_DEV_HOSTNAME }}
+      REDIRECT_HOSTNAMES: ${{ vars.RTI_DEV_REDIRECT_HOSTNAMES }}
       API_REPOSITORY: ${{ vars.RTI_DEV_ECR_API }}
       WEB_REPOSITORY: ${{ vars.RTI_DEV_ECR_WEB }}
       COGNITO_USER_POOL_ID: ${{ vars.RTI_DEV_COGNITO_USER_POOL_ID }}
@@ -68,6 +69,10 @@ jobs:
         run: |
           set -euo pipefail
           test "$(uname -m)" = aarch64
+
+      - name: Validate canonical domain and migration aliases
+        id: domain
+        run: node scripts/dev-domain.mjs >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@v3
 
@@ -129,7 +134,8 @@ jobs:
           cp scripts/dev-database-backup.sh scripts/install-dev-backup.sh bundle/scripts/
           chmod 0755 bundle/scripts/deploy-dev-on-instance.sh bundle/infra/postgres/init/01-create-rti-database-roles.sh
           cat >bundle/dev.env.public <<EOF
-          DEV_SITE_ADDRESS=${HOSTNAME}
+          DEV_SITE_ADDRESS=${{ steps.domain.outputs.site_addresses }}
+          DEV_CANONICAL_HOST=${HOSTNAME}
           DEV_PUBLIC_URL=${PUBLIC_URL}
           DEV_HTTP_PORT=80
           DEV_HTTPS_PORT=443

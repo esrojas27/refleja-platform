@@ -62,6 +62,12 @@ coordinar con el dueño DNS y agrega costo. No es necesario para el piloto peque
 
 ### Opción B: dominio independiente
 
+Actualización 2026-10-25: el usuario compró `reflejati.com` y confirmó el cambio
+DNS hacia DEV. Se utiliza directamente el dominio raíz, sin `app`. El detalle
+del cambio y su verificación está en
+[migración de dominio](reflejati-domain-migration.md). Lo siguiente conserva el
+criterio utilizado antes de la compra.
+
 Elegir nombre y extensión, comprobar disponibilidad y precio de renovación, y
 registrarlo a nombre de la empresa con acceso institucional, MFA y renovación
 controlada. No se ha confirmado disponibilidad de ningún nombre ni autorizado

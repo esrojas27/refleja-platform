@@ -19,6 +19,7 @@ on:
       - "infra/dev/**"
       - "scripts/check-dev-container-budget.mjs"
       - "scripts/check-native-arm64-workflows.test.mjs"
+      - "scripts/dev-domain*.mjs"
   push:
     branches: [master]
     paths:
@@ -38,6 +39,7 @@ on:
       - "infra/dev/**"
       - "scripts/check-dev-container-budget.mjs"
       - "scripts/check-native-arm64-workflows.test.mjs"
+      - "scripts/dev-domain*.mjs"
   workflow_dispatch:
 
 concurrency:
@@ -61,9 +63,11 @@ jobs:
           test "$(uname -m)" = aarch64
       - uses: docker/setup-buildx-action@v3
       - name: Check native build configuration
-        run: node --test scripts/check-native-arm64-workflows.test.mjs
+        run: node --test scripts/check-native-arm64-workflows.test.mjs scripts/dev-domain.test.mjs
       - name: Validate isolated ports and memory budget
         run: node scripts/check-dev-container-budget.mjs
+      - name: Verify domain redirects with the real reverse proxy
+        run: node --test scripts/dev-domain-proxy.test.mjs
       - name: Build API for Graviton
         uses: docker/build-push-action@v6
         with:
