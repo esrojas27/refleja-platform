@@ -51,6 +51,7 @@ jobs:
           node --test scripts/dev.test.mjs
           node --test scripts/bootstrap-operator.test.mjs
           node --test scripts/check-mvp-e2e-environment.test.mjs
+          node --test scripts/check-native-arm64-workflows.test.mjs
       - name: Lint frontend
         working-directory: apps/web
         run: npm run lint

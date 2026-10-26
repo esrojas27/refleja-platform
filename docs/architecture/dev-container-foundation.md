@@ -2,6 +2,26 @@
 
 Esta fase prepara el despliegue sin crear recursos en AWS.
 
+## Compilación de CI en ARM64 nativo
+
+El gate de contenedores y el despliegue de DEV usan `ubuntu-24.04-arm` y
+construyen imágenes `linux/arm64`, la arquitectura de la instancia Graviton.
+Ambos comprueban `uname -m = aarch64` antes de construir y no registran QEMU.
+Las cachés `dev-api-arm64-native-v1` y `dev-web-arm64-native-v1` se comparten
+entre ambos workflows y no reutilizan las capas del antiguo build emulado.
+
+Este ajuste corrige el fallo del 2026-10-25: la compilación y TypeScript de
+Next.js terminaban correctamente, pero un worker de generación de páginas
+abortaba bajo QEMU con `Illegal instruction` / `SIGILL`. La advertencia de
+`metadataBase` no era el error fatal. No se cambian las imágenes base, los
+límites de memoria, los permisos OIDC, los datos ni los recursos de AWS.
+
+`node --test scripts/check-native-arm64-workflows.test.mjs` comprueba las
+invariantes de configuración en CI. La validación definitiva es completar
+la construcción nativa y el despliegue con comprobación pública de salud.
+Los comandos ARM64 en máquinas x64 de la sección local todavía requieren
+emulación; no sustituyen esa validación nativa de GitHub.
+
 ## Validación local
 
 1. Copiar `config/dev.env.example` a `config/dev.env` y reemplazar los valores.
