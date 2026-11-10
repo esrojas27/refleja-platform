@@ -89,7 +89,7 @@ public class ProgramTemplateService {
                                             .map(activity -> new ProgramBlueprints.ActivityDraft(activity.reference(),
                                                     activity.title(), activity.instructions(), activity.youtubeUrl(),
                                                     null, activity.position()))
-                                            .toList()))
+                                            .toList(), session.youtubeUrl()))
                             .toList())).toList();
         } catch (DateTimeException exception) {
             throw new InvalidProgramTemplateInput("startDate");
@@ -162,7 +162,7 @@ public class ProgramTemplateService {
                     sessions.add(new ProgramTemplateSnapshot.Session(session.name(), session.description(),
                             session.objective(), 0,
                             session.position(), activities,closing==null?null:new ProgramTemplateSnapshot.Survey(closing.title(),closing.instructions(),
-                                closing.questions().stream().map(q->new ProgramTemplateSnapshot.Question(q.prompt(),q.type(),q.position(),q.options())).toList())));
+                                closing.questions().stream().map(q->new ProgramTemplateSnapshot.Question(q.prompt(),q.type(),q.position(),q.options())).toList()), session.youtubeUrl()));
                 }
             }
             dimensions.add(new ProgramTemplateSnapshot.Dimension(dimension.name(), dimension.description(),

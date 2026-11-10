@@ -33,8 +33,9 @@ export const editDimension = (org: string, program: string, id: string,
   input: { name: string; description: string; version: number }, signal?: AbortSignal) =>
   request(org, program, `dimensions/${encodeURIComponent(id)}`, "PUT", { name: input.name, description: input.description, version: input.version }, signal);
 export const editSession = (org: string, program: string, id: string,
-  input: { name: string; closingComment: string; version: number }, signal?: AbortSignal) =>
-  request(org, program, `sessions/${encodeURIComponent(id)}`, "PUT", { name: input.name, closingComment: input.closingComment, version: input.version }, signal);
+  input: { name: string; description?: string; youtubeUrl?: string; closingComment: string; version: number }, signal?: AbortSignal) =>
+  request(org, program, `sessions/${encodeURIComponent(id)}`, "PUT", { name: input.name,
+    description: input.description, youtubeUrl: input.youtubeUrl, closingComment: input.closingComment, version: input.version }, signal);
 export const editActivity = (org: string, program: string, id: string,
   input: { title: string; instructions: string; youtubeUrl: string | null; version: number }, signal?: AbortSignal) =>
   request(org, program, `activities/${encodeURIComponent(id)}`, "PUT", { title: input.title, instructions: input.instructions, youtubeUrl: input.youtubeUrl, version: input.version }, signal);

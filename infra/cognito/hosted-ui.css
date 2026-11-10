@@ -1,0 +1,10 @@
+.background-customizable { background-color: #f8f1f4; }
+.banner-customizable { background-color: #ffffff; padding: 20px 0 12px 0; }
+.logo-customizable { max-width: 28%; max-height: 90px; }
+.label-customizable { color: #29232a; font-weight: 600; }
+.textDescription-customizable { color: #29232a; }
+.inputField-customizable { border: 1px solid #cbbec5; height: 44px; }
+.inputField-customizable:focus { border-color: #725062; }
+.submitButton-customizable { color: #ffffff; background-color: #29232a; height: 44px; }
+.submitButton-customizable:hover { color: #ffffff; background-color: #583b4d; }
+.redirect-customizable { color: #583b4d; }

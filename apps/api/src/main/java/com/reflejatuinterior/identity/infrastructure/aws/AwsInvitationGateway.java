@@ -51,19 +51,21 @@ class AwsInvitationGateway implements InvitationGateway, AutoCloseable {
         catch (RuntimeException exception) { throw deliveryFailure("PROVISION", exception); }
     }
 
-    @Override public void sendWelcomeIfRequired(Invitation invitation) {
+    @Override public String sendWelcomeIfRequired(Invitation invitation) {
         try {
             var user = get(invitation.cognitoUsername());
             var found = account(user, invitation.email());
             if (!found.subject().equals(invitation.cognitoSubject())) throw new Conflict();
             if (found.needsWelcome()) {
-                cognito.adminCreateUser(AdminCreateUserRequest.builder().userPoolId(settings.pool())
+                var response = cognito.adminCreateUser(AdminCreateUserRequest.builder().userPoolId(settings.pool())
                         // This pool uses email as its username attribute. Cognito returns an internal UUID
                         // from AdminGetUser, but AdminCreateUser RESEND expects the original email identifier.
                         .username(invitation.email()).messageAction(MessageActionType.RESEND)
                         .desiredDeliveryMediums(DeliveryMediumType.EMAIL).forceAliasCreation(false)
                         .userAttributes(attribute("email", invitation.email())).build());
+                if (settings.combinedWelcome()) return "cognito:" + response.responseMetadata().requestId();
             }
+            return null;
         } catch (Conflict exception) { throw exception; }
         catch (RuntimeException exception) { throw deliveryFailure("WELCOME", exception); }
     }

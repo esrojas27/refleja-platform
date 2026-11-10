@@ -3,6 +3,7 @@
 import { BarChart3, ChevronDown, Plus } from "lucide-react";
 import Link from "next/link";
 import { ActivityVideo } from "@/components/participation/activity-video";
+import { isYoutubeVideoUrl } from "@/lib/participation/youtube";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import { fetchCurrentIdentity, IdentityRequestError } from "@/lib/auth/authenticated-api";
@@ -189,6 +190,8 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
 
                   {sessionOpen && <div id={`session-panel-${session.id}`} className="border-t border-border/70 px-4 py-4">
                     <Link className="rti-button-secondary mb-4" href={`/organizations/${encodeURIComponent(organizationId)}/programs/${encodeURIComponent(programId)}/agenda?session=${encodeURIComponent(session.id)}`}>Agendar participantes</Link>
+                    {session.description && <p className="mb-3 whitespace-pre-wrap text-sm text-muted-foreground">{session.description}</p>}
+                    {session.youtubeUrl && <ActivityVideo url={session.youtubeUrl} title={session.name} session />}
                     {session.closingComment && <p className="whitespace-pre-wrap text-sm text-muted-foreground"><span className="font-medium text-foreground">Comentario de cierre: </span>{session.closingComment}</p>}
                     <div className="mt-4 rounded-xl border border-border bg-accent/30 p-4">
                       <p className="font-semibold">Encuesta de cierre de sesión</p>
@@ -334,7 +337,8 @@ export function DimensionForm({ organizationId, programId, position, onSaved, in
 export function SessionForm({ organizationId, programId, dimensionId, position, onSaved, initial }: {
   organizationId: string; programId: string; dimensionId: string; position: number; onSaved: () => void; initial?: ProgramSession;
 }) {
-  const [input, setInput] = useState({ name: initial?.name ?? "", closingComment: initial?.closingComment ?? "" });
+  const [input, setInput] = useState({ name: initial?.name ?? "", description: initial?.description ?? "",
+    youtubeUrl: initial?.youtubeUrl ?? "", closingComment: initial?.closingComment ?? "" });
   const [pending, setPending] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [message, setMessage] = useState("");
@@ -345,9 +349,13 @@ export function SessionForm({ organizationId, programId, dimensionId, position, 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (submitting.current || blocked) return;
-    const clean: ProgramSessionInput = { name: input.name.trim(), closingComment: input.closingComment.trim(), position };
+    const clean: ProgramSessionInput = { name: input.name.trim(), description: input.description.trim(),
+      youtubeUrl: input.youtubeUrl.trim(), closingComment: input.closingComment.trim(), position };
     if (!clean.name || clean.name.length > 255 || clean.closingComment.length > 10000) {
       setMessage("Revisa el nombre y el comentario de cierre."); return;
+    }
+    if (!isYoutubeVideoUrl(input.youtubeUrl.trim()) || input.youtubeUrl.trim().length > 2048) {
+      setMessage("Usa un enlace HTTPS válido de YouTube para el video de la sesión."); return;
     }
     submitting.current = true; setPending(true); setMessage(initial ? "Guardando sesión…" : "Creando sesión…");
     const controller = new AbortController(); request.current = controller;
@@ -371,6 +379,12 @@ export function SessionForm({ organizationId, programId, dimensionId, position, 
     <div><label htmlFor={`${prefix}-name`} className="block text-sm font-medium">Nombre</label>
       <input id={`${prefix}-name`} className="rti-field" required maxLength={255} value={input.name}
         onChange={event => setInput({ ...input, name: event.target.value })} disabled={pending || blocked} /></div>
+    <div><label htmlFor={`${prefix}-description`} className="block text-sm font-medium">Descripción</label>
+      <textarea id={`${prefix}-description`} className="rti-field min-h-20 resize-y" maxLength={10000} value={input.description}
+        onChange={event => setInput({ ...input, description: event.target.value })} disabled={pending || blocked} /></div>
+    <div><label htmlFor={`${prefix}-youtube-url`} className="block text-sm font-medium">Video de YouTube de la sesión (opcional)</label>
+      <input id={`${prefix}-youtube-url`} type="url" className="rti-field" maxLength={2048} value={input.youtubeUrl}
+        onChange={event => setInput({ ...input, youtubeUrl: event.target.value })} disabled={pending || blocked} /></div>
     <p className="text-sm text-muted-foreground">Este comentario aparecerá al enviar todas las actividades. Después de crear la sesión, configura sus actividades y su encuesta de cierre antes de agendar participantes.</p>
     <div><label htmlFor={`${prefix}-closingComment`} className="block text-sm font-medium">Comentario de cierre</label>
       <textarea id={`${prefix}-closingComment`} className="rti-field min-h-20 resize-y" maxLength={10000} value={input.closingComment}

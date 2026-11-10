@@ -51,10 +51,15 @@ class ProgramStructureIntegrationTests extends PostgreSqlIntegrationTestSupport 
         assertThat(moduleId.version()).isEqualTo(7);
 
         var sessionResponse = mvc.perform(post(path(organization, program) + "/" + moduleId + "/sessions")
-                .header("Authorization", bearer).contentType(MediaType.APPLICATION_JSON).content(sessionBody(1)))
+                .header("Authorization", bearer).contentType(MediaType.APPLICATION_JSON).content("""
+                        {"name":"Sesión inicial","description":" Contexto de la sesión ",
+                         "youtubeUrl":"https://youtu.be/dQw4w9WgXcQ",
+                         "closingComment":"Definir el punto de partida","position":1}
+                        """))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.moduleId").value(moduleId.toString()))
                 .andExpect(jsonPath("$.closingComment").value("Definir el punto de partida"))
-                .andExpect(jsonPath("$.description").doesNotExist())
+                .andExpect(jsonPath("$.description").value("Contexto de la sesión"))
+                .andExpect(jsonPath("$.youtubeUrl").value("https://youtu.be/dQw4w9WgXcQ"))
                 .andExpect(jsonPath("$.scheduledDate").isEmpty()).andExpect(jsonPath("$.position").value(1))
                 .andReturn().getResponse();
         var sessionId = UUID.fromString(json.readTree(sessionResponse.getContentAsString()).path("id").asText());

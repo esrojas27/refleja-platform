@@ -26,8 +26,9 @@ class InvitationAwsConfiguration {
             @Value("${app.invitations.user-pool-id:}") String pool,
             @Value("${app.invitations.ses-from:}") String sender,
             @Value("${app.invitations.web-base-url:}") String webBase,
+            @Value("${app.invitations.combined-welcome:false}") boolean combinedWelcome,
             @Value("${app.security.cognito.issuer-uri:}") String issuer) {
-        var settings = new Settings(region, pool, sender, webBase);
+        var settings = new Settings(region, pool, sender, webBase, combinedWelcome);
         if (!enabled || !settings.valid() || !issuer.equals("https://cognito-idp." + region + ".amazonaws.com/" + pool)) {
             return new DisabledGateway();
         }
@@ -45,7 +46,10 @@ class InvitationAwsConfiguration {
         return new AwsInvitationGateway(cognito, ses, settings, credentials);
     }
 
-    record Settings(String region, String pool, String sender, String webBase) {
+    record Settings(String region, String pool, String sender, String webBase, boolean combinedWelcome) {
+        Settings(String region, String pool, String sender, String webBase) {
+            this(region, pool, sender, webBase, false);
+        }
         boolean valid() {
             try {
                 URI uri = URI.create(webBase);
@@ -59,7 +63,7 @@ class InvitationAwsConfiguration {
     }
     private static class DisabledGateway implements InvitationGateway {
         @Override public Account provision(Person person) { throw new DeliveryUnavailable(); }
-        @Override public void sendWelcomeIfRequired(Invitation invitation) { throw new DeliveryUnavailable(); }
+        @Override public String sendWelcomeIfRequired(Invitation invitation) { throw new DeliveryUnavailable(); }
         @Override public String sendInvitation(Invitation invitation) { throw new DeliveryUnavailable(); }
     }
 }

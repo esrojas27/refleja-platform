@@ -17,7 +17,8 @@ public interface SessionSchedules {
     long unread(UUID org, UUID user);
     boolean markRead(UUID org, UUID user, UUID id);
 
-    record Session(UUID id, UUID moduleId, String dimensionName, String name, String objective, int dimensionPosition, int position) {}
+    record Session(UUID id, UUID moduleId, String dimensionName, String name, String objective,
+            int dimensionPosition, int position, String description, String youtubeUrl) {}
     record Person(UUID enrollmentId, String email, String name, String status, boolean enabled, LocalDate scheduledDate, Long version) {}
     record OwnedSession(Session session, LocalDate scheduledDate) {}
     record Revision(UUID id, UUID enrollmentId, LocalDate previousDate, LocalDate scheduledDate, String actorLabel, String reason, String source, Instant recordedAt) {}

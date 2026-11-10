@@ -42,13 +42,14 @@ public class ContentAdministrationService {
         content.editDimension(org, program, id, name, description);
         audit(actor, program, id, "DIMENSION_UPDATED", request);
     }
-    public void editSession(String subject, UUID org, UUID program, UUID id, long version, String name, String objective, LocalDate date, String request) {
+    public void editSession(String subject, UUID org, UUID program, UUID id, long version, String name,
+            String description, String youtubeUrl, String objective, String request) {
         var actor = authorize(subject, org, program);
         node(org, program, ProgramContent.Kind.SESSION, id, version).requireVisible();
         var old=schedules.sessions(org,program).stream().filter(s->s.id().equals(id)).findFirst().orElseThrow(ProgramActivities.Missing::new);
         if(sessionForms.hasStarted(org,program,id)&&!java.util.Objects.equals(old.objective(),objective==null||objective.isBlank()?null:objective.trim()))
             throw new ProgramContent.Conflict("SESSION_CLOSURE_STARTED");
-        content.editSession(org, program, id, name, objective, date);
+        content.editSession(org, program, id, name, description, youtubeUrl, objective);
         audit(actor, program, id, "SESSION_UPDATED", request);
     }
     public void editActivity(String subject, UUID org, UUID program, UUID id, long version,

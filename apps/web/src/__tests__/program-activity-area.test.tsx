@@ -104,13 +104,13 @@ it("creates activity content with recipients derived from the session agenda", a
   expect(screen.getByRole("dialog", { name: "Crear actividad" })).toBeTruthy();
   fireEvent.change(within(form).getByLabelText("Título"), { target: { value: "Práctica consciente" } });
   fireEvent.change(within(form).getByLabelText("Instrucciones"), { target: { value: "Registra tres hallazgos" } });
-  fireEvent.change(within(form).getByLabelText("Video de YouTube (opcional)"), { target: { value: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" } });
+  expect(within(form).queryByLabelText(/Video de YouTube/)).toBeNull();
   expect(within(form).queryByLabelText("Fecha límite")).toBeNull();
   expect(within(form).queryByLabelText(/Ana Prueba/)).toBeNull();
   fireEvent.submit(form);
   await waitFor(() => expect(createProgramActivity).toHaveBeenCalledWith("org-a", "program-a", {
     sessionId: "session-a", title: "Práctica consciente", instructions: "Registra tres hallazgos",
-    youtubeUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    youtubeUrl: null,
     position: 2,
   }, expect.any(AbortSignal)));
 });

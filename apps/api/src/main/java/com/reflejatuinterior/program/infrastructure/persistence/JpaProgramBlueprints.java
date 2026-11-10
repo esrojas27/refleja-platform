@@ -48,7 +48,7 @@ class JpaProgramBlueprints implements ProgramBlueprints {
                                                     .map(activity -> new Activity(activity.id(), activity.title(),
                                                             activity.instructions(), activity.youtubeUrl(),
                                                             activity.dueDate(), activity.position()))
-                                                    .toList()))
+                                                    .toList(), session.youtubeUrl()))
                                     .toList())).toList();
             return new Source(program.id(), program.organizationId(), program.name(), program.description(),
                     program.startDate(), program.endDate(), storedDimensions);
@@ -77,10 +77,10 @@ class JpaProgramBlueprints implements ProgramBlueprints {
                     dimensionInput.name(), dimensionInput.description(), dimensionInput.position()));
             for (var sessionDraft : dimensionDraft.sessions()) {
                 var sessionInput = new NewProgramSession(sessionDraft.name(), sessionDraft.description(),
-                        sessionDraft.objective(), sessionDraft.scheduledDate(), sessionDraft.position());
+                        sessionDraft.objective(), sessionDraft.scheduledDate(), sessionDraft.position(), sessionDraft.youtubeUrl());
                 var session = sessions.saveAndFlush(new ProgramSessionJpaEntity(organizationId, program.id(),
                         dimension.id(), sessionInput.name(), sessionInput.description(), sessionInput.objective(),
-                        sessionInput.scheduledDate(), sessionInput.position()));
+                        sessionInput.scheduledDate(), sessionInput.position(), sessionInput.youtubeUrl()));
                 var storedActivities = new ArrayList<ProgramActivityJpaEntity>();
                 for (var activityDraft : sessionDraft.activities()) {
                     var activityInput = new NewProgramActivity(activityDraft.title(), activityDraft.instructions(),

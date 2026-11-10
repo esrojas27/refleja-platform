@@ -3,7 +3,11 @@ package com.reflejatuinterior.program.domain;
 import java.time.LocalDate;
 
 public record NewProgramSession(String name, String description, String objective,
-        LocalDate scheduledDate, int position) {
+        LocalDate scheduledDate, int position, String youtubeUrl) {
+    public NewProgramSession(String name, String description, String objective, LocalDate scheduledDate, int position) {
+        this(name, description, objective, scheduledDate, position, null);
+    }
+
     public NewProgramSession {
         if (name == null || name.isBlank() || name.length() > 255
                 || name.codePoints().anyMatch(Character::isISOControl)) {
@@ -18,6 +22,7 @@ public record NewProgramSession(String name, String description, String objectiv
         }
         description = normalize(description);
         objective = normalize(objective);
+        youtubeUrl = NewProgramActivity.normalizeYoutubeUrl(youtubeUrl);
         if (scheduledDate != null && (scheduledDate.getYear() < 1 || scheduledDate.getYear() > 9999)) {
             throw new InvalidProgramInput("scheduledDate");
         }

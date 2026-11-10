@@ -49,7 +49,10 @@ class DefaultCollaboratorInvitations implements CollaboratorInvitations {
         if (attempt.attemptId() == null) return attempt.invitation();
         try {
             if (attempt.needsWelcome()) {
-                gateway.sendWelcomeIfRequired(attempt.invitation());
+                var combinedDelivery = gateway.sendWelcomeIfRequired(attempt.invitation());
+                if (combinedDelivery != null) {
+                    return store.finish(organizationId, invitationId, attempt.attemptId(), combinedDelivery);
+                }
                 if (!store.credentialsSent(organizationId, invitationId, attempt.attemptId())) {
                     return store.findInOrganization(organizationId, invitationId);
                 }

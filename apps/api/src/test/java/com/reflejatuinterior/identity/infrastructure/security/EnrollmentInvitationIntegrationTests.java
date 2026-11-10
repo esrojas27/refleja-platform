@@ -377,8 +377,17 @@ class EnrollmentInvitationIntegrationTests extends PostgreSqlIntegrationTestSupp
         verify(gateway, times(2)).sendInvitation(any());
     }
 
+    @Test void combinedWelcomeSendsOneInvitationAndIsNotSentAgainOnRetry() throws Exception {
+        when(gateway.sendWelcomeIfRequired(any())).thenReturn("cognito:request-id");
+        var enrollment = enroll(EMAIL);
+        assertThat(enrollment.path("invitation").path("deliveryStatus").asText()).isEqualTo("SENT");
+        retry(enrollment, organization, program).andExpect(status().isOk());
+        verify(gateway, times(1)).sendWelcomeIfRequired(any());
+        verify(gateway, never()).sendInvitation(any());
+    }
+
     @Test void credentialsDeliveryFailureRemainsRecoverableWithoutPretendingAnInvitationWasSent() throws Exception {
-        doThrow(new DeliveryUnavailable()).when(gateway).sendWelcomeIfRequired(any());
+        when(gateway.sendWelcomeIfRequired(any())).thenThrow(new DeliveryUnavailable());
         var enrollment = enroll(EMAIL);
         assertThat(enrollment.path("invitation").path("deliveryStatus").asText()).isEqualTo("FAILED");
         assertPending(enrollment);

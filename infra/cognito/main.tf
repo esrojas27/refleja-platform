@@ -45,6 +45,14 @@ resource "aws_cognito_user_pool" "development" {
 
   admin_create_user_config {
     allow_admin_create_user_only = true
+
+    invite_message_template {
+      email_subject = "Tu invitación a Refleja Tu Interior"
+      email_message = templatefile("${path.module}/invitation.html.tftpl", {
+        invitation_url = "${trimsuffix(var.callback_urls[0], "/account")}/invitations"
+      })
+      sms_message = "Usuario: {username}. Clave temporal: {####}"
+    }
   }
 
   dynamic "email_configuration" {
@@ -87,4 +95,11 @@ resource "aws_cognito_user_pool_client" "web" {
 resource "aws_cognito_user_pool_domain" "development" {
   domain       = var.cognito_domain_prefix
   user_pool_id = aws_cognito_user_pool.development.id
+}
+
+resource "aws_cognito_user_pool_ui_customization" "web" {
+  client_id    = aws_cognito_user_pool_client.web.id
+  user_pool_id = aws_cognito_user_pool_domain.development.user_pool_id
+  css          = file("${path.module}/hosted-ui.css")
+  image_file   = filebase64("${path.module}/../../apps/web/public/brand/RP_CIRCULAR.jpeg")
 }

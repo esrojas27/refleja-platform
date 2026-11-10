@@ -1,6 +1,6 @@
 import { youtubeVideoId } from "@/lib/participation/youtube";
 
-export function ActivityVideo({ url, title }: { url: string; title: string }) {
+export function ActivityVideo({ url, title, session = false }: { url: string; title: string; session?: boolean }) {
   const videoId = youtubeVideoId(url);
   if (!videoId) return <p className="mt-3 text-sm text-muted-foreground">El enlace del video no es válido. Solicita al consultor que lo revise.</p>;
 
@@ -8,7 +8,7 @@ export function ActivityVideo({ url, title }: { url: string; title: string }) {
     <div className="overflow-hidden rounded-2xl border border-border bg-black">
       <iframe
         src={`https://www.youtube-nocookie.com/embed/${videoId}?hl=es&playsinline=1`}
-        title={`Video de la actividad: ${title}`}
+        title={`Video de la ${session ? "sesión" : "actividad"}: ${title}`}
         className="aspect-video min-h-[200px] w-full border-0"
         loading="lazy"
         allow="encrypted-media; fullscreen; picture-in-picture"

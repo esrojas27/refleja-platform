@@ -11,7 +11,7 @@ public record ProgramTemplateSnapshot(String sourceName, String sourceDescriptio
     }
 
     public record Session(String name, String description, String objective, long scheduledDayOffset,
-                          int position, List<Activity> activities,Survey closingSurvey) {
+                          int position, List<Activity> activities, Survey closingSurvey, String youtubeUrl) {
         public Session { activities = List.copyOf(activities); }
     }
 

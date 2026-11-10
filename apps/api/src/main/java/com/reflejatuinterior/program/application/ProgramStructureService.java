@@ -56,7 +56,7 @@ public class ProgramStructureService {
 
     @Transactional
     public ProgramSessionData createSession(String subject, UUID organizationId, UUID programId, UUID moduleId,
-            String name, String description, String objective, LocalDate scheduledDate, int position, String requestId) {
+            String name, String description, String objective, LocalDate scheduledDate, int position, String youtubeUrl, String requestId) {
         var context = policy.authorizeConsultant(subject, organizationId, "CREATE_PROGRAM_SESSION", requestId);
         tenantContext.activate(context.organizationId());
         requireProgram(context.organizationId(), programId);
@@ -66,7 +66,7 @@ public class ProgramStructureService {
         if (structure.findModule(context.organizationId(), programId, moduleId).orElseThrow(ProgramNotFound::new).archived())
             throw new com.reflejatuinterior.program.ProgramContent.Conflict("CONTENT_ARCHIVED");
         var created = structure.createSession(context.organizationId(), programId, moduleId,
-                new NewProgramSession(name, description, objective, scheduledDate, position));
+                new NewProgramSession(name, description, objective, scheduledDate, position, youtubeUrl));
         auditAfterCommit("PROGRAM_SESSION_CREATED", context.userId(), context.organizationId(), created.id(), requestId);
         return created;
     }

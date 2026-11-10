@@ -4,6 +4,18 @@ Terraform es la fuente de verdad para el User Pool, el app client público y el
 dominio administrado de Cognito de RTI-VS1-006. Esta configuración no crea usuarios,
 grupos, Identity Pools ni secretos de cliente.
 
+## Invitación con clave temporal y estilos de acceso
+
+Aplica primero la plantilla de Cognito y comprueba que el enlace apunte al entorno
+correcto. Después activa `RTI_DEV_COMBINED_WELCOME=true` en las variables del
+entorno `development` de GitHub y publica la aplicación. Las cuentas pendientes de
+cambiar la clave reciben el correo de Cognito como invitación completa. Las cuentas
+confirmadas reciben la invitación de SES y conservan su clave. Las invitaciones
+ya enviadas se mantienen. Para volver al envío anterior, desactiva la variable y
+vuelve a desplegar la aplicación antes de cambiar la plantilla de Cognito.
+
+El logo y el CSS se aplican al app client en la interfaz clásica existente.
+
 ## Prerrequisitos
 
 - Terraform compatible con la restricción de `versions.tf`.

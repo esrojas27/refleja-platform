@@ -248,7 +248,7 @@ export function ActivityForm({ organizationId, programId, sessions, activities, 
         disabled={pending || blocked || unavailable} />
       {instructionsLocked && <p className="mt-2 text-sm text-muted-foreground">Las instrucciones y la encuesta están protegidas porque ya existen entregas. Duplica la actividad para cambiarlas.</p>}
       {invalidFields.includes("instructions") && <p id="activity-instructions-error" className="mt-1 text-sm text-destructive">Escribe las instrucciones que debe seguir el colaborador.</p>}</div>
-    <div><label htmlFor="activity-youtube-url" className="block text-sm font-medium">Video de YouTube (opcional)</label>
+    {initial?.youtubeUrl && <div><label htmlFor="activity-youtube-url" className="block text-sm font-medium">Video existente de la actividad</label>
       <input id="activity-youtube-url" type="url" className="rti-field" maxLength={2048}
         placeholder="https://www.youtube.com/watch?v=..." value={input.youtubeUrl}
         aria-invalid={invalidFields.includes("youtubeUrl") || undefined}
@@ -257,7 +257,7 @@ export function ActivityForm({ organizationId, programId, sessions, activities, 
         disabled={pending || blocked || unavailable} />
       {invalidFields.includes("youtubeUrl")
         ? <p id="activity-youtube-url-error" className="mt-1 text-sm text-destructive">Usa un enlace HTTPS válido de YouTube.</p>
-        : <p className="mt-2 text-xs text-muted-foreground">El video se mostrará dentro de la actividad, con un enlace alternativo a YouTube.</p>}</div>
+        : <p className="mt-2 text-xs text-muted-foreground">Los videos nuevos se configuran en la sesión.</p>}</div>}
     <p className="rounded-xl bg-muted/50 p-3 text-sm">Los destinatarios se definen en Agendar participantes de la sesión. Esta actividad se asignará automáticamente a quienes ya tengan fecha y a quienes se agenden después. El vencimiento será tres días calendario después de su sesión.</p>
     <button className="rti-button-primary" disabled={pending || blocked || unavailable}>
       {pending ? "Guardando…" : initial ? "Guardar cambios" : "Crear actividad"}

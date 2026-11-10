@@ -32,6 +32,7 @@ app:
     user-pool-id: ${INVITATIONS_COGNITO_USER_POOL_ID:}
     ses-from: ${INVITATIONS_SES_FROM:}
     web-base-url: ${INVITATIONS_WEB_BASE_URL:http://localhost:3000}
+    combined-welcome: ${INVITATIONS_COMBINED_WELCOME:false}
   security:
     operator-organization-id: ${OPERATOR_ORGANIZATION_ID:}
     cognito:

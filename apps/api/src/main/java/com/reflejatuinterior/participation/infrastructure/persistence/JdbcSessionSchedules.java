@@ -26,7 +26,8 @@ class JdbcSessionSchedules implements SessionSchedules {
             """;
     private Session session(ResultSet r) throws SQLException {
         return new Session(r.getObject("id",UUID.class),r.getObject("module_id",UUID.class),r.getString("dimension_name"),
-                r.getString("name"),r.getString("objective"),r.getInt("dimension_position"),r.getInt("position"));
+                r.getString("name"),r.getString("objective"),r.getInt("dimension_position"),r.getInt("position"),
+                r.getString("description"),r.getString("youtube_url"));
     }
     public List<Session> sessions(UUID org, UUID program) {
         return jdbc.query("SELECT s.*,d.name dimension_name,d.position dimension_position "+SESSIONS+" ORDER BY d.position,s.position,s.id",params(org,program),(r,i)->session(r));

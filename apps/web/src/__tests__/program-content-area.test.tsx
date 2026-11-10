@@ -132,11 +132,14 @@ it("appends sessions inside their module using the next visible position", async
   const form = await screen.findByRole("form", { name: "Crear sesión" });
   expect(screen.getByRole("dialog", { name: "Agregar sesión" })).toBeTruthy();
   fireEvent.change(within(form).getByLabelText("Nombre"), { target: { value: "Segunda sesión" } });
+  fireEvent.change(within(form).getByLabelText("Descripción"), { target: { value: "Práctica guiada" } });
+  fireEvent.change(within(form).getByLabelText(/Video de YouTube de la sesión/), { target: { value: "https://youtu.be/dQw4w9WgXcQ" } });
   fireEvent.change(within(form).getByLabelText("Comentario de cierre"), { target: { value: "Practicar lo aprendido" } });
   expect(within(form).queryByLabelText("Fecha")).toBeNull();
   fireEvent.submit(form);
   await waitFor(() => expect(createProgramSession).toHaveBeenCalledWith("org-a", "program-a", "module-a",
-    { name: "Segunda sesión", closingComment: "Practicar lo aprendido", position: 4 }, expect.any(AbortSignal)));
+    { name: "Segunda sesión", description: "Práctica guiada", youtubeUrl: "https://youtu.be/dQw4w9WgXcQ",
+      closingComment: "Practicar lo aprendido", position: 4 }, expect.any(AbortSignal)));
 });
 
 it("creates a visual survey with the original four question types", async () => {

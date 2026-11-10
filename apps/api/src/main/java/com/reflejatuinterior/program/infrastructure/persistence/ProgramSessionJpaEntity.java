@@ -27,6 +27,8 @@ class ProgramSessionJpaEntity {
     private String name;
     @Column(name = "description", columnDefinition = "text")
     private String description;
+    @Column(name = "youtube_url", length = 2048)
+    private String youtubeUrl;
     @Column(name = "objective", columnDefinition = "text")
     private String objective;
     @Column(name = "scheduled_date")
@@ -45,12 +47,13 @@ class ProgramSessionJpaEntity {
     protected ProgramSessionJpaEntity() {}
 
     ProgramSessionJpaEntity(UUID organizationId, UUID programId, UUID moduleId, String name,
-            String description, String objective, LocalDate scheduledDate, int position) {
+            String description, String objective, LocalDate scheduledDate, int position, String youtubeUrl) {
         this.organizationId = organizationId;
         this.programId = programId;
         this.moduleId = moduleId;
         this.name = name;
         this.description = description;
+        this.youtubeUrl = youtubeUrl;
         this.objective = objective;
         this.scheduledDate = scheduledDate;
         this.position = position;
@@ -63,11 +66,13 @@ class ProgramSessionJpaEntity {
     String name() { return name; }
     String description() { return description; }
     String objective() { return objective; }
+    String youtubeUrl() { return youtubeUrl; }
     LocalDate scheduledDate() { return scheduledDate; }
     int position() { return position; }
     boolean archived() { return archived; }
     void edit(com.reflejatuinterior.program.domain.NewProgramSession input) {
-        name = input.name(); objective = input.objective(); scheduledDate = input.scheduledDate();
+        name = input.name(); description = input.description(); youtubeUrl = input.youtubeUrl();
+        objective = input.objective(); scheduledDate = input.scheduledDate();
     }
     void archive(boolean value) { archived = value; }
     void moveTo(int value) { position = value; }

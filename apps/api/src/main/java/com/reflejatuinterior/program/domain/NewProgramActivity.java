@@ -32,7 +32,7 @@ public record NewProgramActivity(String title, String instructions, String youtu
         if (position < 1) throw new InvalidProgramInput("position");
     }
 
-    private static String normalizeYoutubeUrl(String value) {
+    static String normalizeYoutubeUrl(String value) {
         if (value == null || value.isBlank()) return null;
         var normalized = value.strip();
         if (normalized.length() > 2048 || normalized.codePoints().anyMatch(Character::isISOControl)) {
