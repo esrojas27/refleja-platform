@@ -3,6 +3,9 @@ package com.reflejatuinterior.participation.application;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.LinkedHashMap;
+import com.reflejatuinterior.participation.domain.EvaluationQuestionType;
 import java.util.Set;
 import java.util.UUID;
 import com.reflejatuinterior.identity.CollaboratorAccess;
@@ -68,6 +71,12 @@ public class ActivityEvaluationService {
     @Transactional
     public SurveySubmission submit(String subject, UUID programId, UUID activityId,
             List<ActivityEvaluationResponses.AnswerInput> input, long version, String requestId) {
+        return submit(subject, programId, activityId, input, version, Map.of(), requestId);
+    }
+
+    @Transactional
+    public SurveySubmission submit(String subject, UUID programId, UUID activityId,
+            List<ActivityEvaluationResponses.AnswerInput> input, long version, Map<UUID, byte[]> uploads, String requestId) {
         var owned = authorizeOwned(subject, programId, activityId, requestId);
         var evaluation = evaluations.find(owned.organizationId(), programId, activityId)
                 .orElseThrow(ProgramActivities.Missing::new);
@@ -78,13 +87,51 @@ public class ActivityEvaluationService {
         if (!Set.of("ASSIGNED","CHANGES_REQUESTED").contains(owned.assignment().status())) {
             throw new ActivityWorkflowConflict();
         }
-        var cleanAnswers = validate(evaluation, input);
         var previous=responses.findByAssignment(owned.organizationId(),programId,owned.assignment().id());
+        var newImages = new LinkedHashMap<UUID, ActivityEvaluationResponses.Image>();
+        var remaining = new LinkedHashMap<>(uploads);
+        var cleanAnswers = validate(evaluation, input, (question, answer) -> {
+            if (question.type() != EvaluationQuestionType.IMAGE) return clean(question, answer);
+            var bytes = remaining.remove(question.id());
+            if (bytes == null) {
+                if (answer.values().size() != 1 || previous.stream().flatMap(response -> response.answers().stream())
+                        .noneMatch(old -> old.questionId().equals(question.id()) && old.values().equals(answer.values()))) {
+                    throw new InvalidActivitySurveyResponse("answers");
+                }
+                return answer;
+            }
+            if (!answer.values().isEmpty()) throw new InvalidActivitySurveyResponse("answers");
+            var id = UUID.randomUUID();
+            newImages.put(id, ActivityImageFormat.validate(bytes));
+            return new ActivityEvaluationResponses.AnswerInput(question.id(), List.of(id.toString()));
+        });
+        if (!remaining.isEmpty()) throw new InvalidActivitySurveyResponse("answers");
         var created = previous.isPresent()?responses.replace(owned.organizationId(),programId,owned.assignment().id(),cleanAnswers)
             :responses.create(owned.organizationId(), programId, activityId, evaluation.id(),owned.assignment().id(), owned.enrollmentId(), cleanAnswers);
+        newImages.forEach((id, image) -> responses.storeImage(owned.organizationId(), programId, created.id(), id, image));
         assignments.submit(owned.organizationId(),programId,activityId,owned.enrollmentId(),null).orElseThrow(ActivityAssignmentNotFound::new);
         auditSurveyAfterCommit(owned.userId(), owned.organizationId(), created.id(), requestId);
-        return new SurveySubmission(evaluation.id(), "COMPLETED", created.completedAt());
+        return new SurveySubmission(evaluation.id(), "COMPLETED", created.completedAt(), created.answers());
+    }
+
+    @Transactional(readOnly = true)
+    public ActivityEvaluationResponses.Image reviewedImage(String subject, UUID org, UUID program, UUID imageId, String requestId) {
+        authorize(subject, org, program, "VIEW_ACTIVITY_IMAGE", requestId);
+        return responses.findImage(org, program, imageId, null).orElseThrow(ActivityAssignmentNotFound::new);
+    }
+
+    @Transactional(readOnly = true)
+    public ActivityEvaluationResponses.Image ownedImage(String subject, UUID program, UUID imageId) {
+        for (var membership : collaboratorAccess.resolve(subject).memberships()) {
+            var org = membership.organizationId();
+            tenantContext.activate(org);
+            var enrollment = enrollments.findOwned(org, membership.id(), program);
+            if (enrollment.isPresent() && programs.find(org, program).filter(item -> item.activated()).isPresent()) {
+                return responses.findImage(org, program, imageId, enrollment.get().id())
+                        .orElseThrow(ActivityAssignmentNotFound::new);
+            }
+        }
+        throw new ActivityAssignmentNotFound();
     }
 
     private OwnedContext authorizeOwned(String subject, UUID programId, UUID activityId, String requestId) {
@@ -115,6 +162,13 @@ public class ActivityEvaluationService {
 
     static List<ActivityEvaluationResponses.AnswerInput> validate(ActivityEvaluations.Evaluation evaluation,
             List<ActivityEvaluationResponses.AnswerInput> input) {
+        return validate(evaluation, input, ActivityEvaluationService::clean);
+    }
+
+    private static List<ActivityEvaluationResponses.AnswerInput> validate(ActivityEvaluations.Evaluation evaluation,
+            List<ActivityEvaluationResponses.AnswerInput> input,
+            java.util.function.BiFunction<ActivityEvaluations.Question, ActivityEvaluationResponses.AnswerInput,
+                    ActivityEvaluationResponses.AnswerInput> cleanAnswer) {
         if (input == null || input.size() != evaluation.questions().size()) {
             throw new InvalidActivitySurveyResponse("answers");
         }
@@ -125,7 +179,7 @@ public class ActivityEvaluationService {
             throw new InvalidActivitySurveyResponse("answers");
         }
         return evaluation.questions().stream().sorted(Comparator.comparingInt(ActivityEvaluations.Question::position))
-                .map(question -> clean(question, input.stream().filter(answer -> answer.questionId().equals(question.id()))
+                .map(question -> cleanAnswer.apply(question, input.stream().filter(answer -> answer.questionId().equals(question.id()))
                         .findFirst().orElseThrow(() -> new InvalidActivitySurveyResponse("answers"))))
                 .toList();
     }
@@ -188,5 +242,6 @@ public class ActivityEvaluationService {
 
     private record OwnedContext(UUID userId, UUID organizationId, UUID enrollmentId,
                                 ActivityAssignments.Data assignment) {}
-    public record SurveySubmission(UUID evaluationId, String status, Instant completedAt) {}
+    public record SurveySubmission(UUID evaluationId, String status, Instant completedAt,
+            List<ActivityEvaluationResponses.Answer> answers) {}
 }

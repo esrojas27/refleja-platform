@@ -17,7 +17,8 @@ public final class QuestionOptions {
             if (!options.isEmpty()) throw new InvalidActivityEvaluation("options");
             return List.of();
         }
-        if (options.size() < 2 || options.size() > MAX_OPTIONS) throw new InvalidActivityEvaluation("options");
+        int minimum = type == EvaluationQuestionType.MULTIPLE_CHOICE_WORDS ? QuestionAnswers.MIN_WORD_SELECTIONS : 2;
+        if (options.size() < minimum || options.size() > MAX_OPTIONS) throw new InvalidActivityEvaluation("options");
         var cleaned = options.stream().map(value -> value == null ? "" : value.trim()).toList();
         var seen = new HashSet<String>();
         for (var value : cleaned) {

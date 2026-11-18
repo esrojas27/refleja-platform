@@ -1,5 +1,5 @@
 import { AGREEMENT_OPTIONS, EMOTION_OPTIONS, LIKELIHOOD_OPTIONS, NUMERIC_SCALE_OPTIONS,
-  hasCustomOptions, type FormQuestion } from "@/lib/forms/question-catalog";
+  MAX_WORD_SELECTIONS, WORD_SELECTION_HELP, hasCustomOptions, type FormQuestion } from "@/lib/forms/question-catalog";
 import { SingleChoiceOptions } from "./single-choice-options";
 
 /** Shared answer controls; workflow/submission remains with the enclosing form. */
@@ -10,6 +10,21 @@ export function SurveyQuestionInput({ question, selected, disabled, onChange }: 
   if (question.type === "OPEN_TEXT") return <textarea id={id} aria-label={`Respuesta a ${question.prompt}`}
     className="rti-field mt-3 min-h-28 resize-y" maxLength={5000} value={selected[0] ?? ""}
     onChange={event => onChange([event.target.value])} disabled={disabled} />;
+  if (question.type === "MULTIPLE_CHOICE_WORDS") return <div id={id} tabIndex={-1} className="mt-3">
+    <div className="flex flex-wrap gap-2" role="group" aria-label={question.prompt} aria-describedby={id + "-help"}>
+      {(question.options ?? []).map(option => <label key={option}
+        className="flex min-h-11 max-w-full cursor-pointer items-center gap-2 rounded-full border bg-background px-4 py-2 text-sm has-checked:border-primary has-checked:bg-accent focus-within:ring-2 focus-within:ring-ring">
+        <input type="checkbox" className="size-4 shrink-0 accent-primary" checked={selected.includes(option)}
+          disabled={disabled || (!selected.includes(option) && selected.length >= MAX_WORD_SELECTIONS)}
+          onChange={event => onChange(event.target.checked
+            ? [...selected, option] : selected.filter(value => value !== option))} />
+        <span className="min-w-0 [overflow-wrap:anywhere]">{option}</span>
+      </label>)}
+    </div>
+    <p id={id + "-help"} className="mt-2 text-xs text-muted-foreground" aria-live="polite">
+      {WORD_SELECTION_HELP} {selected.length} seleccionadas.
+    </p>
+  </div>;
   if (hasCustomOptions(question.type)) return <div id={id} tabIndex={-1} className="mt-3">
     <SingleChoiceOptions id={question.id} options={question.options ?? []} words={question.type === "SINGLE_CHOICE_WORDS"}
       selected={selected[0]} disabled={disabled} onChange={value => onChange([value])} />

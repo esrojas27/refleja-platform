@@ -200,6 +200,46 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
             .content(surveyResponseBody(survey))).andExpect(status().isConflict());
     }
 
+    @Test void storesImageAndThreeWordsAndRestrictsImageAccessToTheOwnerAndConsultant() throws Exception {
+        var activity = createAdminActivity(true, 1);
+        var definition = mvc.perform(post(evaluationPath(activity)).header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("""
+                {"title":"Actividad con foto","questions":[
+                    {"prompt":"Foto","type":"IMAGE","position":1},
+                    {"prompt":"Palabras","type":"MULTIPLE_CHOICE_WORDS","position":2,"options":["Una","Dos","Tres"]}
+                ]}
+                """)).andExpect(status().isCreated()).andReturn();
+        var questions = json.readTree(definition.getResponse().getContentAsString()).path("questions");
+        var imageQuestion = questions.get(0).path("id").asText();
+        var wordsQuestion = questions.get(1).path("id").asText();
+        var picture = new java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_INT_RGB);
+        var output = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(picture, "png", output);
+        var bytes = output.toByteArray();
+        var metadata = """
+                {"version":0,"answers":[{"questionId":"%s","values":[]},
+                {"questionId":"%s","values":["Una","Dos","Tres"]}]}
+                """.formatted(imageQuestion, wordsQuestion);
+        var submitted = mvc.perform(multipart(surveyResponsePath(activity))
+                .file(new org.springframework.mock.web.MockMultipartFile("submission", "submission.json",
+                        "application/json", metadata.getBytes(java.nio.charset.StandardCharsets.UTF_8)))
+                .file(new org.springframework.mock.web.MockMultipartFile(imageQuestion, "photo.png", "image/png", bytes))
+                .header("Authorization", token(collaborator)))
+                .andExpect(status().isOk()).andReturn();
+        var stored = json.readTree(submitted.getResponse().getContentAsString()).path("answers");
+        var firstIsImage = stored.get(0).path("questionId").asText().equals(imageQuestion);
+        var imageId = stored.get(firstIsImage ? 0 : 1).path("values").get(0).asText();
+        assertThat(stored.get(firstIsImage ? 1 : 0).path("values").size()).isEqualTo(3);
+        var own = "/api/v1/me/programs/" + program + "/activity-images/" + imageId;
+        var review = "/api/v1/organizations/" + organization + "/programs/" + program + "/activity-images/" + imageId;
+        mvc.perform(get(own).header("Authorization", token(collaborator))).andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.IMAGE_PNG)).andExpect(content().bytes(bytes));
+        mvc.perform(get(review).header("Authorization", token(consultant))).andExpect(status().isOk())
+                .andExpect(content().bytes(bytes));
+        mvc.perform(get(own).header("Authorization", token(otherCollaborator))).andExpect(status().isNotFound());
+        mvc.perform(get(review).header("Authorization", token(otherCollaborator))).andExpect(status().isForbidden());
+    }
+
     @Test void draftHidesAssignedContentAndRefusesCollaboratorWrites() throws Exception {
         jdbcTemplate.update("update rti.programs set status='DRAFT' where id=? and organization_id=?", program, organization);
         var created = mvc.perform(post(consultantPath()).header("Authorization", token(consultant))

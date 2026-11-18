@@ -249,7 +249,7 @@ function AssignedActivityCard({ programId, activity, onSubmitted, readOnly }: {
         survey: { ...activity.survey!, status: "COMPLETED", completedAt: submission.completedAt }, completionPercentage: 100 })} />}
     {!editable && activity.survey && activity.submittedAt && <>
       <p className="mt-4 rounded-xl bg-accent p-3 text-sm font-semibold">Formulario enviado. Puedes consultar tus respuestas.</p>
-      <QuestionnaireAnswers questions={activity.survey.questions} answers={activity.answers ?? []} />
+      <QuestionnaireAnswers programId={activity.programId} questions={activity.survey.questions} answers={activity.answers ?? []} />
     </>}
   </div>;
 }

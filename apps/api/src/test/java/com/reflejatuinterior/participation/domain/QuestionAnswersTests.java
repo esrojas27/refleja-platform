@@ -25,6 +25,19 @@ class QuestionAnswersTests {
         for(var values:List.of(List.of("0"),List.of("6"),List.of("4.5"),List.of("1","2")))
             assertThatThrownBy(()->QuestionAnswers.clean(type,List.of(),values)).isInstanceOf(InvalidActivitySurveyResponse.class);
     }
+    @Test void multipleWordsRequiresThreeToEightConfiguredSelections() {
+        var type = EvaluationQuestionType.MULTIPLE_CHOICE_WORDS;
+        var options = List.of("Uno", "Dos", "Tres", "Cuatro", "Cinco", "Seis", "Siete", "Ocho", "Nueve");
+        assertThat(QuestionAnswers.clean(type, options, options.subList(0, 3))).hasSize(3);
+        assertThat(QuestionAnswers.clean(type, options, options.subList(0, 8))).hasSize(8);
+        assertThatThrownBy(() -> QuestionAnswers.clean(type, options, options.subList(0, 2)))
+                .isInstanceOf(InvalidActivitySurveyResponse.class);
+        assertThatThrownBy(() -> QuestionAnswers.clean(type, options, options))
+                .isInstanceOf(InvalidActivitySurveyResponse.class);
+        assertThatThrownBy(() -> QuestionOptions.clean(type, options.subList(0, 2)))
+                .isInstanceOf(InvalidActivityEvaluation.class);
+    }
+
     @Test void openAnswersAndTwoEmotionsKeepTheirExistingRules() {
         assertThat(QuestionAnswers.clean(EvaluationQuestionType.OPEN_TEXT,List.of(),List.of(" Mi experiencia "))).containsExactly("Mi experiencia");
         assertThat(QuestionAnswers.clean(EvaluationQuestionType.EMOTION_MULTI_SELECT,List.of(),List.of("Inspirado(a)","Reflexivo(a)"))).hasSize(2);

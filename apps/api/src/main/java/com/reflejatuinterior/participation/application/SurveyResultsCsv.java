@@ -29,6 +29,7 @@ public final class SurveyResultsCsv {
                         "", "", "", q.prompt(), q.type(), "", "", "", "", q.average(), "", "", "", q.responseCount()));
                 for (var option : q.distribution()) rows.add(row("Distribución pregunta", report.programId(), report.programName(), a.dimensionName(), a.sessionName(), a.title(), s.title(),
                         "", "", "", q.prompt(), q.type(), option.value(), option.label(), option.count(), option.percentage(), "", "", "", "", q.responseCount()));
+                if (q.type().name().equals("IMAGE")) continue;
                 for (var person : s.responses()) person.answers().stream().filter(answer -> answer.questionId().equals(q.id())).forEach(answer ->
                     answer.values().forEach(value -> rows.add(row("Respuesta", report.programId(), report.programName(), a.dimensionName(), a.sessionName(), a.title(), s.title(),
                             person.name(), person.email(), person.completedAt(), q.prompt(), q.type(), value, SurveyResultsService.label(q.type(), value),

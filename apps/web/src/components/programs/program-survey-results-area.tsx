@@ -176,7 +176,7 @@ function SurveyCard({ survey, expanded }: { survey: SurveyResult; expanded: bool
           const values = person.answers.find(a => a.questionId === q.id)?.values ?? [];
           const options = q.type === "AGREEMENT_SCALE" ? AGREEMENT_OPTIONS : q.type === "LIKELIHOOD_SCALE" ? LIKELIHOOD_OPTIONS : undefined;
           return <div key={q.id}><p className="text-sm font-medium">{q.position}. {q.prompt}</p>
-            <p className="mt-1 whitespace-pre-wrap break-words text-sm text-muted-foreground">{values.map(v => options ? `${v} · ${options[Number(v) - 1]}` : v).join(" · ")}</p></div>;
+            <p className="mt-1 whitespace-pre-wrap break-words text-sm text-muted-foreground">{q.type === "IMAGE" ? (values.length ? "Imagen adjunta en la entrega" : "") : values.map(v => options ? `${v} · ${options[Number(v) - 1]}` : v).join(" · ")}</p></div>;
         })}</div>} />
       </details>
     </div>
@@ -190,9 +190,13 @@ function Question({ question, respondents }: { question: SurveyQuestionResult; r
       <BarChart3 aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" /></div>
     <p className="mt-2 text-xs text-muted-foreground">{question.responseCount} respuestas{question.average !== null ? ` · Media ${number(question.average)} / 5` : ""}</p>
     {emotion && <p className="mt-2 text-xs text-muted-foreground">Hasta dos emociones por persona. Cada porcentaje usa como base las personas que respondieron esta pregunta; la suma puede superar el 100%.</p>}
+    {question.type === "MULTIPLE_CHOICE_WORDS" && <p className="mt-2 text-xs text-muted-foreground">
+      Cada porcentaje se calcula sobre las personas que respondieron. La suma puede superar el 100 %.
+    </p>}
     {emotion && question.responseCount > 0 && <p className="mt-3 text-sm font-medium">Más seleccionadas: {question.distribution.filter(option => option.count === question.distribution[0]?.count).map(option => option.label).join(", ")}</p>}
     {open ? <Respondents key={question.id} people={respondents.filter(p => p.answers.some(a => a.questionId === question.id))}
       render={person => <p className="whitespace-pre-wrap break-words text-sm">{person.answers.find(a => a.questionId === question.id)?.values[0]}</p>} />
+      : question.type === "IMAGE" ? <p className="mt-2 text-sm text-muted-foreground">Consulta las imágenes en la revisión de entregas.</p>
       : <ol className="mt-4 space-y-3">{question.distribution.map(option => <li key={option.value}>
         <div className="flex items-start justify-between gap-3 text-sm"><span className="min-w-0 break-words">{(question.type === "AGREEMENT_SCALE" || question.type === "LIKELIHOOD_SCALE") && `${option.value}. `}{option.label}</span>
           <span className="shrink-0 tabular-nums">{option.count} · {number(option.percentage)}%</span></div>

@@ -101,6 +101,36 @@ it.each(["SINGLE_CHOICE_LETTERS", "SINGLE_CHOICE_WORDS"] as const)("%s requires 
   await waitFor(() => expect(submitMyActivitySurvey).toHaveBeenCalledWith("program", "activity", [{ questionId: question.id, values: ["Palabra 30"] }], 0));
 });
 
+it("updates the preview and instructions when the editor switches to multiple choice", () => {
+  render(<ActivityEvaluationForm {...props} initial={definition} />);
+  expect(screen.getByText("Vista para el colaborador · Selección única")).toBeTruthy();
+  fireEvent.change(screen.getByLabelText("Tipo de respuesta"), { target: { value: "MULTIPLE_CHOICE_WORDS" } });
+  expect(screen.getByText("Vista para el colaborador · Selección múltiple")).toBeTruthy();
+  expect(screen.getByText(/podrá elegir entre 3 y 8 opciones/)).toBeTruthy();
+  expect(screen.queryByText(/elegirá solo una/)).toBeNull();
+});
+
+it("lets the collaborator select and deselect several words before submitting", async () => {
+  const multipleSurvey: ActivitySurvey = { ...survey, questions: [{ ...question, type: "MULTIPLE_CHOICE_WORDS" }] };
+  render(<ActivitySurveyForm version={0} programId="program" activityId="activity" survey={multipleSurvey} onCompleted={vi.fn()} />);
+  expect(screen.queryByRole("radio")).toBeNull();
+  expect(screen.getByText(/Selecciona entre 3 y 8 opciones/)).toBeTruthy();
+  const checkbox = (index: number) => screen.getByRole<HTMLInputElement>("checkbox", { name: words[index] });
+  fireEvent.click(checkbox(0));
+  fireEvent.click(checkbox(1));
+  fireEvent.click(screen.getByRole("button", { name: "Enviar actividad" }));
+  expect(submitMyActivitySurvey).not.toHaveBeenCalled();
+  for (let index = 2; index < 8; index++) fireEvent.click(checkbox(index));
+  expect(checkbox(8).disabled).toBe(true);
+  fireEvent.click(checkbox(7));
+  expect(checkbox(8).disabled).toBe(false);
+  for (let index = 4; index < 7; index++) fireEvent.click(checkbox(index));
+  fireEvent.click(screen.getByRole("checkbox", { name: words[1] }));
+  fireEvent.click(screen.getByRole("button", { name: "Enviar actividad" }));
+  await waitFor(() => expect(submitMyActivitySurvey).toHaveBeenCalledWith("program", "activity",
+    [{ questionId: question.id, values: [words[0], words[2], words[3]] }], 0));
+});
+
 it("disables custom radio choices while the submission is pending", async () => {
   vi.mocked(submitMyActivitySurvey).mockReturnValue(new Promise(() => {}));
   render(<ActivitySurveyForm version={0} programId="program" activityId="activity" survey={survey} onCompleted={vi.fn()} />);

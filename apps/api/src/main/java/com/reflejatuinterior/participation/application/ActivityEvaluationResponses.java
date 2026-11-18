@@ -18,6 +18,11 @@ public interface ActivityEvaluationResponses {
     Response createForSession(UUID org,UUID program,UUID session,UUID evaluation,UUID enrollment,List<AnswerInput> answers);
     Optional<Response> findForSession(UUID org,UUID program,UUID session,UUID enrollment);
 
+    void storeImage(UUID org, UUID program, UUID responseId, UUID imageId, Image image);
+    Optional<Image> findImage(UUID org, UUID program, UUID imageId, UUID enrollmentId);
+
+    record Image(String contentType, byte[] bytes) {}
+
     record AnswerInput(UUID questionId, List<String> values) {
         public AnswerInput { values = List.copyOf(values); }
     }

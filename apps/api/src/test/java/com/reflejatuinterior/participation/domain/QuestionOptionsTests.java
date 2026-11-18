@@ -30,7 +30,7 @@ class QuestionOptionsTests {
     }
 
     @ParameterizedTest
-    @EnumSource(value=EvaluationQuestionType.class,names={"SINGLE_CHOICE_LETTERS","SINGLE_CHOICE_WORDS"},mode=EnumSource.Mode.EXCLUDE)
+    @EnumSource(value=EvaluationQuestionType.class,names={"SINGLE_CHOICE_LETTERS","SINGLE_CHOICE_WORDS","MULTIPLE_CHOICE_WORDS"},mode=EnumSource.Mode.EXCLUDE)
     void fixedQuestionTypesDoNotAcceptCustomOptions(EvaluationQuestionType type) {
         assertThat(QuestionOptions.clean(type,null)).isEmpty();
         assertThatThrownBy(()->QuestionOptions.clean(type,List.of("Una","Dos"))).isInstanceOf(InvalidActivityEvaluation.class);

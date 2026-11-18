@@ -1,5 +1,7 @@
 "use client";
 
+import { ActivityAnswerImage } from "@/components/forms/activity-answer-image";
+
 import Link from "next/link";
 import { ActivityVideo } from "@/components/participation/activity-video";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
@@ -123,7 +125,7 @@ function ActivityContent({ organizationId, programId }: { organizationId: string
                 <p className="mt-2 text-xs">{person.dueDate ? `Fecha límite: ${person.dueDate}` : "Sesión sin agendar"}</p>
                 <div className="mt-2"><ActivityStatusBadges status={person.status} dueDate={person.dueDate ?? null}
                   surveyStatus={person.surveyStatus === "NOT_REQUIRED" ? undefined : person.surveyStatus} /></div>
-                <ReviewedFormAnswers answers={person.answers} />
+                <ReviewedFormAnswers answers={person.answers} organizationId={organizationId} programId={programId} />
                 {person.reviewComment && <p className="mt-2 whitespace-pre-wrap break-words text-muted-foreground">Comentario del consultor: {person.reviewComment}</p>}
                 <p className="mt-2 text-muted-foreground">Avance conservado: {person.completionPercentage}%</p>
               </li>)}</ul>
@@ -370,7 +372,7 @@ function ReviewCard({ organizationId, programId, item, leaving, onReviewed }: {
       <div><p className="font-medium">{name}</p><p className="text-muted-foreground">{assignee.email}</p></div>
       <ActivityStatusBadges status={assignee.status} dueDate={assignee.dueDate ?? null} />
     </div>
-    <ReviewedFormAnswers answers={assignee.answers} />
+    <ReviewedFormAnswers answers={assignee.answers} organizationId={organizationId} programId={programId} />
     {assignee.reviewComment && <p className="mt-3 text-muted-foreground">Comentario de revisión: {assignee.reviewComment}</p>}
     <div className="mt-4 space-y-3">
       <label className="block font-medium" htmlFor={`review-${assignee.assignmentId}`}>Comentario de revisión</label>
@@ -388,10 +390,12 @@ function ReviewCard({ organizationId, programId, item, leaving, onReviewed }: {
   </article>;
 }
 
-function ReviewedFormAnswers({ answers }: { answers: ActivityAssignee["answers"] }) {
+function ReviewedFormAnswers({ answers, organizationId, programId }: { answers: ActivityAssignee["answers"]; organizationId: string; programId: string }) {
   if (!answers?.length) return <p className="mt-3 text-muted-foreground">Sin formulario enviado.</p>;
   return <ol className="mt-3 space-y-3">{answers.map(answer => <li key={answer.questionId} className="rounded-xl bg-muted/40 p-3">
-    <p className="font-medium">{answer.prompt}</p><p className="mt-1 whitespace-pre-wrap break-words">{answer.values.join(" · ")}</p>
+    <p className="font-medium">{answer.prompt}</p>{answer.type === "IMAGE" && answer.values[0]
+      ? <ActivityAnswerImage key={answer.values[0]} organizationId={organizationId} programId={programId} imageId={answer.values[0]} />
+      : <p className="mt-1 whitespace-pre-wrap break-words">{answer.values.join(" · ")}</p>}
   </li>)}</ol>;
 }
 

@@ -35,7 +35,7 @@ export type ActivityInput = {
   position: number;
 };
 export type ActivityReviewInput = { decision: "APPROVE" | "REQUEST_CHANGES"; comment: string | null };
-export type ActivitySurveyAnswerInput = { questionId: string; values: string[] };
+export type ActivitySurveyAnswerInput = { questionId: string; values: string[]; image?: File };
 export type ActivitySurveySubmission = { evaluationId: string; status: "COMPLETED"; completedAt: string; answers?: ActivitySurveyAnswerInput[] };
 
 export function compareAssignedActivityOrder(left: AssignedActivity, right: AssignedActivity) {
@@ -79,8 +79,8 @@ export async function activityRequest<T>(path: string, method: "GET" | "POST", e
   if (!base) throw new ActivityRequestError(0);
   const response = await fetch(`${base.replace(/\/$/, "")}/api/v1${path}`, {
     method, signal, cache: "no-store",
-    headers: { Authorization: `Bearer ${session.tokens.accessToken.toString()}`, ...(input ? { "Content-Type": "application/json" } : {}) },
-    body: input ? JSON.stringify(input) : undefined,
+    headers: { Authorization: `Bearer ${session.tokens.accessToken.toString()}`, ...(input && !(input instanceof FormData) ? { "Content-Type": "application/json" } : {}) },
+    body: input instanceof FormData ? input : input ? JSON.stringify(input) : undefined,
   });
   if (response.status !== expected) {
     const body = await response.json().catch(() => null);
@@ -112,9 +112,29 @@ export const listMyProgramActivities = (programId: string, signal?: AbortSignal)
     "GET", 200, undefined, signal);
 
 export const submitMyActivitySurvey = (programId: string, activityId: string,
-  answers: ActivitySurveyAnswerInput[], version: number, signal?: AbortSignal) => request<ActivitySurveySubmission>(
-    `/me/programs/${encodeURIComponent(programId)}/activities/${encodeURIComponent(activityId)}/submission`,
-    "POST", 200, { answers, version }, signal);
+  answers: ActivitySurveyAnswerInput[], version: number, signal?: AbortSignal) => {
+  const path = `/me/programs/${encodeURIComponent(programId)}/activities/${encodeURIComponent(activityId)}/submission`;
+  const images = answers.filter(answer => answer.image);
+  if (!images.length) return request<ActivitySurveySubmission>(path, "POST", 200, { answers, version }, signal);
+  const form = new FormData();
+  const submission = { answers: answers.map(({ questionId, values }) => ({ questionId, values })), version };
+  form.append("submission", new Blob([JSON.stringify(submission)], { type: "application/json" }));
+  for (const { questionId, image } of images) if (image) form.append(questionId, image);
+  return request<ActivitySurveySubmission>(path, "POST", 200, form, signal);
+};
+
+export async function fetchActivityImage(programId: string, imageId: string, signal: AbortSignal, organizationId?: string) {
+  const session = await fetchAuthSession();
+  signal.throwIfAborted();
+  const base = process.env.NEXT_PUBLIC_API_BASE_URL;
+  if (!session.tokens?.accessToken || !base) throw new ActivityRequestError(401);
+  const prefix = organizationId ? programsPath(organizationId) : "/me/programs";
+  const response = await fetch(`${base.replace(/\/$/, "")}/api/v1${prefix}/${encodeURIComponent(programId)}/activity-images/${encodeURIComponent(imageId)}`, {
+    signal, cache: "no-store", headers: { Authorization: `Bearer ${session.tokens.accessToken}` },
+  });
+  if (!response.ok) throw new ActivityRequestError(response.status);
+  return response.blob();
+}
 export const submitMyActivity=submitMyActivitySurvey;
 
 export const reviewActivityAssignment = (organizationId: string, programId: string, activityId: string,
@@ -135,6 +155,7 @@ export function activityErrorMessage(error: unknown) {
     : status === 401 ? "Tu sesión no está disponible. Inicia sesión de nuevo."
     : status === 403 ? "No tienes permiso para gestionar estas actividades."
     : status === 404 ? "El programa, la sesión o la inscripción ya no está disponible."
+    : status === 413 ? "La carga supera el tamaño permitido. Usa imágenes de hasta 10 MB y un máximo de 40 MB por entrega."
     : status === 400 ? "Revisa los datos de la actividad."
     : status === 409 ? "La actividad cambió. Actualiza el listado antes de intentarlo de nuevo."
     : "No se pudo completar la operación. Inténtalo de nuevo.";

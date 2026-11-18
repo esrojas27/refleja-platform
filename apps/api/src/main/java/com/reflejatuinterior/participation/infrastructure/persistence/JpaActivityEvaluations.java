@@ -128,6 +128,9 @@ class JpaActivityEvaluations implements ActivityEvaluations {
 
     @Override public Evaluation createForSession(UUID org, UUID program, UUID session, String title, String instructions, List<QuestionInput> input) {
         var text=validate(title,instructions,input);
+        if (input.stream().anyMatch(question -> question.type().activityOnly())) {
+            throw new InvalidActivityEvaluation("questions");
+        }
         var entity=new ActivityEvaluationJpaEntity(org,program,null,text.title(),text.instructions()); entity.forSession(session);
         var saved=evaluations.saveAndFlush(entity);
         return data(saved,saveQuestions(org,program,saved.id(),input));
@@ -144,6 +147,9 @@ class JpaActivityEvaluations implements ActivityEvaluations {
         var entity=evaluations.findByOrganizationIdAndProgramIdAndSessionId(org,program,session).orElseThrow(ProgramActivities.Missing::new);
         if(entity.version()!=version) throw new ProgramContent.Conflict("CONTENT_VERSION_CONFLICT");
         var text=validate(title,instructions,input);
+        if (input.stream().anyMatch(question -> question.type().activityOnly())) {
+            throw new InvalidActivityEvaluation("questions");
+        }
         questions.deleteAll(questions.findByEvaluationIdOrderByPositionAsc(entity.id()));questions.flush();
         entity.edit(text.title(),text.instructions());evaluations.saveAndFlush(entity);
         return data(entity,saveQuestions(org,program,entity.id(),input));

@@ -155,8 +155,8 @@ public class SurveyResultsService {
                 .collect(java.util.stream.Collectors.groupingBy(Function.identity(), java.util.stream.Collectors.counting()));
         List<String> options = switch (q.type()) {
             case AGREEMENT_SCALE, LIKELIHOOD_SCALE, NUMERIC_SCALE -> List.of("1", "2", "3", "4", "5");
-            case EMOTION_MULTI_SELECT -> EMOTIONS; case OPEN_TEXT -> List.of();
-            case SINGLE_CHOICE_LETTERS, SINGLE_CHOICE_WORDS -> q.options();
+            case EMOTION_MULTI_SELECT -> EMOTIONS; case OPEN_TEXT, IMAGE -> List.of();
+            case SINGLE_CHOICE_LETTERS, SINGLE_CHOICE_WORDS, MULTIPLE_CHOICE_WORDS -> q.options();
         };
         var distribution = options.stream().map(value -> new SurveyResults.OptionCount(value, label(q.type(), value),
                 counts.getOrDefault(value, 0L).intValue(), values.isEmpty() ? 0 : rounded(100d * counts.getOrDefault(value, 0L) / values.size())))

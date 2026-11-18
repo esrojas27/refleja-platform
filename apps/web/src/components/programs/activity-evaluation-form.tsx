@@ -4,7 +4,7 @@ import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { editSurvey } from "@/lib/programs/content-administration-api";
 import { ProgramContentRequestError, programContentErrorMessage } from "@/lib/programs/program-content-api";
-import { QUESTION_TYPE_LABELS, MAX_QUESTION_OPTIONS, hasCustomOptions, parseQuestionOptions, questionOptionsError } from "@/lib/forms/question-catalog";
+import { QUESTION_TYPE_LABELS, MAX_QUESTION_OPTIONS, activityOnlyQuestion, hasCustomOptions, parseQuestionOptions, questionOptionsError } from "@/lib/forms/question-catalog";
 import { SingleChoicePreview } from "@/components/forms/single-choice-options";
 import { QuestionnaireTemplatePicker } from "@/components/forms/questionnaire-template-picker";
 import type { EvaluationInput } from "@/lib/participation/evaluation-api";
@@ -38,6 +38,10 @@ export function ActivityEvaluationForm({ organizationId, programId, activityId, 
 
   function loadTemplate(definition:EvaluationInput){
     if(pending||blocked||submitting.current)return;
+    if (sessionId && definition.questions.some(question => activityOnlyQuestion(question.type))) {
+      setMessage("Esta plantilla contiene preguntas que solo se pueden usar en actividades.");
+      return;
+    }
     setTitle(definition.title);setInstructions(definition.instructions??"");
     setQuestions([...definition.questions].sort((a,b)=>a.position-b.position).map(q=>({key:nextKey.current++,prompt:q.prompt,type:q.type,optionsText:(q.options??[]).join("\n")})));
     setInvalid([]);setOrderNotice("");setMessage("Plantilla cargada. Revisa las preguntas y guarda el formulario para aplicar los cambios.");
@@ -92,7 +96,7 @@ export function ActivityEvaluationForm({ organizationId, programId, activityId, 
       ...(questions.length === 0 ? ["questions"] : []),
       ...questions.filter(question => !question.prompt.trim() || question.prompt.trim().length > 500)
         .map(question => `question-${question.key}`),
-      ...questions.filter(question => hasCustomOptions(question.type) && questionOptionsError(parseQuestionOptions(question.optionsText)))
+      ...questions.filter(question => hasCustomOptions(question.type) && questionOptionsError(parseQuestionOptions(question.optionsText), question.type))
         .map(question => `options-${question.key}`),
     ];
     if (missing.length) {
@@ -186,19 +190,20 @@ export function ActivityEvaluationForm({ organizationId, programId, activityId, 
             <div><label htmlFor={`evaluation-question-${question.key}-type`} className="block text-sm font-medium">Tipo de respuesta</label>
               <select id={`evaluation-question-${question.key}-type`} className="rti-field" value={question.type}
                 onChange={event => updateQuestion(question.key, { type: event.target.value as EvaluationQuestionType })}
-                disabled={pending || blocked}>{Object.entries(QUESTION_TYPE_LABELS).map(([value, label]) =>
+                disabled={pending || blocked}>{Object.entries(QUESTION_TYPE_LABELS).filter(([value]) => !sessionId || !activityOnlyQuestion(value as EvaluationQuestionType)).map(([value, label]) =>
                   <option key={value} value={value}>{label}</option>)}</select></div>
           </div>
           {hasCustomOptions(question.type) && <div className="mt-4">
             <label htmlFor={`evaluation-question-${question.key}-options`} className="block text-sm font-medium">Opciones de respuesta</label>
-            <p id={`evaluation-question-${question.key}-options-help`} className="mt-1 text-sm text-muted-foreground">Escribe o pega una opción por línea. De 2 a 100 opciones, hasta 200 caracteres por opción. Las líneas vacías se omiten.</p>
+            <p id={`evaluation-question-${question.key}-options-help`} className="mt-1 text-sm text-muted-foreground">Escribe o pega una opción por línea. De {question.type === "MULTIPLE_CHOICE_WORDS" ? 3 : 2} a 100 opciones, hasta 200 caracteres por opción. Las líneas vacías se omiten.</p>
             <textarea id={`evaluation-question-${question.key}-options`} className="rti-field mt-2 min-h-40 resize-y" value={question.optionsText} maxLength={25000}
               aria-invalid={invalid.includes(`options-${question.key}`) || undefined}
               aria-describedby={`evaluation-question-${question.key}-options-help${invalid.includes(`options-${question.key}`) ? ` evaluation-question-${question.key}-options-error` : ""}`}
               placeholder={"Primera opción\nSegunda opción"} disabled={pending || blocked}
               onChange={event => updateQuestion(question.key, { optionsText: event.target.value })} />
-            <p className="mt-1 text-xs text-muted-foreground">{parseQuestionOptions(question.optionsText).length} opciones · El colaborador elegirá solo una.</p>
-            {invalid.includes(`options-${question.key}`) && <p id={`evaluation-question-${question.key}-options-error`} className="mt-1 text-sm text-destructive">{questionOptionsError(parseQuestionOptions(question.optionsText))}</p>}
+            <p className="mt-1 text-xs text-muted-foreground">{parseQuestionOptions(question.optionsText).length} opciones · {question.type === "MULTIPLE_CHOICE_WORDS"
+              ? "El colaborador podrá elegir entre 3 y 8 opciones." : "El colaborador elegirá solo una."}</p>
+            {invalid.includes(`options-${question.key}`) && <p id={`evaluation-question-${question.key}-options-error`} className="mt-1 text-sm text-destructive">{questionOptionsError(parseQuestionOptions(question.optionsText), question.type)}</p>}
           </div>}
           <QuestionPreview type={question.type} options={parseQuestionOptions(question.optionsText)} />
         </li>;
@@ -214,9 +219,13 @@ export function ActivityEvaluationForm({ organizationId, programId, activityId, 
 
 export function QuestionPreview({ type, options: customOptions = [] }: { type: EvaluationQuestionType; options?: string[] }) {
   if (hasCustomOptions(type)) return <div className="mt-4 rounded-xl border border-dashed border-border bg-muted/35 p-3">
-    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vista para el colaborador · Selección única</p>
-    {customOptions.length ? <SingleChoicePreview options={customOptions.slice(0, MAX_QUESTION_OPTIONS)} words={type === "SINGLE_CHOICE_WORDS"} />
+    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vista para el colaborador · {type === "MULTIPLE_CHOICE_WORDS" ? "Selección múltiple" : "Selección única"}</p>
+    {customOptions.length ? <SingleChoicePreview options={customOptions.slice(0, MAX_QUESTION_OPTIONS)} words={type !== "SINGLE_CHOICE_LETTERS"} />
       : <p className="mt-2 text-sm text-muted-foreground">Agrega las opciones para ver cómo se mostrarán.</p>}
+  </div>;
+  if (type === "IMAGE") return <div className="mt-4 rounded-xl border border-dashed border-border bg-muted/35 p-3">
+    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vista para el colaborador · Imagen</p>
+    <p className="mt-2 text-sm">Podrá adjuntar una imagen JPG, PNG o WebP de hasta 10 MB.</p>
   </div>;
   if (type === "NUMERIC_SCALE") return <div className="mt-4 rounded-xl border border-dashed border-border bg-muted/35 p-3">
     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vista para el colaborador</p>

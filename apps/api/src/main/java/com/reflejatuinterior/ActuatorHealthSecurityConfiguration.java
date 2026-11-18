@@ -57,7 +57,8 @@ class ActuatorHealthSecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/api/v1/me/notifications/{id}/read").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/me/programs",
                                 "/api/v1/me/programs/{programId}",
-                                "/api/v1/me/programs/{programId}/activities").authenticated()
+                                "/api/v1/me/programs/{programId}/activities",
+                                "/api/v1/me/programs/{programId}/activity-images/{imageId}").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/organizations").authenticated()
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/organizations/{organizationId}/programs",
@@ -76,7 +77,8 @@ class ActuatorHealthSecurityConfiguration {
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/survey-results/export",
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/reports",
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/reports/export",
-                                "/api/v1/organizations/{organizationId}/programs/{programId}/activities").authenticated()
+                                "/api/v1/organizations/{organizationId}/programs/{programId}/activities",
+                                "/api/v1/organizations/{organizationId}/programs/{programId}/activity-images/{imageId}").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/organizations/{organizationId}/programs/{programId}/enrollments",
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/enrollments/{enrollmentId}/history",
                                 "/api/v1/invitations").authenticated()

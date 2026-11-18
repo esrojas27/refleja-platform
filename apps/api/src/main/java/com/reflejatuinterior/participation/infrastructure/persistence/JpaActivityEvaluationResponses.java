@@ -90,6 +90,30 @@ class JpaActivityEvaluationResponses implements ActivityEvaluationResponses {
         return Map.copyOf(result);
     }
 
+    @Override
+    public void storeImage(UUID org, UUID program, UUID responseId, UUID imageId, Image image) {
+        jdbc.update("""
+            INSERT INTO rti.activity_answer_images(id, organization_id, program_id, response_id, content_type, image_bytes)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """, imageId, org, program, responseId, image.contentType(), image.bytes());
+    }
+
+    @Override
+    public Optional<Image> findImage(UUID org, UUID program, UUID imageId, UUID enrollmentId) {
+        var sql = """
+            SELECT i.content_type, i.image_bytes
+            FROM rti.activity_answer_images i
+            JOIN rti.activity_evaluation_responses r
+              ON (r.organization_id, r.program_id, r.id) = (i.organization_id, i.program_id, i.response_id)
+            WHERE i.organization_id = ? AND i.program_id = ? AND i.id = ?
+            """;
+        var mapper = (org.springframework.jdbc.core.RowMapper<Image>) (row, index) ->
+                new Image(row.getString("content_type"), row.getBytes("image_bytes"));
+        return (enrollmentId == null ? jdbc.query(sql, mapper, org, program, imageId)
+                : jdbc.query(sql + " AND r.enrollment_id = ?", mapper, org, program, imageId, enrollmentId))
+                .stream().findFirst();
+    }
+
     private static Response data(ActivityEvaluationResponseJpaEntity response,
             List<ActivityEvaluationAnswerJpaEntity> storedAnswers) {
         var grouped = storedAnswers.stream().collect(java.util.stream.Collectors.groupingBy(
