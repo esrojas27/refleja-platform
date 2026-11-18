@@ -16,9 +16,10 @@ class ReflejaTuInteriorApplicationTests extends PostgreSqlIntegrationTestSupport
                     "20260920020000", "20260921010000", "20260921020000", "20260924010000",
                     "20260924020000", "20261019010000", "20261019020000", "20261020010000", "20261022010000",
                     "20261022020000", "20261023010000", "20261023020000", "20261025010000", "20261025020000",
-                    "20261025030000", "20261109010000");
+                    "20261025030000", "20261109010000", "20261117010000", "20261117020000");
 
     private static final List<String> BUSINESS_TABLES = List.of(
+            "activity_answer_images",
             "activity_assignments",
             "activity_evaluation_answers",
             "activity_evaluation_questions",
@@ -82,7 +83,7 @@ class ReflejaTuInteriorApplicationTests extends PostgreSqlIntegrationTestSupport
                 Boolean.class);
         Integer migratorOwnedTableCount = jdbcTemplate.queryForObject(
                 "select count(*) from pg_tables where schemaname = 'rti' "
-                        + "and tablename in ('activity_assignments', 'activity_evaluation_answers', "
+                        + "and tablename in ('activity_answer_images', 'activity_assignments', 'activity_evaluation_answers', "
                         + "'activity_evaluation_questions', 'activity_evaluation_responses', 'activity_evaluations', "
                         + "'activity_notifications', 'enrollment_changes', 'enrollments', 'membership_roles', "
                         + "'organization_memberships', 'organizations', 'program_activities', 'program_modules', "
@@ -95,11 +96,11 @@ class ReflejaTuInteriorApplicationTests extends PostgreSqlIntegrationTestSupport
         assertThat(runtimeRole).isEqualTo("rti_app");
         assertThat(successfulMigrations).containsExactlyElementsOf(MIGRATION_VERSIONS);
         assertThat(businessTables).containsExactlyElementsOf(BUSINESS_TABLES);
-        assertThat(uuidIdentifierCount).isEqualTo(23);
+        assertThat(uuidIdentifierCount).isEqualTo(24);
         assertThat(symbolicStatusCount).isEqualTo(10);
         assertThat(runtimeHasSchemaUsage).isTrue();
         assertThat(runtimeHasSchemaCreate).isFalse();
-        assertThat(migratorOwnedTableCount).isEqualTo(26);
+        assertThat(migratorOwnedTableCount).isEqualTo(27);
         assertThat(environment.getProperty("spring.flyway.default-schema")).isEqualTo("rti");
         assertThat(environment.getProperty("spring.jpa.hibernate.ddl-auto")).isEqualTo("validate");
         assertThat(environment.getProperty("spring.jpa.open-in-view", Boolean.class)).isFalse();
