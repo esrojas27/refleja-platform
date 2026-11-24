@@ -6,7 +6,7 @@ import { listEnrollments } from "@/lib/participation/participation-api";
 import { createProgramActivity, listProgramActivities, type ProgramActivity } from "@/lib/participation/activity-api";
 import { createActivityEvaluation, listActivityEvaluations, listSessionEvaluations, saveSessionEvaluation } from "@/lib/participation/evaluation-api";
 import { createProgramDimension, createProgramSession, listProgramDimensions, type ProgramDimension } from "@/lib/programs/program-content-api";
-import { archiveContent, deleteContent, duplicateActivity, editActivity, editDimension, editSession, editSurvey, moveContent } from "@/lib/programs/content-administration-api";
+import { archiveContent, deleteContent, duplicateActivity, editActivity, editDimension, editSession, editSessionObjective, editSurvey, moveContent } from "@/lib/programs/content-administration-api";
 import { ActivityForm } from "@/components/programs/program-activity-area";
 import { ActivityEvaluationForm } from "@/components/programs/activity-evaluation-form";
 import { ContentTools } from "@/components/programs/content-tools";
@@ -14,7 +14,7 @@ import { ProgramStateContext } from "@/components/programs/program-state-context
 
 vi.mock("@/lib/programs/content-administration-api", () => ({
   archiveContent: vi.fn(), deleteContent: vi.fn(), duplicateActivity: vi.fn(), editActivity: vi.fn(),
-  editDimension: vi.fn(), editSession: vi.fn(), editSurvey: vi.fn(), moveContent: vi.fn(),
+  editDimension: vi.fn(), editSession: vi.fn(), editSessionObjective: vi.fn(), editSurvey: vi.fn(), moveContent: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/authenticated-api", async original => ({
@@ -178,7 +178,7 @@ it("appends sessions inside their module using the next visible position", async
   fireEvent.submit(form);
   await waitFor(() => expect(createProgramSession).toHaveBeenCalledWith("org-a", "program-a", "module-a",
     { name: "Segunda sesión", description: "Práctica guiada", youtubeUrl: "https://youtu.be/dQw4w9WgXcQ",
-      closingComment: "Practicar lo aprendido", position: 4 }, expect.any(AbortSignal)));
+      sessionObjective: "", closingComment: "Practicar lo aprendido", position: 4 }, expect.any(AbortSignal)));
 });
 
 it("creates a visual survey with the original four question types", async () => {
@@ -264,6 +264,39 @@ it("edits a session closingComment without recreating it", async () => {
   await waitFor(() => expect(editSession).toHaveBeenCalledWith("org-a", "program-a", "session-a",
     expect.objectContaining({ closingComment: "Objetivo revisado", version: 0 }), expect.any(AbortSignal)));
   expect(createProgramSession).not.toHaveBeenCalled();
+});
+
+it("labels session descriptions and shows the objective in a hint without duplicating closing text", async () => {
+  vi.mocked(listProgramDimensions).mockResolvedValue({ items: [{
+    ...dimensionData, sessions: [{ ...dimensionData.sessions[0],
+      description: "Descripción independiente", sessionObjective: "Cierre de prueba", closingComment: "Cierre de prueba" }],
+  }] });
+  render(<ProgramContentArea organizationId="org-a" programId="program-a" />);
+  fireEvent.click(await screen.findByRole("button", { name: /Fundamentos/, expanded: false }));
+  fireEvent.click(screen.getByRole("button", { name: /Sesión inicial/, expanded: false }));
+  expect(screen.queryByRole("button", { name: "Editar objetivo de sesión" })).toBeNull();
+  expect(screen.getByText("Descripción de sesión:")).toBeTruthy();
+  expect(screen.getByText("Comentario de cierre:")).toBeTruthy();
+  expect(screen.getAllByText(/Cierre de prueba/)).toHaveLength(1);
+  expect(screen.getByRole("button", { name: "Ver objetivo de la sesión Sesión inicial" })).toBeTruthy();
+});
+
+it("edits only the session objective when the program is closed", async () => {
+  vi.mocked(editSessionObjective).mockResolvedValue();
+  render(<ProgramStateContext.Provider value={{ canEdit: false, status: "COMPLETED" } as never}>
+    <ProgramContentArea organizationId="org-a" programId="program-a" />
+  </ProgramStateContext.Provider>);
+  fireEvent.click(await screen.findByRole("button", { name: /Fundamentos/, expanded: false }));
+  fireEvent.click(screen.getByRole("button", { name: /Sesión inicial/, expanded: false }));
+  expect(screen.queryByRole("button", { name: "Editar objetivo de sesión" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Editar" }));
+  const form = screen.getByRole("form", { name: "Editar sesión" });
+  expect(within(form).getByLabelText<HTMLTextAreaElement>("Comentario de cierre").disabled).toBe(true);
+  fireEvent.change(screen.getByLabelText("Objetivo de sesión (opcional)"), { target: { value: " Reconocer fortalezas " } });
+  fireEvent.submit(form);
+  await waitFor(() => expect(editSessionObjective).toHaveBeenCalledWith("org-a", "program-a", "session-a",
+    { sessionObjective: "Reconocer fortalezas", version: 0 }, expect.any(AbortSignal)));
+  expect(editSession).not.toHaveBeenCalled();
 });
 
 it("protects delivered instructions but allows saving activity metadata", async () => {

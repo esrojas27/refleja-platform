@@ -3,7 +3,10 @@ package com.reflejatuinterior.program.domain;
 import java.time.LocalDate;
 
 public record NewProgramSession(String name, String description, String objective,
-        LocalDate scheduledDate, int position, String youtubeUrl) {
+        LocalDate scheduledDate, int position, String youtubeUrl, String sessionObjective) {
+    public NewProgramSession(String name, String description, String objective, LocalDate scheduledDate, int position, String youtubeUrl) {
+        this(name, description, objective, scheduledDate, position, youtubeUrl, null);
+    }
     public NewProgramSession(String name, String description, String objective, LocalDate scheduledDate, int position) {
         this(name, description, objective, scheduledDate, position, null);
     }
@@ -20,6 +23,7 @@ public record NewProgramSession(String name, String description, String objectiv
         if (objective != null && (objective.length() > 10000 || objective.indexOf('\0') >= 0)) {
             throw new InvalidProgramInput("objective");
         }
+        sessionObjective = normalizeSessionObjective(sessionObjective);
         description = normalize(description);
         objective = normalize(objective);
         youtubeUrl = NewProgramActivity.normalizeYoutubeUrl(youtubeUrl);
@@ -27,6 +31,13 @@ public record NewProgramSession(String name, String description, String objectiv
             throw new InvalidProgramInput("scheduledDate");
         }
         if (position < 1) throw new InvalidProgramInput("position");
+    }
+
+    public static String normalizeSessionObjective(String value) {
+        if (value != null && (value.length() > 10000 || value.indexOf('\0') >= 0)) {
+            throw new InvalidProgramInput("sessionObjective");
+        }
+        return normalize(value);
     }
 
     private static String normalize(String value) {

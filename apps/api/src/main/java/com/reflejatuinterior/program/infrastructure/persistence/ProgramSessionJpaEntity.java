@@ -29,6 +29,8 @@ class ProgramSessionJpaEntity {
     private String description;
     @Column(name = "youtube_url", length = 2048)
     private String youtubeUrl;
+    @Column(name = "session_objective", columnDefinition = "text")
+    private String sessionObjective;
     @Column(name = "objective", columnDefinition = "text")
     private String objective;
     @Column(name = "scheduled_date")
@@ -47,13 +49,14 @@ class ProgramSessionJpaEntity {
     protected ProgramSessionJpaEntity() {}
 
     ProgramSessionJpaEntity(UUID organizationId, UUID programId, UUID moduleId, String name,
-            String description, String objective, LocalDate scheduledDate, int position, String youtubeUrl) {
+            String description, String objective, LocalDate scheduledDate, int position, String youtubeUrl, String sessionObjective) {
         this.organizationId = organizationId;
         this.programId = programId;
         this.moduleId = moduleId;
         this.name = name;
         this.description = description;
         this.youtubeUrl = youtubeUrl;
+        this.sessionObjective = sessionObjective;
         this.objective = objective;
         this.scheduledDate = scheduledDate;
         this.position = position;
@@ -67,6 +70,10 @@ class ProgramSessionJpaEntity {
     String description() { return description; }
     String objective() { return objective; }
     String youtubeUrl() { return youtubeUrl; }
+    String sessionObjective() { return sessionObjective; }
+    void editObjective(String value) {
+        sessionObjective = com.reflejatuinterior.program.domain.NewProgramSession.normalizeSessionObjective(value);
+    }
     LocalDate scheduledDate() { return scheduledDate; }
     int position() { return position; }
     boolean archived() { return archived; }

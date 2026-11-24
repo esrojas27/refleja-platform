@@ -43,15 +43,26 @@ public class ContentAdministrationService {
         audit(actor, program, id, "DIMENSION_UPDATED", request);
     }
     public void editSession(String subject, UUID org, UUID program, UUID id, long version, String name,
-            String description, String youtubeUrl, String objective, String request) {
+            String description, String youtubeUrl, String objective, String sessionObjective, String request) {
         var actor = authorize(subject, org, program);
         node(org, program, ProgramContent.Kind.SESSION, id, version).requireVisible();
         var old=schedules.sessions(org,program).stream().filter(s->s.id().equals(id)).findFirst().orElseThrow(ProgramActivities.Missing::new);
         if(sessionForms.hasStarted(org,program,id)&&!java.util.Objects.equals(old.objective(),objective==null||objective.isBlank()?null:objective.trim()))
             throw new ProgramContent.Conflict("SESSION_CLOSURE_STARTED");
-        content.editSession(org, program, id, name, description, youtubeUrl, objective);
+        content.editSession(org, program, id, name, description, youtubeUrl, objective, sessionObjective);
         audit(actor, program, id, "SESSION_UPDATED", request);
     }
+    public void editObjective(String subject, UUID org, UUID program, UUID id, long version,
+            String sessionObjective, String request) {
+        var actor = access.resolve(subject, org);
+        if (!actor.roles().contains("CONSULTANT")) throw new OrganizationAccess.Denied();
+        tenant.activate(actor.organizationId());
+        programs.lock(org, program).orElseThrow(ProgramActivities.Missing::new);
+        node(org, program, ProgramContent.Kind.SESSION, id, version);
+        content.editObjective(org, program, id, sessionObjective);
+        audit(actor, program, id, "SESSION_OBJECTIVE_UPDATED", request);
+    }
+
     public void editActivity(String subject, UUID org, UUID program, UUID id, long version,
             String title, String instructions, String youtube, LocalDate date, String request) {
         var actor = authorize(subject, org, program);

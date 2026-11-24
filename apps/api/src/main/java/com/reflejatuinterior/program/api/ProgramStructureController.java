@@ -69,7 +69,7 @@ class ProgramStructureController {
             @Valid @RequestBody CreateSessionRequest input, HttpServletRequest request) {
         var id = requestId(request);
         var result = structure.createSession(jwt.getSubject(), organizationId, programId, moduleId,
-                input.name(), input.description(), input.closingComment(), null, input.position(), input.youtubeUrl(), id);
+                input.name(), input.description(), input.closingComment(), null, input.position(), input.youtubeUrl(), input.sessionObjective(), id);
         var location = "/api/v1/organizations/" + organizationId + "/programs/" + programId
                 + "/modules/" + moduleId + "/sessions/" + result.id();
         return ResponseEntity.created(URI.create(location)).cacheControl(CacheControl.noStore())
@@ -89,6 +89,7 @@ class ProgramStructureController {
                                 @Size(max = 10000) String description,
                                 @Size(max = 10000) String closingComment,
                                 @Size(max = 2048) String youtubeUrl,
+                                @Size(max = 10000) String sessionObjective,
                                 @Positive int position) {}
     record ModuleListResponse(List<ModuleResponse> items) {}
     record ModuleResponse(UUID id, UUID organizationId, UUID programId, String name, String description,
@@ -100,10 +101,10 @@ class ProgramStructureController {
         }
     }
     record SessionResponse(UUID id, UUID organizationId, UUID programId, UUID moduleId, String name,
-                           String description, String closingComment, LocalDate scheduledDate, int position, long version, boolean archived, String youtubeUrl) {
+                           String description, String closingComment, LocalDate scheduledDate, int position, long version, boolean archived, String youtubeUrl, String sessionObjective) {
         static SessionResponse from(ProgramSessionData data) {
             return new SessionResponse(data.id(), data.organizationId(), data.programId(), data.moduleId(),
-                    data.name(), data.description(), data.objective(), data.scheduledDate(), data.position(), data.version(), data.archived(), data.youtubeUrl());
+                    data.name(), data.description(), data.objective(), data.scheduledDate(), data.position(), data.version(), data.archived(), data.youtubeUrl(), data.sessionObjective());
         }
     }
 }

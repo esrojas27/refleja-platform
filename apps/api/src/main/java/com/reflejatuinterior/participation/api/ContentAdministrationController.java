@@ -32,9 +32,18 @@ class ContentAdministrationController {
             @PathVariable UUID id, @Valid @RequestBody SessionRequest input, HttpServletRequest request) {
         var rid = EnrollmentController.requestId(request);
         service.editSession(jwt.getSubject(), organizationId, programId, id, input.version(), input.name(),
-                input.description(), input.youtubeUrl(), input.closingComment(), rid);
+                input.description(), input.youtubeUrl(), input.closingComment(), input.sessionObjective(), rid);
         return done(rid);
     }
+    @PutMapping("/sessions/{id}/objective")
+    ResponseEntity<Void> objective(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID organizationId,
+            @PathVariable UUID programId, @PathVariable UUID id,
+            @Valid @RequestBody ObjectiveRequest input, HttpServletRequest request) {
+        var rid = EnrollmentController.requestId(request);
+        service.editObjective(jwt.getSubject(), organizationId, programId, id, input.version(), input.sessionObjective(), rid);
+        return done(rid);
+    }
+
     @PutMapping("/activities/{id}")
     ResponseEntity<Void> activity(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID organizationId, @PathVariable UUID programId,
             @PathVariable UUID id, @Valid @RequestBody ActivityRequest input, HttpServletRequest request) {
@@ -78,7 +87,9 @@ class ContentAdministrationController {
     private ResponseEntity<Void> done(String rid) { return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).header("X-Request-ID", rid).build(); }
     record DimensionRequest(@NotBlank @Size(max=255) String name, @Size(max=10000) String description, @NotNull @PositiveOrZero Long version) {}
     record SessionRequest(@NotBlank @Size(max=255) String name, @Size(max=10000) String description,
-            @Size(max=2048) String youtubeUrl, @Size(max=10000) String closingComment, @NotNull @PositiveOrZero Long version) {}
+            @Size(max=2048) String youtubeUrl, @Size(max=10000) String closingComment,
+            @Size(max=10000) String sessionObjective, @NotNull @PositiveOrZero Long version) {}
+    record ObjectiveRequest(@Size(max=10000) String sessionObjective, @NotNull @PositiveOrZero Long version) {}
     record ActivityRequest(@NotBlank @Size(max=255) String title, @NotBlank @Size(max=10000) String instructions,
             @Size(max=2048) String youtubeUrl, @NotNull @PositiveOrZero Long version) {}
     record SurveyRequest(@NotBlank @Size(max=255) String title, @Size(max=2000) String instructions,

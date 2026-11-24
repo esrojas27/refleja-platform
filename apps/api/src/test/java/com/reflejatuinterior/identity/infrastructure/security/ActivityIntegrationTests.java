@@ -75,6 +75,36 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
         }
     }
 
+    @Test void sessionObjectiveRemainsEditableInClosedProgramsWithVersionAndAccessChecks() throws Exception {
+        var activity = createAdminActivity(true, 1);
+        createAdminSurvey(activity);
+        jdbcTemplate.update("update rti.program_sessions set objective='Cierre original' where id=?", session);
+        entityManager.clear();
+        mvc.perform(put(adminPath("sessions", session) + "/objective").header("Authorization", token(collaborator))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0,\"sessionObjective\":\"Intrusión\"}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(put(adminPath("sessions", UUID.randomUUID()) + "/objective").header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0,\"sessionObjective\":\"Objetivo\"}"))
+                .andExpect(status().isNotFound());
+        jdbcTemplate.update("update rti.programs set status='COMPLETED',activated_at=now() where id=?", program);
+        mvc.perform(put(adminPath("sessions", session) + "/objective").header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0,\"sessionObjective\":\" Reconocer fortalezas \"}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(get(collaboratorPath()).header("Authorization", token(collaborator)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].sessionObjective").value("Reconocer fortalezas"));
+        mvc.perform(get("/api/v1/me/programs/" + program + "/sessions").header("Authorization", token(collaborator)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].session.sessionObjective").value("Reconocer fortalezas"));
+        mvc.perform(put(adminPath("sessions", session) + "/objective").header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":0,\"sessionObjective\":\"Cambio obsoleto\"}"))
+                .andExpect(status().isConflict());
+        assertThat(jdbcTemplate.queryForObject("select objective from rti.program_sessions where id=?", String.class, session))
+                .isEqualTo("Cierre original");
+        mvc.perform(put(adminPath("sessions", session) + "/objective").header("Authorization", token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"version\":1,\"sessionObjective\":\"\"}"))
+                .andExpect(status().isNoContent());
+        assertThat(jdbcTemplate.queryForObject("select session_objective from rti.program_sessions where id=?", String.class, session)).isNull();
+    }
+
     @Test void consultantCreatesAndAssignsOnlyToScheduledCollaborators() throws Exception {
         var createdResponse = mvc.perform(post(consultantPath()).header("Authorization", token(consultant))
                 .contentType(MediaType.APPLICATION_JSON).content(body()))

@@ -22,7 +22,7 @@ public interface ProgramBlueprints {
     }
 
     record Session(UUID id, String name, String description, String objective, LocalDate scheduledDate,
-                   int position, List<Activity> activities, String youtubeUrl) {
+                   int position, List<Activity> activities, String youtubeUrl, String sessionObjective) {
         public Session { activities = List.copyOf(activities); }
     }
 
@@ -36,7 +36,7 @@ public interface ProgramBlueprints {
     }
 
     record SessionDraft(String name, String description, String objective, LocalDate scheduledDate,
-                        int position, List<ActivityDraft> activities, String youtubeUrl) {
+                        int position, List<ActivityDraft> activities, String youtubeUrl, String sessionObjective) {
         public SessionDraft { activities = List.copyOf(activities); }
     }
 

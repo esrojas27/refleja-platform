@@ -46,7 +46,7 @@ class JpaProgramActivities implements ProgramActivities {
         return data(activities.saveAndFlush(new ProgramActivityJpaEntity(organizationId, programId,
                 session.moduleId(), session.id(), input.title(), input.instructions(), input.youtubeUrl(),
                 input.dueDate(), input.position())), module.name(), module.position(),
-                session.name(), session.position());
+                session.name(), session.position(), session.sessionObjective());
     }
 
     @Override
@@ -87,7 +87,7 @@ class JpaProgramActivities implements ProgramActivities {
             var dimension = dimensions.get(entity.moduleId());
             var session = programSessions.get(entity.sessionId());
             if (dimension == null || session == null) throw new Missing();
-            return data(entity, dimension.name(), dimension.position(), session.name(), session.position());
+            return data(entity, dimension.name(), dimension.position(), session.name(), session.position(), session.sessionObjective());
         }).sorted(Comparator.comparingInt(Activity::dimensionPosition)
                 .thenComparing(Activity::moduleId)
                 .thenComparingInt(Activity::sessionPosition)
@@ -97,10 +97,10 @@ class JpaProgramActivities implements ProgramActivities {
     }
 
     private static Activity data(ProgramActivityJpaEntity entity, String dimensionName, int dimensionPosition,
-            String sessionName, int sessionPosition) {
+            String sessionName, int sessionPosition, String sessionObjective) {
         return new Activity(entity.id(), entity.organizationId(), entity.programId(), entity.moduleId(),
                 entity.sessionId(), dimensionName, dimensionPosition, sessionName, sessionPosition,
                 entity.title(), entity.instructions(), entity.youtubeUrl(), entity.dueDate(),
-                entity.position(), entity.version(), entity.archived());
+                entity.position(), entity.version(), entity.archived(), sessionObjective);
     }
 }

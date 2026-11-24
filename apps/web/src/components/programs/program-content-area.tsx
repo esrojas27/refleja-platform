@@ -3,6 +3,7 @@
 import { BarChart3, ChevronDown, Plus } from "lucide-react";
 import Link from "next/link";
 import { ActivityVideo } from "@/components/participation/activity-video";
+import { SessionObjectiveHint } from "@/components/participation/session-objective-hint";
 import { isYoutubeVideoUrl } from "@/lib/participation/youtube";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
@@ -18,7 +19,7 @@ import { ActivityForm } from "@/components/programs/program-activity-area";
 import { ActivityEvaluationForm } from "@/components/programs/activity-evaluation-form";
 import { ProgramModal } from "@/components/programs/program-modal";
 import { useProgramState } from "@/components/programs/program-state-context";
-import { editDimension, editSession } from "@/lib/programs/content-administration-api";
+import { editDimension, editSession, editSessionObjective } from "@/lib/programs/content-administration-api";
 import { ContentTools } from "./content-tools";
 import { SaveQuestionnaireTemplate } from "@/components/forms/save-questionnaire-template";
 
@@ -187,10 +188,15 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
                   {canEdit && <ContentTools {...toolsContext} kind="sessions" item={session} parentArchived={dimension.archived}
                     {...usage(allSessionActivities)} {...bounds(session, dimension.sessions)}
                     onEdit={() => setDialog({ kind: "session", dimension, initial: session })} />}
+                  {!canEdit && <div className="px-4 pb-3"><button type="button" className="rti-button-secondary"
+                    onClick={() => setDialog({ kind: "session", dimension, initial: session })}>Editar</button></div>}
 
                   {sessionOpen && <div id={`session-panel-${session.id}`} className="border-t border-border/70 px-4 py-4">
                     <Link className="rti-button-secondary mb-4" href={`/organizations/${encodeURIComponent(organizationId)}/programs/${encodeURIComponent(programId)}/agenda?session=${encodeURIComponent(session.id)}`}>Agendar participantes</Link>
-                    {session.description && <p className="mb-3 whitespace-pre-wrap text-sm text-muted-foreground">{session.description}</p>}
+                    {session.sessionObjective && <div className="mb-3 flex items-center gap-2 text-sm">
+                      <span>Objetivo de sesión</span><SessionObjectiveHint sessionName={session.name} objective={session.sessionObjective} />
+                    </div>}
+                    {session.description && <p className="mb-3 whitespace-pre-wrap text-sm text-muted-foreground"><span className="font-medium text-foreground">Descripción de sesión: </span>{session.description}</p>}
                     {session.youtubeUrl && <ActivityVideo url={session.youtubeUrl} title={session.name} session />}
                     {session.closingComment && <p className="whitespace-pre-wrap text-sm text-muted-foreground"><span className="font-medium text-foreground">Comentario de cierre: </span>{session.closingComment}</p>}
                     <div className="mt-4 rounded-xl border border-border bg-accent/30 p-4">
@@ -254,7 +260,7 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
     {dialog?.kind === "session" && <ProgramModal titleId={`create-session-title-${dialog.dimension.id}`}
       closeLabel="Cerrar creación de sesión" onClose={() => setDialog(null)}>
       <SessionForm organizationId={organizationId} programId={programId} dimensionId={dialog.dimension.id}
-        initial={dialog.initial}
+        initial={dialog.initial} objectiveOnly={!canEdit}
         position={Math.max(0, ...dialog.dimension.sessions.map(session => session.position)) + 1}
         onSaved={() => { setDialog(null); refresh(dialog.initial ? "Sesión actualizada." : `Sesión creada en ${dialog.dimension.name}.`); }} />
     </ProgramModal>}
@@ -362,11 +368,11 @@ function DimensionDescription({ id, text }: { id: string; text: string }) {
   </div>;
 }
 
-export function SessionForm({ organizationId, programId, dimensionId, position, onSaved, initial }: {
-  organizationId: string; programId: string; dimensionId: string; position: number; onSaved: () => void; initial?: ProgramSession;
+export function SessionForm({ organizationId, programId, dimensionId, position, onSaved, initial, objectiveOnly = false }: {
+  organizationId: string; programId: string; dimensionId: string; position: number; onSaved: () => void; initial?: ProgramSession; objectiveOnly?: boolean;
 }) {
   const [input, setInput] = useState({ name: initial?.name ?? "", description: initial?.description ?? "",
-    youtubeUrl: initial?.youtubeUrl ?? "", closingComment: initial?.closingComment ?? "" });
+    sessionObjective: initial?.sessionObjective ?? "", youtubeUrl: initial?.youtubeUrl ?? "", closingComment: initial?.closingComment ?? "" });
   const [pending, setPending] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [message, setMessage] = useState("");
@@ -378,8 +384,8 @@ export function SessionForm({ organizationId, programId, dimensionId, position, 
     event.preventDefault();
     if (submitting.current || blocked) return;
     const clean: ProgramSessionInput = { name: input.name.trim(), description: input.description.trim(),
-      youtubeUrl: input.youtubeUrl.trim(), closingComment: input.closingComment.trim(), position };
-    if (!clean.name || clean.name.length > 255 || clean.closingComment.length > 10000) {
+      sessionObjective: input.sessionObjective.trim(), youtubeUrl: input.youtubeUrl.trim(), closingComment: input.closingComment.trim(), position };
+    if (!clean.name || clean.name.length > 255 || clean.closingComment.length > 10000 || input.sessionObjective.length > 10000) {
       setMessage("Revisa el nombre y el comentario de cierre."); return;
     }
     if (!isYoutubeVideoUrl(input.youtubeUrl.trim()) || input.youtubeUrl.trim().length > 2048) {
@@ -388,7 +394,9 @@ export function SessionForm({ organizationId, programId, dimensionId, position, 
     submitting.current = true; setPending(true); setMessage(initial ? "Guardando sesión…" : "Creando sesión…");
     const controller = new AbortController(); request.current = controller;
     try {
-      if (initial) await editSession(organizationId, programId, initial.id, { ...clean, version: initial.version }, controller.signal);
+      if (initial && objectiveOnly) await editSessionObjective(organizationId, programId, initial.id,
+        { sessionObjective: input.sessionObjective.trim(), version: initial.version }, controller.signal);
+      else if (initial) await editSession(organizationId, programId, initial.id, { ...clean, version: initial.version }, controller.signal);
       else await createProgramSession(organizationId, programId, dimensionId, clean, controller.signal);
       if (!controller.signal.aborted) onSaved();
     } catch (error) {
@@ -404,19 +412,23 @@ export function SessionForm({ organizationId, programId, dimensionId, position, 
   return <form onSubmit={submit} noValidate aria-label={initial ? "Editar sesión" : "Crear sesión"} className="space-y-4">
     <div><p className="rti-kicker">Sesión</p><h2 id={`create-session-title-${dimensionId}`} className="mt-2 text-xl font-semibold">{initial ? "Editar sesión" : "Agregar sesión"}</h2></div>
     {message && <p role="status" className="text-sm">{message}</p>}
+    {objectiveOnly && <p className="rounded-xl bg-muted p-3 text-sm">El programa está cerrado. Puedes actualizar el objetivo de sesión.</p>}
     <div><label htmlFor={`${prefix}-name`} className="block text-sm font-medium">Nombre</label>
       <input id={`${prefix}-name`} className="rti-field" required maxLength={255} value={input.name}
-        onChange={event => setInput({ ...input, name: event.target.value })} disabled={pending || blocked} /></div>
+        onChange={event => setInput({ ...input, name: event.target.value })} disabled={pending || blocked || objectiveOnly} /></div>
     <div><label htmlFor={`${prefix}-description`} className="block text-sm font-medium">Descripción</label>
       <textarea id={`${prefix}-description`} className="rti-field min-h-20 resize-y" maxLength={10000} value={input.description}
-        onChange={event => setInput({ ...input, description: event.target.value })} disabled={pending || blocked} /></div>
+        onChange={event => setInput({ ...input, description: event.target.value })} disabled={pending || blocked || objectiveOnly} /></div>
+    <div><label htmlFor={`${prefix}-session-objective`} className="block text-sm font-medium">Objetivo de sesión (opcional)</label>
+      <textarea id={`${prefix}-session-objective`} className="rti-field min-h-20 resize-y" maxLength={10000} value={input.sessionObjective}
+        onChange={event => setInput({ ...input, sessionObjective: event.target.value })} disabled={pending || blocked} /></div>
     <div><label htmlFor={`${prefix}-youtube-url`} className="block text-sm font-medium">Video de YouTube de la sesión (opcional)</label>
       <input id={`${prefix}-youtube-url`} type="url" className="rti-field" maxLength={2048} value={input.youtubeUrl}
-        onChange={event => setInput({ ...input, youtubeUrl: event.target.value })} disabled={pending || blocked} /></div>
+        onChange={event => setInput({ ...input, youtubeUrl: event.target.value })} disabled={pending || blocked || objectiveOnly} /></div>
     <p className="text-sm text-muted-foreground">Este comentario aparecerá al enviar todas las actividades. Después de crear la sesión, configura sus actividades y su encuesta de cierre antes de agendar participantes.</p>
     <div><label htmlFor={`${prefix}-closingComment`} className="block text-sm font-medium">Comentario de cierre</label>
       <textarea id={`${prefix}-closingComment`} className="rti-field min-h-20 resize-y" maxLength={10000} value={input.closingComment}
-        onChange={event => setInput({ ...input, closingComment: event.target.value })} disabled={pending || blocked} /></div>
+        onChange={event => setInput({ ...input, closingComment: event.target.value })} disabled={pending || blocked || objectiveOnly} /></div>
     <button className="rti-button-primary" disabled={pending || blocked}>{pending ? "Guardando…" : initial ? "Guardar cambios" : "Agregar sesión"}</button>
   </form>;
 }

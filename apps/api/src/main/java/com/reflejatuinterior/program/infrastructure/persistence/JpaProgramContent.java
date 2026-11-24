@@ -54,10 +54,19 @@ class JpaProgramContent implements ProgramContent {
         em.flush();
     }
 
-    @Override public void editSession(UUID org, UUID program, UUID id, String name, String description, String youtubeUrl, String objective) {
+    @Override public void editSession(UUID org, UUID program, UUID id, String name, String description, String youtubeUrl, String objective, String sessionObjective) {
         var item = session(org, program, id);
-        try { item.edit(new NewProgramSession(name, description == null ? item.description() : description,
+        try {
+            if (sessionObjective != null) item.editObjective(sessionObjective);
+            item.edit(new NewProgramSession(name, description == null ? item.description() : description,
                 objective, item.scheduledDate(), item.position(), youtubeUrl == null ? item.youtubeUrl() : youtubeUrl)); }
+        catch (InvalidProgramInput e) { throw new ProgramActivities.InvalidInput(e.field()); }
+        em.flush();
+    }
+
+    @Override public void editObjective(UUID org, UUID program, UUID id, String sessionObjective) {
+        var item = session(org, program, id);
+        try { item.editObjective(sessionObjective); }
         catch (InvalidProgramInput e) { throw new ProgramActivities.InvalidInput(e.field()); }
         em.flush();
     }

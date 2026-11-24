@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { SessionObjectiveHint } from "@/components/participation/session-objective-hint";
 import { ActivityVideo } from "@/components/participation/activity-video";
 import { listOwnedSessions, scheduleError, type OwnedSession } from "@/lib/participation/session-schedule-api";
 
@@ -16,7 +17,8 @@ export function MySessionAgenda({ programId }: { programId: string }) {
     <p className="mt-3 text-sm text-muted-foreground">Estas son las fechas que tu consultor ha asignado a tus sesiones. Las sesiones sin fecha todavía no están disponibles.</p>
     {message&&<p role="status" className="mt-4 rounded-xl bg-muted p-4 text-sm">{message}</p>}
     <ol className="mt-5 space-y-4">{items?.map(item=><li id={`session-${item.session.id}`} key={item.session.id} className="scroll-mt-24 rounded-2xl border border-border p-5">
-      <p className="rti-kicker">{item.session.dimensionName}</p><h2 className="mt-2 text-xl font-semibold">{item.session.name}</h2>
+      <p className="rti-kicker">{item.session.dimensionName}</p><div className="mt-2 flex items-center gap-2"><h2 className="text-xl font-semibold">{item.session.name}</h2>
+        <SessionObjectiveHint sessionName={item.session.name} objective={item.session.sessionObjective} /></div>
       <p className="mt-2 font-medium">Fecha de tu sesión: <time dateTime={item.scheduledDate}>{item.scheduledDate}</time></p>
       {item.session.description && <p className="mt-3 whitespace-pre-wrap text-sm text-muted-foreground">{item.session.description}</p>}
       {item.session.youtubeUrl && <ActivityVideo url={item.session.youtubeUrl} title={item.session.name} session />}

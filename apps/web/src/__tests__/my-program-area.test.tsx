@@ -59,6 +59,23 @@ async function openAssignedActivity() {
   expect((summary!.parentElement as HTMLDetailsElement).open).toBe(true);
 }
 
+it("keeps the session objective hint inside the expanded activity content", async () => {
+  vi.mocked(listMyProgramActivities).mockResolvedValue({ items: [{
+    ...assignedActivity, sessionObjective: "Reconocer mis fortalezas",
+  }] });
+  render(<MyProgramArea mode="activities" programId="program-a" />);
+  await screen.findAllByText("Reflexión inicial", { exact: true });
+  const activity = document.getElementById("activity-activity-a")!;
+  const hint = activity.querySelector('button[aria-label="Ver objetivo de la sesión Autoconocimiento"]')!;
+  const details = activity.querySelector("details")!;
+  expect(hint.closest("details")).toBe(details);
+  expect(hint.closest("summary")).toBeNull();
+  expect(details.open).toBe(false);
+  await openAssignedActivity();
+  expect(details.open).toBe(true);
+  expect(screen.getByRole("button", { name: "Ver objetivo de la sesión Autoconocimiento" })).toBe(hint);
+});
+
 it("renders only the collaborator's returned programs with basic metadata", async () => {
   render(<MyProgramArea mode="list" />);
   expect((await screen.findByRole("link", { name: program.name })).getAttribute("href")).toBe("/my-programs/program-a");

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { SessionObjectiveHint } from "@/components/participation/session-objective-hint";
 import { ActivityVideo } from "@/components/participation/activity-video";
 import { ArrowRight, ChevronDown, Flag } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -213,7 +214,8 @@ function NextActivityNotice({ activities }: { activities: AssignedActivity[] }) 
 function AssignedActivityAccordion({ programId, activity, onSubmitted, readOnly }: {
   programId: string; activity: AssignedActivity; onSubmitted: (activity: AssignedActivity) => void; readOnly: boolean;
 }) {
-  return <li id={`activity-${activity.id}`} className="scroll-mt-28"><details className="group/activity overflow-hidden rounded-2xl border border-border/70 bg-background">
+  return <li id={`activity-${activity.id}`} className="scroll-mt-28">
+    <details className="group/activity overflow-hidden rounded-2xl border border-border/70 bg-background">
     <summary className="flex cursor-pointer list-none flex-col gap-3 px-4 py-4 marker:hidden focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-primary sm:flex-row sm:items-center sm:justify-between sm:px-5 [&::-webkit-details-marker]:hidden">
       <span className="min-w-0"><span className="rti-kicker block break-words">{activity.dimensionName} · {activity.sessionName}</span>
         <span className="mt-2 block break-words text-lg font-semibold">{activity.title}</span>
@@ -226,6 +228,9 @@ function AssignedActivityAccordion({ programId, activity, onSubmitted, readOnly 
       </span>
     </summary>
     <div className="border-t border-border/70 p-4">
+      {activity.sessionObjective && <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
+        <span>Objetivo de sesión</span><SessionObjectiveHint sessionName={activity.sessionName} objective={activity.sessionObjective} />
+      </div>}
       <AssignedActivityCard programId={programId} activity={activity} readOnly={readOnly} onSubmitted={onSubmitted} />
     </div>
   </details></li>;

@@ -8,7 +8,8 @@ import java.util.UUID;
 public interface ProgramContent {
     Node describe(UUID org, UUID program, Kind kind, UUID id);
     void editDimension(UUID org, UUID program, UUID id, String name, String description);
-    void editSession(UUID org, UUID program, UUID id, String name, String description, String youtubeUrl, String objective);
+    void editSession(UUID org, UUID program, UUID id, String name, String description, String youtubeUrl, String objective, String sessionObjective);
+    void editObjective(UUID org, UUID program, UUID id, String sessionObjective);
     void editActivity(UUID org, UUID program, UUID id, String title, String instructions, String youtubeUrl, LocalDate dueDate);
     void archive(UUID org, UUID program, Kind kind, UUID id, boolean archived);
     void move(UUID org, UUID program, Kind kind, UUID id, boolean up);

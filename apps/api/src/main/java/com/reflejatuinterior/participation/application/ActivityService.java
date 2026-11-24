@@ -220,7 +220,7 @@ public class ActivityService {
                 evaluation.map(value -> survey(value, assignment, surveyCompletedAt)).orElse(null),
                 completionPercentage(evaluation, assignment, surveyCompletedAt),
                 evaluationResponses.findByAssignment(activity.organizationId(),activity.programId(),assignment.id()).map(ActivityEvaluationResponses.Response::answers).orElse(List.of()),
-                sessionForms.state(activity.organizationId(),activity.programId(),activity.sessionId(),assignment.enrollmentId()).percentage());
+                sessionForms.state(activity.organizationId(),activity.programId(),activity.sessionId(),assignment.enrollmentId()).percentage(), activity.sessionObjective());
     }
 
     private static SurveyResponse survey(ActivityEvaluations.Evaluation evaluation,
@@ -278,7 +278,7 @@ public class ActivityService {
             String youtubeUrl, LocalDate dueDate, int position, long version,
             UUID assignmentId, String assignmentStatus, String responseText, Instant submittedAt,
             String reviewComment, Instant reviewedAt, long assignmentVersion,
-            SurveyResponse survey, int completionPercentage,List<ActivityEvaluationResponses.Answer> answers,double sessionProgressPercentage) {}
+            SurveyResponse survey, int completionPercentage,List<ActivityEvaluationResponses.Answer> answers,double sessionProgressPercentage, String sessionObjective) {}
     public record SurveyResponse(UUID id, String title, String instructions,
             List<SurveyQuestionResponse> questions, String status, Instant completedAt) {
         public SurveyResponse { questions = List.copyOf(questions); }

@@ -101,6 +101,7 @@ class ActuatorHealthSecurityConfiguration {
                         .requestMatchers(HttpMethod.PUT, "/api/v1/me/profile",
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/content/dimensions/{id}",
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/content/sessions/{id}",
+                                "/api/v1/organizations/{organizationId}/programs/{programId}/content/sessions/{id}/objective",
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/content/activities/{id}",
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/content/activities/{id}/survey",
                                 "/api/v1/organizations/{organizationId}/programs/{programId}/disc-profiles/{enrollmentId}")

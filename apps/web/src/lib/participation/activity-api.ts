@@ -28,7 +28,7 @@ export type AssignedActivity = Omit<ProgramActivity, "assignees"> & {
   assignmentId: string; assignmentStatus: ActivityAssignmentStatus; responseText: string | null;
   submittedAt: string | null; reviewComment: string | null; reviewedAt: string | null;
   assignmentVersion: number; survey: ActivitySurvey | null; completionPercentage: number;
-  answers?: ActivitySurveyAnswerInput[]; sessionProgressPercentage?: number;
+  answers?: ActivitySurveyAnswerInput[]; sessionProgressPercentage?: number; sessionObjective?: string | null;
 };
 export type ActivityInput = {
   sessionId: string; title: string; instructions: string; youtubeUrl: string | null; dueDate?: string;
