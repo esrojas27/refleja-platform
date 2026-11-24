@@ -49,6 +49,10 @@ const activity: ProgramActivity = { id: "activity-a", organizationId: "org-a", p
   dueDate: "2026-10-08", position: 1, version: 0, assignees: [] };
 
 beforeEach(() => {
+  vi.stubGlobal("ResizeObserver", class {
+    observe() {}
+    disconnect() {}
+  });
   vi.mocked(fetchCurrentIdentity).mockResolvedValue(identity);
   vi.mocked(listProgramDimensions).mockResolvedValue({ items: [dimensionData] });
   vi.mocked(createProgramDimension).mockResolvedValue({ ...dimensionData, id: "new-module", position: 3, sessions: [] });
@@ -62,7 +66,42 @@ beforeEach(() => {
     programId: "program-a", activityId: "activity-a", title: "Encuesta de cierre", instructions: null, version: 0,
     questions: [{ id: "question-a", prompt: "¿Qué tan de acuerdo estás?", type: "AGREEMENT_SCALE", position: 1, version: 0 }] });
 });
-afterEach(() => { cleanup(); vi.resetAllMocks(); });
+afterEach(() => { cleanup(); vi.resetAllMocks(); vi.unstubAllGlobals(); });
+
+it("hides dimension descriptions when collapsed and expands only overflowing previews", async () => {
+  const height = vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(60);
+  const scroll = vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(180);
+  try {
+    render(<ProgramContentArea organizationId="org-a" programId="program-a" />);
+    const heading = await screen.findByRole("button", { name: /Fundamentos/, expanded: false });
+    expect(screen.queryByText(dimensionData.description!)).toBeNull();
+    fireEvent.click(heading);
+    fireEvent.click(screen.getByRole("button", { name: "Ver más", expanded: false }));
+    expect(screen.getByRole("button", { name: "Ver menos", expanded: true })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Ver menos" }));
+    fireEvent.click(heading);
+    expect(screen.queryByText(dimensionData.description!)).toBeNull();
+    scroll.mockReturnValue(60);
+    fireEvent.click(heading);
+    expect(screen.getByText(dimensionData.description!)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Ver más" })).toBeNull();
+  } finally {
+    height.mockRestore();
+    scroll.mockRestore();
+  }
+});
+
+it.each([false, true])("saves empty optional instructions for a new questionnaire, session=%s", async session => {
+  render(<ActivityEvaluationForm organizationId="org-a" programId="program-a"
+    activityId={session ? undefined : "activity-a"} sessionId={session ? "session-a" : undefined}
+    activityTitle="Práctica" onSaved={vi.fn()} />);
+  expect(screen.getByLabelText<HTMLTextAreaElement>("Indicaciones opcionales").value).toBe("");
+  fireEvent.change(screen.getByLabelText("Enunciado"), { target: { value: "¿Qué aprendiste?" } });
+  fireEvent.submit(screen.getByRole("form"));
+  const save = session ? saveSessionEvaluation : createActivityEvaluation;
+  await waitFor(() => expect(save).toHaveBeenCalledWith("org-a", "program-a",
+    session ? "session-a" : "activity-a", expect.objectContaining({ instructions: null }), expect.any(AbortSignal)));
+});
 
 it("creates the session closing survey with the same question editor as activities", async () => {
   vi.mocked(saveSessionEvaluation).mockResolvedValue({ id:"closing",organizationId:"org-a",programId:"program-a",activityId:null,

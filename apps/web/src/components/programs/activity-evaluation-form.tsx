@@ -25,7 +25,7 @@ export function ActivityEvaluationForm({ organizationId, programId, activityId, 
   const formLabel=sessionId?"encuesta de cierre":"formulario";
   const actionLabel=`${initial?"Editar":"Crear"} ${formLabel}`;
   const [title, setTitle] = useState(initial?.title ?? `${sessionId?"Encuesta de cierre":"Formulario"} · ${activityTitle}`);
-  const [instructions, setInstructions] = useState(initial ? initial.instructions ?? "" : `Responde estas preguntas desde tu experiencia con la ${sessionId?"sesión":"actividad"}.`);
+  const [instructions, setInstructions] = useState(initial?.instructions ?? "");
   const [questions, setQuestions] = useState<DraftQuestion[]>(initial ? [...initial.questions].sort((a, b) => a.position - b.position).map((q, key) => ({ key, prompt: q.prompt, type: q.type, optionsText: (q.options ?? []).join("\n") })) : [
     { key: 0, prompt: "", type: "AGREEMENT_SCALE", optionsText: "" },
   ]);

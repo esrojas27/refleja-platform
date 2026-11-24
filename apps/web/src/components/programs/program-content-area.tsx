@@ -147,7 +147,6 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
             <span className="min-w-0"><span className="rti-kicker">Dimensión {dimension.position}</span>
               <span className="mt-2 block text-xl font-semibold">{dimension.name}</span>
               {dimension.archived && <span className="mt-2 inline-block rounded-full bg-muted px-3 py-1 text-xs font-medium">Archivada</span>}
-              {dimension.description && <span className="mt-2 block whitespace-pre-wrap text-sm text-muted-foreground">{dimension.description}</span>}
               <span className="mt-3 block text-xs font-medium text-muted-foreground">
                 {visibleSessions.length} {visibleSessions.length === 1 ? "sesión" : "sesiones"} · {activityCount} {activityCount === 1 ? "actividad" : "actividades"}
               </span>
@@ -159,6 +158,7 @@ function ProgramContent({ organizationId, programId }: { organizationId: string;
             onEdit={() => setDialog({ kind: "dimension", initial: dimension })} />}
 
           {dimensionOpen && <div id={`dimension-panel-${dimension.id}`} className="border-t border-border/70 px-5 py-5 sm:px-6">
+            {dimension.description && <DimensionDescription id={dimension.id} text={dimension.description} />}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h3 className="font-semibold">Sesiones</h3>
               <button type="button" disabled={!canEdit || dimension.archived} className="rti-button-secondary" onClick={() => setDialog({ kind: "session", dimension })}>
@@ -332,6 +332,34 @@ export function DimensionForm({ organizationId, programId, position, onSaved, in
         onChange={event => setInput({ ...input, description: event.target.value })} disabled={pending || blocked} /></div>
     <button className="rti-button-primary" disabled={pending || blocked}>{pending ? "Guardando…" : initial ? "Guardar cambios" : "Crear dimensión"}</button>
   </form>;
+}
+
+function DimensionDescription({ id, text }: { id: string; text: string }) {
+  const preview = useRef<HTMLParagraphElement>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [overflowing, setOverflowing] = useState(false);
+
+  useEffect(() => {
+    const element = preview.current;
+    if (!element) return;
+    const measure = () => setOverflowing(element.scrollHeight > element.clientHeight + 1);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [text]);
+
+  return <div className="mb-5">
+    <div className="relative">
+      <p ref={preview} aria-hidden={expanded || undefined}
+        id={expanded ? undefined : `dimension-description-${id}`}
+        className={`line-clamp-3 whitespace-pre-wrap break-words text-sm text-muted-foreground ${expanded ? "pointer-events-none invisible absolute inset-x-0 top-0" : ""}`}>{text}</p>
+      {expanded && <p id={`dimension-description-${id}`} className="whitespace-pre-wrap break-words text-sm text-muted-foreground">{text}</p>}
+    </div>
+    {(overflowing || expanded) && <button type="button" className="rti-link mt-2 text-sm"
+      aria-expanded={expanded} aria-controls={`dimension-description-${id}`}
+      onClick={() => setExpanded(value => !value)}>{expanded ? "Ver menos" : "Ver más"}</button>}
+  </div>;
 }
 
 export function SessionForm({ organizationId, programId, dimensionId, position, onSaved, initial }: {
