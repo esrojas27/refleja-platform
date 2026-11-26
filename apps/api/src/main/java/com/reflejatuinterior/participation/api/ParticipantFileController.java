@@ -52,7 +52,8 @@ class ParticipantFileController {
     private static ResponseEntity<byte[]> binary(ParticipantFiles.Content content,boolean download) {
         var type=content.file().contentType();
         String extension=switch(type) { case "application/pdf" -> "pdf"; case "image/jpeg" -> "jpg"; case "image/png" -> "png"; default -> "webp"; };
-        String name=content.file().title().replaceAll("[\\\\/:*?\"<>|]","_")+"."+extension;
+        String suffix=content.file().documentVersion()==null?"":"-v"+content.file().documentVersion();
+        String name=(content.file().title()+suffix).replaceAll("[\\\\/:*?\"<>|]","_")+"."+extension;
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(MediaType.parseMediaType(type))
             .contentLength(content.bytes().length).header("X-Content-Type-Options","nosniff")
             .header("Content-Security-Policy","sandbox; default-src 'none'")

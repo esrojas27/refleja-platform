@@ -3,28 +3,30 @@ import { programsPath } from "@/lib/programs/program-api";
 
 export type DiscProfile = {
   id: string;
-  dominant: string;
-  influential: string;
-  serene: string;
-  conscientious: string;
+  dominant: number | null;
+  influential: number | null;
+  serene: number | null;
+  conscientious: number | null;
   updatedAt: string;
   version: number;
+  needsUpdate: boolean;
 };
 
 export type ProgramDiscParticipant = {
   enrollmentId: string;
-  enrollmentStatus: "ACTIVE" | "COMPLETED";
+  enrollmentStatus: "INVITED" | "ACTIVE" | "COMPLETED";
   email: string;
   firstName: string | null;
   lastName: string | null;
   profile: DiscProfile | null;
+  canEdit: boolean;
 };
 
 export type DiscProfileInput = {
-  dominant: string;
-  influential: string;
-  serene: string;
-  conscientious: string;
+  dominant: number;
+  influential: number;
+  serene: number;
+  conscientious: number;
   version: number | null;
 };
 
@@ -71,6 +73,9 @@ async function request<T>(path: string, method: "GET" | "PUT", expected: number,
 export const listProgramDiscProfiles = (organizationId: string, programId: string, signal?: AbortSignal) =>
   request<{ items: ProgramDiscParticipant[] }>(discProfilesPath(organizationId, programId), "GET", 200, undefined, signal);
 
+export const getMyDiscProfile = (programId:string,signal?:AbortSignal) =>
+  request<{profile:DiscProfile|null}>(`/me/programs/${encodeURIComponent(programId)}/disc-profile`,"GET",200,undefined,signal);
+
 export const saveProgramDiscProfile = (organizationId: string, programId: string, enrollmentId: string,
   input: DiscProfileInput, signal?: AbortSignal) => request<ProgramDiscParticipant>(
     `${discProfilesPath(organizationId, programId)}/${encodeURIComponent(enrollmentId)}`, "PUT", 200, input, signal);
@@ -81,8 +86,24 @@ export function discErrorMessage(error: unknown) {
     : status === 401 ? "Tu sesión no está disponible. Inicia sesión de nuevo."
     : status === 403 ? "No tienes permiso para consultar o editar las fichas DISC de este programa."
     : status === 404 ? "El programa o el colaborador ya no está disponible."
-    : status === 400 ? "Completa los cuatro campos de la ficha DISC."
+    : status === 400 ? "Ingresa los cuatro porcentajes como números enteros entre 0 y 100."
     : status === 409 ? "La ficha cambió. Actualiza el listado antes de guardar nuevamente."
     : "No se pudo completar la operación. Inténtalo de nuevo.";
   return message + (error instanceof DiscRequestError && error.requestId ? ` Referencia: ${error.requestId}` : "");
+}
+
+export async function uploadDiscPdf(org:string,program:string,enrollment:string,file:File,signal?:AbortSignal) {
+  signal?.throwIfAborted();
+  const session=await fetchAuthSession();signal?.throwIfAborted();
+  if(!session.tokens?.accessToken)throw new DiscRequestError(401);
+  const base=process.env.NEXT_PUBLIC_API_BASE_URL;if(!base)throw new DiscRequestError(0);
+  const body=new FormData();body.append("file",file);
+  const response=await fetch(`${base.replace(/\/$/,"")}/api/v1${discProfilesPath(org,program)}/${encodeURIComponent(enrollment)}/pdf`,{
+    method:"POST",signal,cache:"no-store",headers:{Authorization:`Bearer ${session.tokens.accessToken.toString()}`},body,
+  });
+  if(response.status!==201){
+    const error=await response.json().catch(()=>null);
+    throw new DiscRequestError(response.status,[],undefined,typeof error?.code==="string"?error.code:undefined);
+  }
+  return response.json() as Promise<import("./participant-files-api").ParticipantFile>;
 }

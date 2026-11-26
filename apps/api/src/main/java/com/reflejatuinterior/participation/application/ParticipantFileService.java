@@ -59,6 +59,17 @@ public class ParticipantFileService {
         return saved;
     }
     @Transactional
+    public ParticipantFiles.Data uploadDisc(String subject,UUID org,UUID program,UUID enrollment,byte[] bytes,String requestId) {
+        var actor=authorize(subject,org,program,true);
+        programs.lock(org,program).orElseThrow(ProgramActivities.Missing::new).requireEditable();
+        actor=authorize(subject,org,program,true);
+        enrollments.lock(org,program,enrollment);
+        if (!ParticipantFileFormat.type(bytes).equals("application/pdf")) throw new ParticipantFileFormat.Invalid("file");
+        var saved=files.createDisc(org,program,enrollment,actor.userId(),bytes);
+        audit("DISC_PDF_UPLOADED",actor.userId(),org,program,enrollment,saved.id(),requestId);
+        return saved;
+    }
+    @Transactional
     public void delete(String subject,UUID org,UUID program,UUID enrollment,UUID file,String requestId) {
         var actor=authorize(subject,org,program,true);
         programs.lock(org,program).orElseThrow(ProgramActivities.Missing::new).requireEditable();

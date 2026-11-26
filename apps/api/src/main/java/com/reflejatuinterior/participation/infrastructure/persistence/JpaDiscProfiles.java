@@ -26,7 +26,7 @@ class JpaDiscProfiles implements DiscProfiles {
                 organizationId, programId, enrollmentIds).stream().map(JpaDiscProfiles::data).toList();
     }
 
-    @Override public Data save(UUID organizationId, UUID programId, UUID enrollmentId, Texts texts,
+    @Override public Data save(UUID organizationId, UUID programId, UUID enrollmentId, Percentages percentages,
             Long expectedVersion, UUID actorId) {
         var found = repository.lock(organizationId, programId, enrollmentId);
         boolean created = found.isEmpty();
@@ -34,11 +34,15 @@ class JpaDiscProfiles implements DiscProfiles {
         if (created) {
             if (expectedVersion != null) throw new DiscProfileConflict();
             entity = new DiscProfileJpaEntity(organizationId, programId, enrollmentId,
-                    texts.dominant(), texts.influential(), texts.serene(), texts.conscientious(), actorId);
+                    percentages.dominant(), percentages.influential(), percentages.serene(), percentages.conscientious(), actorId);
         } else {
             entity = found.get();
             if (expectedVersion == null || entity.version() != expectedVersion) throw new DiscProfileConflict();
-            entity.update(texts.dominant(), texts.influential(), texts.serene(), texts.conscientious(), actorId);
+            if (java.util.Objects.equals(entity.dominant(),percentages.dominant())
+                    && java.util.Objects.equals(entity.influential(),percentages.influential())
+                    && java.util.Objects.equals(entity.serene(),percentages.serene())
+                    && java.util.Objects.equals(entity.conscientious(),percentages.conscientious())) return data(entity);
+            entity.update(percentages.dominant(), percentages.influential(), percentages.serene(), percentages.conscientious(), actorId);
         }
         entity = repository.saveAndFlush(entity);
         entityManager.persist(new DiscProfileRevisionJpaEntity(entity, created ? "CREATED" : "UPDATED", actorId));

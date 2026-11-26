@@ -87,7 +87,7 @@ it("marks program content as active", () => {
   expect(screen.getByRole("link", { name: "Contenido" }).getAttribute("aria-current")).toBe("page");
 });
 
-it("shows DISC only to authorized consultants and leaders", async () => {
+it("shows DISC to authorized consultants, leaders and HR", async () => {
   usePathname.mockReturnValue("/organizations/org-a/programs/program-a/disc");
   render(<ProgramWorkspace organizationId="org-a" programId="program-a"><p>Ficha</p></ProgramWorkspace>);
   expect((await screen.findByRole("link", { name: "DISC" })).getAttribute("aria-current")).toBe("page");
@@ -98,8 +98,7 @@ it("shows DISC only to authorized consultants and leaders", async () => {
     organizations: [], activeOrganizationId: "org-a", roles: ["COMPANY_ADMIN"],
   });
   render(<ProgramWorkspace organizationId="org-a" programId="program-a"><p>Ficha</p></ProgramWorkspace>);
-  await Promise.resolve();
-  expect(screen.queryByRole("link", { name: "DISC" })).toBeNull();
+  expect(await screen.findByRole("link", { name: "DISC" })).toBeTruthy();
 });
 
 it("marks collaborators as active and preserves encoded route segments", () => {

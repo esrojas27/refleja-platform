@@ -8,8 +8,9 @@ import java.util.UUID;
 public interface ParticipantFiles {
     List<Data> list(UUID org, UUID program, UUID enrollment);
     Data create(UUID org, UUID program, UUID enrollment, UUID actor, String title, String contentType, byte[] bytes);
+    Data createDisc(UUID org, UUID program, UUID enrollment, UUID actor, byte[] bytes);
     Optional<Content> content(UUID org, UUID program, UUID enrollment, UUID file);
     boolean delete(UUID org, UUID program, UUID enrollment, UUID file);
-    record Data(UUID id, String title, String contentType, int sizeBytes, Instant createdAt) {}
+    record Data(UUID id, String title, String contentType, int sizeBytes, Instant createdAt, String documentType, Integer documentVersion) {}
     record Content(Data file, byte[] bytes) {}
 }

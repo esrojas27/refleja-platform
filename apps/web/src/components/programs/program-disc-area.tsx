@@ -1,200 +1,109 @@
 "use client";
+import {useEffect,useRef,useState,type FormEvent} from "react";
+import {fetchCurrentIdentity,IdentityRequestError} from "@/lib/auth/authenticated-api";
+import {listProgramDiscProfiles,saveProgramDiscProfile,discErrorMessage,DiscRequestError,type ProgramDiscParticipant,type DiscProfileInput} from "@/lib/participation/disc-api";
+import {useProgramState} from "./program-state-context";
+import {DiscRadar,DISC_FIELDS,type DiscValues} from "./disc-radar";
+import {DiscPdfVersions} from "./disc-pdf-versions";
 
-import Link from "next/link";
-import { CheckCircle2, ChevronRight, CircleDashed, Sparkles, UserRound } from "lucide-react";
-import { FormEvent, useEffect, useRef, useState } from "react";
-import { fetchCurrentIdentity, IdentityRequestError } from "@/lib/auth/authenticated-api";
-import { DiscProfileInput, DiscRequestError, ProgramDiscParticipant, discErrorMessage,
-  listProgramDiscProfiles, saveProgramDiscProfile } from "@/lib/participation/disc-api";
-import { useProgramState } from "@/components/programs/program-state-context";
-
-export function ProgramDiscArea({ organizationId, programId }: { organizationId: string; programId: string }) {
-  const canEdit = useProgramState()?.canEdit ?? true;
-  const [items, setItems] = useState<ProgramDiscParticipant[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState("Consultando fichas DISC…");
-  const [authorized, setAuthorized] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [queueOpen, setQueueOpen] = useState(false);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    async function load() {
-      try {
-        const identity = await fetchCurrentIdentity(organizationId, controller.signal);
-        if (!identity.roles.some(role => role === "CONSULTANT" || role === "LEADER")) {
-          setMessage("Sólo consultores y líderes autorizados del programa pueden ver las fichas DISC.");
-          return;
-        }
-        setAuthorized(true);
-        const response = await listProgramDiscProfiles(organizationId, programId, controller.signal);
-        setItems(response.items);
-        setMessage(response.items.length === 0 ? "No hay colaboradores activos disponibles en este programa." : "");
-      } catch (error) {
-        if (!controller.signal.aborted) {
-          const normalized = error instanceof IdentityRequestError
-            ? new DiscRequestError(error.status) : error;
-          setMessage(discErrorMessage(normalized));
-        }
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
+export function ProgramDiscArea(props:{organizationId:string;programId:string}){
+  return <DiscArea key={props.organizationId+"/"+props.programId} {...props}/>;
+}
+function DiscArea({organizationId,programId}:{organizationId:string;programId:string}){
+  const canEditProgram=useProgramState()?.canEdit??true;
+  const [items,setItems]=useState<ProgramDiscParticipant[]>([]),[selectedId,setSelectedId]=useState<string>();
+  const [message,setMessage]=useState("Consultando fichas DISC…"),[loading,setLoading]=useState(true),[notice,setNotice]=useState("");
+  const [attempt,setAttempt]=useState(0);
+  useEffect(()=>{
+    const controller=new AbortController();
+    async function load(){try{
+      const identity=await fetchCurrentIdentity(organizationId,controller.signal);if(controller.signal.aborted)return;
+      if(identity.activeOrganizationId!==organizationId||!identity.roles.some(r=>["CONSULTANT","LEADER","COMPANY_ADMIN"].includes(r))){
+        setMessage("Solo consultores, líderes y RRHH autorizados del programa pueden consultar las fichas DISC.");return;
       }
-    }
-    void load();
-    return () => controller.abort();
-  }, [organizationId, programId]);
-
-  const pending = items.filter(item => !item.profile);
-  const completed = items.length - pending.length;
-  const selected = items.find(item => item.enrollmentId === selectedId)
-    ?? pending[0] ?? items[0] ?? null;
-
-  function openQueue(item?: ProgramDiscParticipant) {
-    setSelectedId(item?.enrollmentId ?? pending[0]?.enrollmentId ?? items[0]?.enrollmentId ?? null);
-    setQueueOpen(true);
-  }
-
-  function saved(value: ProgramDiscParticipant) {
-    const updated = items.map(item => item.enrollmentId === value.enrollmentId ? value : item);
-    setItems(updated);
-    const next = updated.find(item => !item.profile && item.enrollmentId !== value.enrollmentId);
-    if (next) setSelectedId(next.enrollmentId);
-    else setQueueOpen(false);
-  }
-
-  return <main className="rti-surface p-6 sm:p-9">
-    <p className="rti-kicker">Conocimiento del equipo</p>
-    <h1 className="mt-3 text-3xl font-semibold sm:text-4xl">Ficha DISC</h1>
-    <p className="mt-3 max-w-3xl text-muted-foreground">
-      Registra una lectura independiente de los rasgos Dominante, Influyente, Sereno y Concienzudo de cada colaborador.
-    </p>
-
-    {loading ? <p role="status" className="mt-6 rounded-2xl bg-muted/60 px-4 py-3 text-sm">{message}</p>
-      : !authorized || items.length === 0 ? <EmptyState message={message} />
-      : <>
-        <section aria-label="Estado de fichas DISC" className="mt-7 grid gap-3 sm:grid-cols-3">
-          <Metric label="Colaboradores" value={items.length} />
-          <Metric label="Fichas completas" value={completed} accent />
-          <Metric label="Pendientes" value={pending.length} />
-        </section>
-
-        <section aria-labelledby="disc-queue-title" className="mt-7 rounded-3xl border border-primary/15 bg-accent/25 p-5 sm:p-7">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div><p className="rti-kicker">Recorrido individual</p>
-              <h2 id="disc-queue-title" className="mt-2 text-xl font-semibold">{canEdit ? "Completar fichas DISC" : "Consultar fichas DISC"}</h2></div>
-            {canEdit && !queueOpen && <button type="button" className="rti-button-primary" onClick={() => openQueue()}>
-              {pending.length > 0 ? `Completar pendientes (${pending.length})` : "Revisar fichas"}
-            </button>}
-          </div>
-          {!queueOpen ? <div className="mt-5 flex items-center gap-3 rounded-2xl border border-border/70 bg-background/70 px-4 py-4 text-sm text-muted-foreground">
-            {pending.length === 0 ? <CheckCircle2 aria-hidden="true" className="size-5 shrink-0 text-primary" />
-              : <CircleDashed aria-hidden="true" className="size-5 shrink-0 text-primary" />}
-            <p>{pending.length === 0 ? "Todas las fichas DISC están completas."
-              : `Hay ${pending.length} ${pending.length === 1 ? "ficha pendiente" : "fichas pendientes"}.`}</p>
-          </div> : canEdit && selected && <DiscForm key={`${selected.enrollmentId}-${selected.profile?.version ?? "new"}`}
-            organizationId={organizationId} programId={programId} participant={selected}
-            onSaved={saved} onClose={() => setQueueOpen(false)} />}
-        </section>
-
-        <section aria-labelledby="disc-team-title" className="mt-7">
-          <h2 id="disc-team-title" className="text-xl font-semibold">Integrantes del programa</h2>
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
-            {items.map(item => <article key={item.enrollmentId} className="rounded-2xl border border-border/70 bg-card p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex min-w-0 items-start gap-3"><span className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-secondary text-primary">
-                  <UserRound aria-hidden="true" className="size-5" /></span><div className="min-w-0">
-                    <p className="font-semibold">{participantName(item)}</p><p className="truncate text-sm text-muted-foreground">{item.email}</p>
-                  </div></div>
-                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${item.profile ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
-                  {item.profile ? "Completa" : "Pendiente"}</span>
-              </div>
-              {canEdit ? <button type="button" onClick={() => openQueue(item)} className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline">
-                {item.profile ? "Editar ficha" : "Completar ficha"}<ChevronRight aria-hidden="true" className="size-4" />
-              </button> : item.profile && <dl className="mt-4 space-y-2 text-sm">
-                {([["D · Dominante", item.profile.dominant], ["I · Influyente", item.profile.influential],
-                  ["S · Sereno", item.profile.serene], ["C · Concienzudo", item.profile.conscientious]] as const)
-                  .map(([label, text]) => <div key={label}><dt className="font-semibold">{label}</dt><dd className="whitespace-pre-wrap break-words text-muted-foreground">{text}</dd></div>)}
-              </dl>}
-            </article>)}
-          </div>
-        </section>
-      </>}
+      const response=await listProgramDiscProfiles(organizationId,programId,controller.signal);
+      if(!controller.signal.aborted){setItems(response.items);setMessage(response.items.length?"":identity.roles.includes("CONSULTANT")?"No hay colaboradores registrados disponibles en este programa.":"No hay colaboradores activos o completados disponibles en este programa.");}
+    }catch(error){if(!controller.signal.aborted)setMessage(discErrorMessage(error instanceof IdentityRequestError?new DiscRequestError(error.status):error));}
+      finally{if(!controller.signal.aborted)setLoading(false);}}
+    void load();return()=>controller.abort();
+  },[organizationId,programId,attempt]);
+  const complete=(item:ProgramDiscParticipant)=>!!item.profile&&!item.profile.needsUpdate;
+  const pending=items.filter(i=>!complete(i)),selected=items.find(i=>i.enrollmentId===selectedId);
+  const canEdit=!!selected?.canEdit&&canEditProgram;
+  const canEditAny=canEditProgram&&items.some(i=>i.canEdit);
+  function saved(value:ProgramDiscParticipant){setItems(current=>current.map(p=>p.enrollmentId===value.enrollmentId?value:p));setNotice(`Ficha DISC de ${name(value)} guardada.`);}
+  function refresh(){setItems([]);setSelectedId(undefined);setLoading(true);setNotice("");setMessage("Consultando fichas DISC…");setAttempt(v=>v+1);}
+  return <main className="rti-surface min-w-0 p-6 sm:p-9">
+    <p className="rti-kicker">Conocimiento del equipo</p><h1 className="mt-3 text-3xl font-semibold sm:text-4xl">Ficha DISC</h1>
+    <p className="mt-3 max-w-3xl text-muted-foreground">Consulta los porcentajes de Dominante, Influyente, Sereno y Concienzudo. Cada rasgo va de 0 a 100 y se representa en un eje del radar.</p>
+    {notice&&<p role="status" className="mt-5 rounded-xl bg-accent p-3 text-sm">{notice}</p>}
+    {message&&<p role="status" className="mt-5 rounded-xl bg-muted p-3 text-sm">{message}</p>}
+    {!loading&&items.length>0&&<>
+      <section aria-label="Estado de fichas DISC" className="mt-6 grid gap-3 sm:grid-cols-3">
+        {[["Colaboradores",items.length],["Fichas completas",items.length-pending.length],["Pendientes",pending.length]].map(([label,value])=><div key={label} className="rounded-2xl border border-border bg-card p-4">
+          <p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 text-2xl font-semibold">{value}</p></div>)}
+      </section>
+      {canEditAny&&<p className="mt-4 text-sm text-muted-foreground">Puedes preparar el DISC de los colaboradores registrados, incluso antes de enviar o aceptar su invitación.</p>}
+      {canEditAny&&pending.length>0&&<button type="button" className="rti-button-primary mt-5" onClick={()=>setSelectedId(pending[0].enrollmentId)}>Completar pendientes ({pending.length})</button>}
+      {selected&&<section key={selected.enrollmentId} aria-label={`Detalle DISC de ${name(selected)}`} className="mt-6 min-w-0 rounded-2xl border border-border bg-card p-4 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="break-words text-xl font-semibold">{name(selected)}</h2><p className="break-all text-sm text-muted-foreground">{selected.email}</p></div>
+          <button type="button" className="rti-button-secondary" onClick={()=>setSelectedId(undefined)}>Cerrar ficha</button></div>
+        {selected.enrollmentStatus==="INVITED"&&<p className="mt-4 rounded-xl bg-muted p-3 text-sm">Invitación pendiente de aceptación. La ficha y los PDF quedan guardados; el colaborador podrá consultarlos al aceptar la invitación y completar su perfil.</p>}
+        {selected.profile?.needsUpdate&&<p className="mt-4 rounded-xl bg-muted p-3 text-sm">Esta ficha fue registrada como texto. Está pendiente ingresar sus cuatro porcentajes; no se han calculado valores automáticamente.</p>}
+        {canEdit?<DiscForm key={selected.profile?.version??"new"} organizationId={organizationId} programId={programId} participant={selected} onSaved={saved}/>
+          :<div className="mx-auto mt-5 max-w-xl"><DiscRadar values={values(selected)}/></div>}
+        <DiscPdfVersions organizationId={organizationId} programId={programId} enrollmentId={selected.enrollmentId} canEdit={canEdit}/>
+      </section>}
+      <section className="mt-7" aria-label="Integrantes del programa"><h2 className="text-xl font-semibold">Integrantes del programa</h2>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">{items.map(item=><article key={item.enrollmentId} className="min-w-0 rounded-2xl border border-border p-4">
+          <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><h3 className="break-words font-semibold">{name(item)}</h3><p className="break-all text-sm text-muted-foreground">{item.email}</p></div>
+            <span className="rounded-full bg-muted px-3 py-1 text-xs font-semibold">{complete(item)?"Completa":item.profile?"Actualizar":"Pendiente"}</span></div>
+          <p className="mt-2 text-sm text-muted-foreground">{item.enrollmentStatus==="INVITED"?"Invitación pendiente de aceptación":item.enrollmentStatus==="COMPLETED"?"Inscripción completada":"Inscripción activa"}</p>
+          {complete(item)&&<dl className="mt-3 grid grid-cols-4 gap-2 text-center text-sm">{DISC_FIELDS.map(f=><div key={f.key}><dt className="font-semibold">{f.code}</dt><dd>{item.profile![f.key]}%</dd></div>)}</dl>}
+          <button type="button" className="rti-button-secondary mt-4" onClick={()=>setSelectedId(item.enrollmentId)} aria-label={`${item.canEdit&&canEditProgram?(complete(item)?"Editar ficha":"Completar ficha"):"Consultar ficha"} de ${name(item)}`}>
+            {item.canEdit&&canEditProgram?(complete(item)?"Editar ficha":"Completar ficha"):"Consultar ficha"}
+          </button>
+        </article>)}</div>
+      </section>
+    </>}
+    <button type="button" className="rti-button-secondary mt-5" disabled={loading} onClick={refresh}>Actualizar fichas</button>
   </main>;
 }
-
-function DiscForm({ organizationId, programId, participant, onSaved, onClose }: {
-  organizationId: string; programId: string; participant: ProgramDiscParticipant;
-  onSaved: (value: ProgramDiscParticipant) => void; onClose: () => void;
-}) {
-  const original = participant.profile;
-  const [input, setInput] = useState<DiscProfileInput>({
-    dominant: original?.dominant ?? "", influential: original?.influential ?? "",
-    serene: original?.serene ?? "", conscientious: original?.conscientious ?? "",
-    version: original?.version ?? null,
-  });
-  const [pending, setPending] = useState(false);
-  const [message, setMessage] = useState("");
-  const submitting = useRef(false);
-
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    if (submitting.current) return;
-    const clean = { ...input, dominant: input.dominant.trim(), influential: input.influential.trim(),
-      serene: input.serene.trim(), conscientious: input.conscientious.trim() };
-    if ([clean.dominant, clean.influential, clean.serene, clean.conscientious].some(value => !value)) {
-      setMessage("Completa los cuatro campos de la ficha DISC."); return;
-    }
-    submitting.current = true; setPending(true); setMessage("Guardando ficha DISC…");
-    try {
-      const saved = await saveProgramDiscProfile(organizationId, programId, participant.enrollmentId, clean);
-      setMessage("Ficha DISC guardada."); onSaved(saved);
-    } catch (error) { setMessage(discErrorMessage(error)); }
-    finally { submitting.current = false; setPending(false); }
+type Draft=Record<keyof DiscValues,string>;
+function DiscForm({organizationId,programId,participant,onSaved}:{organizationId:string;programId:string;participant:ProgramDiscParticipant;onSaved:(value:ProgramDiscParticipant)=>void}){
+  const [draft,setDraft]=useState<Draft>(()=>Object.fromEntries(DISC_FIELDS.map(f=>[f.key,participant.profile?.[f.key]?.toString()??""])) as Draft);
+  const [invalid,setInvalid]=useState<string[]>([]),[pending,setPending]=useState(false),[blocked,setBlocked]=useState(false),[message,setMessage]=useState("");
+  const writing=useRef(false),request=useRef<AbortController|null>(null);
+  useEffect(()=>()=>request.current?.abort(),[]);
+  const valid=(value:string)=>/^\d{1,3}$/.test(value)&&Number(value)>=0&&Number(value)<=100;
+  const preview=Object.fromEntries(DISC_FIELDS.map(f=>[f.key,valid(draft[f.key])?Number(draft[f.key]):null])) as DiscValues;
+  async function submit(event:FormEvent){event.preventDefault();if(writing.current||blocked)return;
+    const errors=DISC_FIELDS.filter(f=>!valid(draft[f.key])).map(f=>f.key);
+    if(errors.length){setInvalid(errors);setMessage("Ingresa los cuatro porcentajes como números enteros entre 0 y 100.");document.getElementById("disc-"+errors[0])?.focus();return;}
+    const input={...preview,version:participant.profile?.version??null} as DiscProfileInput;
+    writing.current=true;setPending(true);setMessage("Guardando ficha DISC…");const controller=new AbortController();request.current=controller;
+    try{const saved=await saveProgramDiscProfile(organizationId,programId,participant.enrollmentId,input,controller.signal);
+      if(!controller.signal.aborted){setMessage("Ficha DISC guardada.");onSaved(saved);}
+    }catch(error){if(!controller.signal.aborted){setMessage(discErrorMessage(error));setBlocked(!(error instanceof DiscRequestError)||error.status===0||error.status>=500||[401,403,404,409].includes(error.status));}}
+    finally{writing.current=false;if(!controller.signal.aborted)setPending(false);}
   }
-
-  return <form aria-label={`Ficha DISC de ${participantName(participant)}`} onSubmit={submit}
-    className="mt-5 animate-in slide-in-from-bottom-6 fade-in rounded-2xl border border-border/70 bg-card p-5 shadow-sm motion-reduce:animate-none sm:p-6">
-    <div className="flex flex-col gap-3 border-b border-border/70 pb-4 sm:flex-row sm:items-start sm:justify-between">
-      <div><p className="rti-kicker">Integrante actual</p><h3 className="mt-1 text-lg font-semibold">{participantName(participant)}</h3>
-        <p className="text-sm text-muted-foreground">{participant.email}</p></div>
-      <button type="button" onClick={onClose} className="rti-button-secondary">Cerrar recorrido</button>
+  const positions={dominant:"col-start-1 row-start-1",influential:"col-start-2 row-start-1 lg:col-start-3",
+    serene:"col-start-2 row-start-3 lg:col-start-3",conscientious:"col-start-1 row-start-3"};
+  return <form aria-label={`Ficha DISC de ${name(participant)}`} noValidate onSubmit={submit} className="mt-5">
+    <p className="text-sm leading-6 text-muted-foreground">Ingresa valores enteros de 0 a 100. No tienen que sumar 100. El radar se actualiza mientras completas los campos.</p>
+    <div className="mt-5 grid min-w-0 grid-cols-2 items-center gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,2fr)_minmax(0,1fr)]">
+      {DISC_FIELDS.map(field=><div key={field.key} className={`min-w-0 rounded-xl border border-border bg-background p-3 ${positions[field.key]}`}>
+        <label htmlFor={"disc-"+field.key} className="block text-sm font-semibold"><span style={{color:field.color}}>{field.code}</span> · {field.label} (%)</label>
+        <input id={"disc-"+field.key} className="rti-field mt-2" type="number" inputMode="numeric" min={0} max={100} step={1} required
+          value={draft[field.key]} disabled={pending||blocked} aria-invalid={invalid.includes(field.key)||undefined}
+          onChange={event=>{setDraft(v=>({...v,[field.key]:event.target.value}));setInvalid(v=>v.filter(k=>k!==field.key));}}/>
+      </div>)}
+      <div className="col-span-2 col-start-1 row-start-2 min-w-0 lg:col-span-1 lg:col-start-2 lg:row-span-3 lg:row-start-1"><DiscRadar values={preview}/></div>
     </div>
-    <div className="mt-5 grid gap-5 md:grid-cols-2">
-      <DiscField code="D" label="Dominante" value={input.dominant} disabled={pending}
-        onChange={value => setInput({ ...input, dominant: value })} />
-      <DiscField code="I" label="Influyente" value={input.influential} disabled={pending}
-        onChange={value => setInput({ ...input, influential: value })} />
-      <DiscField code="S" label="Sereno" value={input.serene} disabled={pending}
-        onChange={value => setInput({ ...input, serene: value })} />
-      <DiscField code="C" label="Concienzudo" value={input.conscientious} disabled={pending}
-        onChange={value => setInput({ ...input, conscientious: value })} />
-    </div>
-    {message && <p role="status" className="mt-5 rounded-xl bg-muted/60 px-3 py-2 text-sm">{message}</p>}
-    <button className="rti-button-primary mt-5" disabled={pending}>{pending ? "Guardando…" : "Guardar y continuar"}</button>
+    {message&&<p role="status" className="mt-4 rounded-xl bg-muted p-3 text-sm">{message}</p>}
+    <button className="rti-button-primary mt-5" disabled={pending||blocked}>{pending?"Guardando…":"Guardar ficha"}</button>
+    {blocked&&<p className="mt-3 text-sm">Actualiza las fichas antes de volver a guardar.</p>}
   </form>;
 }
-
-function DiscField({ code, label, value, disabled, onChange }: { code: string; label: string; value: string;
-  disabled: boolean; onChange: (value: string) => void }) {
-  const id = `disc-${code.toLowerCase()}`;
-  return <div><label htmlFor={id} className="flex items-center gap-2 text-sm font-semibold">
-    <span className="inline-flex size-7 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">{code}</span>{label}</label>
-    <textarea id={id} className="rti-field mt-2 min-h-32 resize-y" required maxLength={5000}
-      value={value} onChange={event => onChange(event.target.value)} disabled={disabled} /></div>;
-}
-
-function Metric({ label, value, accent = false }: { label: string; value: number; accent?: boolean }) {
-  return <div className={`rounded-2xl border p-4 ${accent ? "border-primary/25 bg-accent/40" : "border-border/70 bg-card"}`}>
-    <p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 text-2xl font-semibold">{value}</p></div>;
-}
-
-function EmptyState({ message }: { message: string }) {
-  return <div className="mt-7 rounded-3xl border border-border/70 bg-muted/35 p-6 text-sm">
-    <Sparkles aria-hidden="true" className="size-6 text-primary" /><p role="status" className="mt-3 text-muted-foreground">{message}</p>
-    <Link href="/account" className="mt-4 inline-block font-semibold text-primary hover:underline">Volver a Cuenta</Link>
-  </div>;
-}
-
-function participantName(item: ProgramDiscParticipant) {
-  return [item.firstName, item.lastName].filter(Boolean).join(" ") || item.email;
-}
+function name(p:ProgramDiscParticipant){return [p.firstName,p.lastName].filter(Boolean).join(" ")||p.email;}
+function values(p:ProgramDiscParticipant):DiscValues{return {dominant:p.profile?.dominant??null,influential:p.profile?.influential??null,serene:p.profile?.serene??null,conscientious:p.profile?.conscientious??null};}

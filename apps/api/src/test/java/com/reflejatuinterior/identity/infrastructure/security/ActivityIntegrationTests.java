@@ -373,7 +373,7 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
                 .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Otra sesión\",\"scheduledDate\":\"2026-10-01\",\"position\":2}"))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PROGRAM_READ_ONLY"));
         mvc.perform(put(base + "/disc-profiles/" + enrollment).header("Authorization", token(consultant))
-                .contentType(MediaType.APPLICATION_JSON).content("{\"dominant\":\"D\",\"influential\":\"I\",\"serene\":\"S\",\"conscientious\":\"C\"}"))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"dominant\":80,\"influential\":65,\"serene\":30,\"conscientious\":45}"))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PROGRAM_READ_ONLY"));
     }
 

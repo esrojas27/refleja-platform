@@ -47,7 +47,8 @@ class ActuatorHealthSecurityConfiguration {
                                 "/api/v1/me/programs/{program}/files",
                                 "/api/v1/me/programs/{program}/files/{file}/content").authenticated()
                         .requestMatchers(HttpMethod.POST,
-                                "/api/v1/organizations/{org}/programs/{program}/enrollments/{enrollment}/files").authenticated()
+                                "/api/v1/organizations/{org}/programs/{program}/enrollments/{enrollment}/files",
+                                "/api/v1/organizations/{org}/programs/{program}/disc-profiles/{enrollment}/pdf").authenticated()
                         .requestMatchers(HttpMethod.DELETE,
                                 "/api/v1/organizations/{org}/programs/{program}/enrollments/{enrollment}/files/{file}").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/me", "/api/v1/me/profile").authenticated()
@@ -68,7 +69,8 @@ class ActuatorHealthSecurityConfiguration {
                         .requestMatchers(HttpMethod.GET, "/api/v1/me/programs",
                                 "/api/v1/me/programs/{programId}",
                                 "/api/v1/me/programs/{programId}/activities",
-                                "/api/v1/me/programs/{programId}/activity-images/{imageId}").authenticated()
+                                "/api/v1/me/programs/{programId}/activity-images/{imageId}",
+                                "/api/v1/me/programs/{programId}/disc-profile").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/organizations").authenticated()
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/organizations/{organizationId}/programs",

@@ -165,6 +165,7 @@ it.each([409, 403, 503, 0])("blocks unsafe resubmission after HTTP %s", async st
   render(<EnrollmentForm organizationId="org-a" programId="program-a" onSaved={vi.fn()} />); fill(); fireEvent.submit(screen.getByRole("form"));
   await waitFor(() => expect((screen.getByRole("button", { name: "Agregar persona" }) as HTMLButtonElement).disabled).toBe(true));
   expect(screen.queryByText("Colaborador registrado.")).toBeNull();
+  if (status === 503) expect(screen.getByText("El servicio de invitaciones no está disponible. Revisa el listado antes de reintentar.")).toBeTruthy();
 });
 it("allows a deliberate delivery retry only for a pending invitation with failed delivery", async () => {
   vi.mocked(listEnrollments).mockResolvedValue({ ...data, items: [{ ...enrollment, invitation: { ...enrollment.invitation!, deliveryStatus: "FAILED" } }] });

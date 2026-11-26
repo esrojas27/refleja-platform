@@ -21,14 +21,14 @@ class DiscProfileJpaEntity {
     private UUID programId;
     @Column(name = "enrollment_id", nullable = false, updatable = false)
     private UUID enrollmentId;
-    @Column(name = "dominant_text", nullable = false, length = 5000)
-    private String dominant;
-    @Column(name = "influential_text", nullable = false, length = 5000)
-    private String influential;
-    @Column(name = "serene_text", nullable = false, length = 5000)
-    private String serene;
-    @Column(name = "conscientious_text", nullable = false, length = 5000)
-    private String conscientious;
+    @Column(name = "dominant_percent")
+    private Integer dominant;
+    @Column(name = "influential_percent")
+    private Integer influential;
+    @Column(name = "serene_percent")
+    private Integer serene;
+    @Column(name = "conscientious_percent")
+    private Integer conscientious;
     @Column(name = "created_by", nullable = false, updatable = false)
     private UUID createdBy;
     @Column(name = "updated_by", nullable = false)
@@ -43,7 +43,7 @@ class DiscProfileJpaEntity {
     protected DiscProfileJpaEntity() {}
 
     DiscProfileJpaEntity(UUID organizationId, UUID programId, UUID enrollmentId,
-            String dominant, String influential, String serene, String conscientious, UUID actorId) {
+            Integer dominant, Integer influential, Integer serene, Integer conscientious, UUID actorId) {
         this.organizationId = organizationId;
         this.programId = programId;
         this.enrollmentId = enrollmentId;
@@ -51,7 +51,7 @@ class DiscProfileJpaEntity {
         this.createdBy = actorId;
     }
 
-    void update(String dominant, String influential, String serene, String conscientious, UUID actorId) {
+    void update(Integer dominant, Integer influential, Integer serene, Integer conscientious, UUID actorId) {
         this.dominant = dominant;
         this.influential = influential;
         this.serene = serene;
@@ -63,10 +63,10 @@ class DiscProfileJpaEntity {
     UUID organizationId() { return organizationId; }
     UUID programId() { return programId; }
     UUID enrollmentId() { return enrollmentId; }
-    String dominant() { return dominant; }
-    String influential() { return influential; }
-    String serene() { return serene; }
-    String conscientious() { return conscientious; }
+    Integer dominant() { return dominant; }
+    Integer influential() { return influential; }
+    Integer serene() { return serene; }
+    Integer conscientious() { return conscientious; }
     UUID createdBy() { return createdBy; }
     UUID updatedBy() { return updatedBy; }
     Instant createdAt() { return createdAt; }

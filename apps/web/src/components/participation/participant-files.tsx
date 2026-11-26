@@ -54,7 +54,7 @@ function ParticipantFilesContent({programId,organizationId,enrollmentId}:FileSco
       <div><p className="text-sm text-muted-foreground">{result.items.length}/{result.maxFiles} archivos · Hasta 10 MB por archivo</p>
         {!result.items.length?<p className="mt-3 rounded-xl border border-dashed border-border p-5 text-sm">Todavía no hay archivos para esta persona en este programa.</p>
           :<ul className="mt-3 space-y-3">{result.items.map(file=><li key={file.id}>
-            <FileRow scope={scope} file={file} canManage={result.canManage} onDeleted={()=>refresh("Archivo eliminado.")}/>
+            <ParticipantFileEntry scope={scope} file={file} canManage={result.canManage} onDeleted={()=>refresh("Archivo eliminado.")}/>
           </li>)}</ul>}
       </div>
     </>}
@@ -93,7 +93,7 @@ function FileUpload({scope,full,onSaved}:{scope:FileScope;full:boolean;onSaved:(
     </>}
   </form>;
 }
-function FileRow({scope,file,canManage,onDeleted}:{scope:FileScope;file:ParticipantFile;canManage:boolean;onDeleted:()=>void}){
+export function ParticipantFileEntry({scope,file,canManage,onDeleted}:{scope:FileScope;file:ParticipantFile;canManage:boolean;onDeleted:()=>void}){
   const [confirming,setConfirming]=useState(false);const [pending,setPending]=useState(false);const [message,setMessage]=useState("");
   const [preview,setPreview]=useState<string>();const previewUrl=useRef<string|undefined>(undefined);
   const request=useRef<AbortController|null>(null);const writing=useRef(false);
@@ -122,11 +122,11 @@ function FileRow({scope,file,canManage,onDeleted}:{scope:FileScope;file:Particip
     :`${(file.sizeBytes/1024/1024).toLocaleString("es-CO",{maximumFractionDigits:2})} MB`;
   return <article className="min-w-0 space-y-3 rounded-2xl border border-border bg-background p-4">
     <div className="flex items-start gap-3"><FileText aria-hidden="true" className="mt-1 size-5 shrink-0 text-muted-foreground"/>
-      <div className="min-w-0"><h3 className="break-words font-semibold">{file.title}</h3>
+      <div className="min-w-0"><h3 className="break-words font-semibold">{file.title}</h3>{file.documentType==="DISC"&&<p className="mt-1 text-xs font-semibold text-primary">Versión {file.documentVersion}</p>}
         <p className="mt-1 text-xs text-muted-foreground">{file.contentType==="application/pdf"?"PDF":"Imagen"} · {sizeLabel} · {new Date(file.createdAt).toLocaleDateString("es-CO")}</p></div></div>
-    <div className="flex flex-wrap gap-2"><button type="button" className="rti-button-secondary gap-2" disabled={pending} onClick={()=>void open(false)} aria-label={`Ver ${file.title}`}><Eye aria-hidden="true" className="size-4"/>Ver archivo</button>
-      <button type="button" className="rti-button-secondary gap-2" disabled={pending} onClick={()=>void open(true)} aria-label={`Descargar ${file.title}`}><Download aria-hidden="true" className="size-4"/>Descargar</button>
-      {canManage&&<button type="button" className="rti-button-secondary gap-2" disabled={pending} onClick={()=>setConfirming(true)} aria-label={`Eliminar ${file.title}`}><Trash2 aria-hidden="true" className="size-4"/>Eliminar</button>}
+    <div className="flex flex-wrap gap-2"><button type="button" className="rti-button-secondary gap-2" disabled={pending} onClick={()=>void open(false)} aria-label={`Ver ${file.title}${file.documentVersion ? " versión "+file.documentVersion : ""}`}><Eye aria-hidden="true" className="size-4"/>Ver archivo</button>
+      <button type="button" className="rti-button-secondary gap-2" disabled={pending} onClick={()=>void open(true)} aria-label={`Descargar ${file.title}${file.documentVersion ? " versión "+file.documentVersion : ""}`}><Download aria-hidden="true" className="size-4"/>Descargar</button>
+      {canManage&&<button type="button" className="rti-button-secondary gap-2" disabled={pending} onClick={()=>setConfirming(true)} aria-label={`Eliminar ${file.title}${file.documentVersion ? " versión "+file.documentVersion : ""}`}><Trash2 aria-hidden="true" className="size-4"/>Eliminar</button>}
     </div>
     {pending&&<p role="status" className="text-sm">Procesando archivo…</p>}
     {message&&<p role="status" className="text-sm">{message}</p>}

@@ -33,7 +33,7 @@ export function ProgramWorkspace({
     fetchCurrentIdentity(organizationId, controller.signal)
       .then(identity => { if (!controller.signal.aborted) setPermissions({ organizationId,
         files: identity.activeOrganizationId === organizationId && identity.roles.some(role => ["CONSULTANT","LEADER","COMPANY_ADMIN"].includes(role)),
-        disc: identity.roles.some(role => role === "CONSULTANT" || role === "LEADER"),
+        disc: identity.activeOrganizationId === organizationId && identity.roles.some(role => ["CONSULTANT","LEADER","COMPANY_ADMIN"].includes(role)),
         results: identity.activeOrganizationId === organizationId && identity.roles.includes("CONSULTANT") }); })
       .catch(() => { if (!controller.signal.aborted) setPermissions({ organizationId, disc: false, results: false, files: false }); });
     return () => controller.abort();

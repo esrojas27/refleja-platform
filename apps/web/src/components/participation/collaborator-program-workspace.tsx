@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpenText, CheckSquare2, ChevronLeft, CalendarDays, FolderOpen } from "lucide-react";
+import { BookOpenText, CheckSquare2, ChevronLeft, CalendarDays, FolderOpen, BrainCircuit } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -9,6 +9,7 @@ import { CollaboratorActivitiesContext } from "@/components/participation/collab
 import { activityErrorMessage, listMyProgramActivities, pendingAssignedActivities,
   type AssignedActivity } from "@/lib/participation/activity-api";
 import { getMyProgram, myProgramsPath, type MyProgram } from "@/lib/participation/participation-api";
+import { getMyDiscProfile } from "@/lib/participation/disc-api";
 import { listMySessionClosures } from "@/lib/participation/session-closure-api";
 
 export function CollaboratorProgramWorkspace({ programId, children }: { programId: string; children: ReactNode }) {
@@ -16,6 +17,22 @@ export function CollaboratorProgramWorkspace({ programId, children }: { programI
   const summaryPath = myProgramsPath(programId);
   const [result, setResult] = useState<{ programId: string; activities?: AssignedActivity[]; message: string; status?: MyProgram["status"]; enrollmentStatus?: MyProgram["enrollmentStatus"];closingPending?:number }>();
   const [attempt,setAttempt]=useState(0);
+  const [disc,setDisc]=useState<{programId:string;available:boolean}>();
+  const [discAttempt,setDiscAttempt]=useState(0);
+  useEffect(()=>{
+    const refresh=()=>setDiscAttempt(v=>v+1);
+    const visible=()=>{if(document.visibilityState==="visible")refresh();};
+    window.addEventListener("focus",refresh);document.addEventListener("visibilitychange",visible);
+    return()=>{window.removeEventListener("focus",refresh);document.removeEventListener("visibilitychange",visible);};
+  },[]);
+  useEffect(()=>{
+    const controller=new AbortController();
+    getMyDiscProfile(programId,controller.signal).then(data=>{
+      if(!controller.signal.aborted)setDisc({programId,available:!!data.profile&&!data.profile.needsUpdate&&
+        [data.profile.dominant,data.profile.influential,data.profile.serene,data.profile.conscientious].every(v=>v!==null)});
+    }).catch(()=>{if(!controller.signal.aborted)setDisc({programId,available:false});});
+    return()=>controller.abort();
+  },[programId,pathname,discAttempt,attempt]);
   useEffect(()=>{const reload=()=>setAttempt(a=>a+1);window.addEventListener("rti:session-work-changed",reload);return()=>window.removeEventListener("rti:session-work-changed",reload);},[]);
   const currentResult = result?.programId === programId ? result : undefined;
   const activities = currentResult?.activities;
@@ -26,6 +43,7 @@ export function CollaboratorProgramWorkspace({ programId, children }: { programI
     { href: `${summaryPath}/agenda`, label: "Mi agenda", icon: CalendarDays },
     { href: `${summaryPath}/activities`, label: "Actividades", icon: CheckSquare2 },
     { href: `${summaryPath}/files`, label: "Archivos", icon: FolderOpen },
+    ...(disc?.programId===programId&&disc.available?[{href:`${summaryPath}/disc`,label:"DISC",icon:BrainCircuit}]:[]),
   ];
 
   useEffect(() => {

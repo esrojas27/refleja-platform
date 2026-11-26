@@ -20,14 +20,14 @@ class DiscProfileRevisionJpaEntity {
     private UUID programId;
     @Column(name = "enrollment_id", nullable = false, updatable = false)
     private UUID enrollmentId;
-    @Column(name = "dominant_text", nullable = false, updatable = false, length = 5000)
-    private String dominant;
-    @Column(name = "influential_text", nullable = false, updatable = false, length = 5000)
-    private String influential;
-    @Column(name = "serene_text", nullable = false, updatable = false, length = 5000)
-    private String serene;
-    @Column(name = "conscientious_text", nullable = false, updatable = false, length = 5000)
-    private String conscientious;
+    @Column(name = "dominant_percent")
+    private Integer dominant;
+    @Column(name = "influential_percent")
+    private Integer influential;
+    @Column(name = "serene_percent")
+    private Integer serene;
+    @Column(name = "conscientious_percent")
+    private Integer conscientious;
     @Column(name = "action", nullable = false, updatable = false)
     private String action;
     @Column(name = "actor_id", nullable = false, updatable = false)

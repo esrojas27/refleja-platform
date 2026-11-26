@@ -1,79 +1,55 @@
-# Ficha DISC por participante del programa
+# Ficha DISC porcentual y versiones del PDF
 
-## Alcance
+## Alcance y permisos
 
-Un consultor de Refleja Tu Interior o un líder autorizado del programa puede
-registrar una ficha DISC para cada integrante con rol `COLLABORATOR`. La ficha
-contiene cuatro textos independientes y obligatorios:
+La ficha de cada colaborador contiene cuatro porcentajes enteros independientes de 0 a 100: D (Dominante), I (Influyente), S (Sereno) y C (Concienzudo). No se normalizan, no deben sumar 100 y no se calculan a partir de respuestas.
 
-- D — Dominante;
-- I — Influyente;
-- S — Sereno;
-- C — Concienzudo.
+Solo el consultor puede editar porcentajes o cargar PDF. Líder y RRHH pueden consultar fichas si tienen membresía activa e inscripción activa o completada en ese programa. Suspensión/retiro bloquean su acceso. El colaborador puede consultar exclusivamente su propia ficha, en modo lectura, cuando el consultor haya definido los cuatro porcentajes. En ese momento aparece DISC en su espacio del programa, con el mismo radar y sus versiones de PDF. Los documentos continúan disponibles también mediante Archivos.
 
-DISC no es un test automático ni calcula puntajes. Este incremento conserva la
-lectura cualitativa ingresada por la persona autorizada y no la muestra al
-colaborador, RRHH ni otros roles.
+El consultor puede preparar porcentajes y PDF para colaboradores con inscripción INVITED, además de ACTIVE/COMPLETED. No se exige haber enviado ni aceptado la invitación: una invitación en borrador también permite preparar la ficha. En INVITED se utiliza el rol COLLABORATOR de la invitación, aunque una cuenta existente todavía no tenga asignado ese rol. No se incluyen invitaciones revocadas, otros roles ni inscripciones suspendidas, retiradas o pendientes de aprobación. Líder y RRHH mantienen su consulta de colaboradores activos/completados.
 
-## Autorización y alcance
+Guardar DISC no envía invitaciones ni activa cuentas o inscripciones. La ficha y los archivos pertenecen a la inscripción original y se conservan al aceptar la invitación. Solo entonces, con el perfil completo y el programa activado, el colaborador puede consultarlos. Una cuenta ya activa en otro programa tampoco puede leer el DISC de una invitación todavía no aceptada. La vista del consultor identifica estas personas con «Invitación pendiente de aceptación».
 
-La API vuelve a resolver identidad, membresía y roles desde el Access Token en
-cada operación. Se permite acceso a:
+El programa finalizado/cancelado conserva consulta y bloquea edición y cargas. La API resuelve permisos en cada operación, usa RLS y exige la última versión optimista para modificar una ficha.
 
-- una membresía activa con rol `CONSULTANT` en la organización seleccionada;
-- una membresía activa con rol `LEADER` que además tenga una inscripción
-  `ACTIVE` o `COMPLETED` en el programa solicitado.
+## Radar
 
-`COMPANY_ADMIN`, `COLLABORATOR` y líderes no inscritos en el programa reciben
-`403`. El destino debe ser una inscripción activa o completada cuya membresía
-actual incluya el rol `COLLABORATOR`. La API no acepta identificadores de usuario
-ni roles elegidos por el navegador.
+La ficha usa un radar de cuatro ejes: D arriba, I a la derecha, S abajo y C a la izquierda. El centro es 0 y el anillo exterior 100. Cinco anillos representan 20, 40, 60, 80 y 100. Un polígono conecta los cuatro valores cuando todos están completos.
 
-## Persistencia, aislamiento y auditoría
+La vista previa cambia mientras se editan los campos. Los datos faltantes no se representan como cero ni forman un polígono completo. La gráfica incluye nombres y valores en texto, descripción accesible y una leyenda legible en móvil. Es una visualización de valores registrados, sin interpretación automática ni diagnóstico.
 
-`program_participant_disc_profiles` mantiene una ficha por organización,
-programa e inscripción. Los cuatro textos admiten entre 1 y 5.000 caracteres.
-La fila registra quién la creó, quién la actualizó, fechas y versión optimista.
+## Datos existentes y auditoría
 
-Cada creación o actualización agrega una instantánea a
-`program_participant_disc_profile_revisions`. El rol de ejecución sólo tiene
-`SELECT` e `INSERT` sobre este historial, por lo que no puede modificar ni borrar
-revisiones. Ambas tablas usan RLS con `app.current_organization_id`; una
-organización no puede consultar o alterar fichas de otra aunque conozca sus UUID.
-La aplicación emite además un evento estructurado después de confirmar la
-transacción, sin incluir el contenido sensible de la ficha.
+La migración V20261125030000 agrega columnas INTEGER de porcentajes a las fichas y sus revisiones. Conserva los textos y revisiones anteriores. Una ficha cualitativa sin porcentajes se marca needsUpdate, aparece pendiente y requiere captura explícita; no se convierte texto a números.
 
-## Contrato HTTP
+Las modificaciones guardan una revisión numérica con el actor y la versión. Guardar los mismos valores con la versión vigente es una operación sin cambios, sin duplicar la revisión. Un cliente desactualizado recibe 409. El historial continúa sin permisos de UPDATE/DELETE para rti_app.
 
-- `GET /api/v1/organizations/{organizationId}/programs/{programId}/disc-profiles`
-  devuelve únicamente colaboradores elegibles y su ficha, si existe.
-- `PUT /api/v1/organizations/{organizationId}/programs/{programId}/disc-profiles/{enrollmentId}`
-  crea o actualiza los cuatro campos. Para actualizar exige la última `version`;
-  un valor obsoleto produce `409`.
-- Las respuestas usan `Cache-Control: no-store`.
+## Consulta personal del colaborador
 
-## Experiencia web
+GET /api/v1/me/programs/{program}/disc-profile resuelve la persona desde el Access Token, sin aceptar un enrollmentId elegido por el cliente. Solo permite una membresía activa de colaborador con inscripción ACTIVE/COMPLETED en un programa que haya sido activado. Suspensión o retiro impiden la consulta.
 
-La navegación del programa muestra **DISC** sólo después de confirmar un rol
-`CONSULTANT` o `LEADER`. La vista presenta métricas de fichas completas y
-pendientes, un recorrido individual semejante a la bandeja de revisión de
-actividades y un listado desde el que puede editarse cualquier ficha existente.
-Al guardar una ficha pendiente, el recorrido avanza al siguiente colaborador.
+Devuelve profile null cuando no hay ficha numérica completa, incluida una ficha cualitativa anterior; cuatro valores cero constituyen una ficha completa. Nunca devuelve fichas, identidades ni documentos de otros participantes. No habilita edición en las rutas personales ni acceso al listado administrativo.
+
+La navegación comprueba la disponibilidad al cargar, cambiar de ruta y volver a la pestaña. Un fallo en esta consulta no interrumpe el listado de actividades. La página personal /my-programs/{program}/disc consulta sus PDF por las rutas autenticadas existentes /me/programs/{program}/files, filtradas por documentType DISC.
+
+## PDF y archivos
+
+POST /api/v1/organizations/{org}/programs/{program}/disc-profiles/{enrollment}/pdf recibe únicamente file. Valida un PDF de hasta 10 MB. Puede cargarse antes o después de registrar los porcentajes; no altera sus valores ni su versión optimista.
+
+El PDF queda en participant_files con título DISC, documentType DISC y documentVersion asignada por el servidor. Cada carga crea otro archivo: no reemplaza anteriores. El contador por inscripción/programa sobrevive a eliminaciones y no reutiliza números. El nombre descargado incluye la versión, por ejemplo DISC-v2.pdf.
+
+Los documentos se muestran tanto en la sección DISC como en Archivos. Consultor puede eliminarlos con confirmación; las versiones conservadas siguen disponibles. Cada PDF cuenta dentro del límite conjunto de 10 archivos por persona/programa. Alcanzar el límite no sobrescribe ni elimina documentos automáticamente.
+
+Los archivos anteriores se conservan sin inferir su tipo o numeración a partir del nombre. Todo sigue incluido en el respaldo de PostgreSQL; no se añade infraestructura ni se envían correos.
 
 ## Validación manual
 
-1. Abrir un programa como consultor y confirmar la opción **DISC**.
-2. Verificar que el listado incluya colaboradores y excluya líderes y RRHH.
-3. Pulsar **Completar pendientes**, ingresar D, I, S y C y guardar.
-4. Confirmar que la ficha cambie a **Completa** y que el recorrido avance.
-5. Volver a editarla y confirmar que el cambio se guarde sin duplicar la ficha.
-6. Ingresar como líder inscrito en ese programa y repetir la consulta/edición.
-7. Confirmar que RRHH, un colaborador y un líder de otro programa no puedan ver
-   la información.
-
-## Límites
-
-No se implementan cuestionarios DISC, puntajes, archivos, exportación, borrado,
-aprobación ni visibilidad para el colaborador. Tampoco se define todavía una
-política de retención o anonimización; esa decisión de privacidad debe tratarse
-antes de operar con datos reales a escala.
+1. Reiniciar el backend y abrir DISC como consultor. Completar una ficha con D=80, I=65, S=30, C=45 y comprobar el radar durante la edición.
+2. Probar 0, 100, un decimal, un número negativo y uno mayor de 100. Solo admitir enteros dentro del rango, sin exigir suma 100.
+3. Guardar y volver a abrir: conservar valores. Guardar sin cambios debe funcionar.
+4. Cargar dos PDF distintos: ver versiones 1 y 2, ambas en Archivos con el nombre DISC. Descargar y comprobar cada contenido y nombre.
+5. Eliminar la versión 2 con confirmación y cargar otra: debe ser versión 3, con la 1 intacta.
+6. Como líder y RRHH inscritos, consultar radar y PDF sin formularios de edición/carga ni eliminación.
+7. Como colaborador, comprobar que DISC aparezca solo tras registrar los cuatro porcentajes (también si son cero). Consultar su radar y sus versiones de PDF sin controles de edición, carga o eliminación. Verificar que no accede a fichas o PDF ajenos.
+8. Comprobar el límite conjunto de diez archivos, el programa cerrado y el acceso tras suspensión/retiro.
+9. Registrar otro colaborador sin enviar su invitación. Abrir DISC como consultor: debe aparecer, permitir guardar los cuatro porcentajes y cargar un PDF, y seguir con invitación pendiente. Tras enviar y aceptar la invitación y completar el perfil, comprobar como colaborador el mismo radar y el mismo PDF, sin volver a cargarlos.

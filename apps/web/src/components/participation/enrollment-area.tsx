@@ -166,7 +166,8 @@ export function EnrollmentForm({ organizationId, programId, onSaved }: {
       setFields(failure.fields);
       const uncertain = failure.status === 0 || failure.status >= 500;
       setBlocked(uncertain || [401, 403, 404, 409].includes(failure.status));
-      setMessage(uncertain ? "No se pudo confirmar el resultado. Actualiza el listado antes de repetir el registro." : participationErrorMessage(failure));
+      setMessage(failure.status === 503 ? participationErrorMessage(failure)
+        : uncertain ? "No se pudo confirmar el resultado. Actualiza el listado antes de repetir el registro." : participationErrorMessage(failure));
     } finally { submitting.current = false; if (!controller.signal.aborted) setPending(false); }
   }
   return <form onSubmit={submit} noValidate aria-label="Registrar persona" className="space-y-5">

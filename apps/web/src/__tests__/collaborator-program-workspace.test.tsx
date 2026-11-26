@@ -1,9 +1,11 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { CollaboratorProgramWorkspace } from "@/components/participation/collaborator-program-workspace";
 import { listMyProgramActivities, type AssignedActivity } from "@/lib/participation/activity-api";
 import { getMyProgram } from "@/lib/participation/participation-api";
+import {getMyDiscProfile} from "@/lib/participation/disc-api";
+vi.mock("@/lib/participation/disc-api",()=>({getMyDiscProfile:vi.fn()}));
 import { listMySessionClosures } from "@/lib/participation/session-closure-api";
 vi.mock("@/lib/participation/participation-api", async original => ({
   ...await original<typeof import("@/lib/participation/participation-api")>(), getMyProgram: vi.fn(),
@@ -19,11 +21,52 @@ vi.mock("@/lib/participation/activity-api", async original => ({
 }));
 
 beforeEach(() => {
+  vi.mocked(getMyDiscProfile).mockResolvedValue({profile:null});
   vi.mocked(listMySessionClosures).mockResolvedValue({ items: [] });
   vi.mocked(listMyProgramActivities).mockResolvedValue({ items: [] });
   vi.mocked(getMyProgram).mockResolvedValue({ id: "program-a", status: "ACTIVE" } as Awaited<ReturnType<typeof getMyProgram>>);
 });
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
+
+const ownProfile={id:"disc",dominant:80,influential:65,serene:30,conscientious:45,version:0,updatedAt:"2026-11-26T12:00:00Z",needsUpdate:false};
+it("shows DISC only once the four personal percentages exist and marks its route active",async()=>{
+  usePathname.mockReturnValue("/my-programs/program-a/disc");
+  vi.mocked(getMyDiscProfile).mockResolvedValue({profile:ownProfile});
+  render(<CollaboratorProgramWorkspace programId="program-a"><p>Mi perfil</p></CollaboratorProgramWorkspace>);
+  const link=await screen.findByRole("link",{name:"DISC"});
+  expect(link.getAttribute("href")).toBe("/my-programs/program-a/disc");
+  expect(link.getAttribute("aria-current")).toBe("page");
+});
+it("reveals the DISC item on focus after the consultant completes it, including zero values",async()=>{
+  usePathname.mockReturnValue("/my-programs/program-a");
+  render(<CollaboratorProgramWorkspace programId="program-a"><p>Resumen</p></CollaboratorProgramWorkspace>);
+  await waitFor(()=>expect(getMyDiscProfile).toHaveBeenCalled());
+  expect(screen.queryByRole("link",{name:"DISC"})).toBeNull();
+  vi.mocked(getMyDiscProfile).mockResolvedValue({profile:{...ownProfile,dominant:0,influential:0,serene:0,conscientious:0}});
+  fireEvent.focus(window);
+  expect(await screen.findByRole("link",{name:"DISC"})).toBeTruthy();
+});
+it.each([null,{...ownProfile,dominant:null},{...ownProfile,needsUpdate:true}])("hides incomplete DISC without affecting activities",async profile=>{
+  usePathname.mockReturnValue("/my-programs/program-a");
+  vi.mocked(getMyDiscProfile).mockResolvedValue({profile});
+  await act(async()=>{render(<CollaboratorProgramWorkspace programId="program-a"><p>Resumen</p></CollaboratorProgramWorkspace>);});
+  expect(screen.queryByRole("link",{name:"DISC"})).toBeNull();
+  expect(screen.getByRole("link",{name:"Actividades"})).toBeTruthy();
+});
+it("clears the personal DISC link on access failure or a program change",async()=>{
+  usePathname.mockReturnValue("/my-programs/program-a");
+  vi.mocked(getMyDiscProfile).mockResolvedValue({profile:ownProfile});
+  const view=render(<CollaboratorProgramWorkspace programId="program-a"><p>Resumen</p></CollaboratorProgramWorkspace>);
+  await screen.findByRole("link",{name:"DISC"});
+  vi.mocked(getMyDiscProfile).mockRejectedValue(new Error("Access unavailable"));
+  fireEvent.focus(window);
+  await waitFor(()=>expect(screen.queryByRole("link",{name:"DISC"})).toBeNull());
+  vi.mocked(getMyDiscProfile).mockResolvedValue({profile:ownProfile});
+  fireEvent.focus(window);await screen.findByRole("link",{name:"DISC"});
+  vi.mocked(getMyDiscProfile).mockReturnValue(new Promise(()=>{}));
+  view.rerender(<CollaboratorProgramWorkspace programId="program-b"><p>Otro programa</p></CollaboratorProgramWorkspace>);
+  expect(screen.queryByRole("link",{name:"DISC"})).toBeNull();
+});
 
 it("keeps a pending session closure in the navigation after all activities were submitted",async()=>{
   vi.mocked(listMySessionClosures).mockResolvedValue({items:[{sessionId:"session",sessionName:"Interior",dimensionName:"Interior",status:"PENDING",

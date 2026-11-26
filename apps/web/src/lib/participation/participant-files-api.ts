@@ -3,7 +3,7 @@ export const MAX_PARTICIPANT_FILE_BYTES = 10 * 1024 * 1024;
 export const MAX_PARTICIPANT_FILES = 10;
 export const PARTICIPANT_FILE_TYPES = ["application/pdf","image/jpeg","image/png","image/webp"];
 export type FileScope = { programId: string; organizationId?: string; enrollmentId?: string };
-export type ParticipantFile = { id: string; title: string; contentType: string; sizeBytes: number; createdAt: string };
+export type ParticipantFile = { id: string; title: string; contentType: string; sizeBytes: number; createdAt: string; documentType?: "DISC" | null; documentVersion?: number | null };
 export type ParticipantFileList = { items: ParticipantFile[]; canManage: boolean; maxFileBytes: number; maxFiles: number };
 export type FileParticipant = { enrollmentId: string; email: string; firstName: string | null; lastName: string | null; enrollmentStatus: string };
 export type FileParticipants = { items: FileParticipant[]; page: number; size: number; totalElements: number; totalPages: number; canManage: boolean };
@@ -67,5 +67,5 @@ export function participantFileError(error:unknown){
 }
 export function participantFileName(file:ParticipantFile){
   const extension:Record<string,string>={"application/pdf":"pdf","image/jpeg":"jpg","image/png":"png","image/webp":"webp"};
-  return file.title.replace(/[\\/:*?"<>|]/g,"_")+"."+(extension[file.contentType]??"bin");
+  return (file.title+(file.documentVersion ? "-v"+file.documentVersion : "")).replace(/[\\/:*?"<>|]/g,"_")+"."+(extension[file.contentType]??"bin");
 }
