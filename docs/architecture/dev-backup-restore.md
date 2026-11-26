@@ -20,7 +20,9 @@ exitosos, comprobados el 2026-10-21.
 - La instancia puede escribir/leer copias, pero ya no tiene `s3:DeleteObject`.
   Esto no es Object Lock ni un respaldo inmutable frente al administrador de AWS.
 
-No incluye Cognito, contraseñas de Parameter Store, DNS, archivos futuros ni una
+Las imágenes de respuestas y los archivos por participante/programa se guardan en PostgreSQL y quedan incluidos en estas copias.
+
+No incluye Cognito, contraseñas de Parameter Store, DNS, archivos externos ni una
 imagen completa del servidor. Terraform y Git permiten reconstruir el servidor;
 las identidades Cognito existentes y los secretos deben conservarse separadamente.
 El backup contiene datos personales: no descargarlo al repositorio ni enviarlo por correo.

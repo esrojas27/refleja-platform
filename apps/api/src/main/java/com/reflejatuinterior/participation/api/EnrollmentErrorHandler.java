@@ -29,8 +29,22 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice(assignableTypes = {EnrollmentController.class, InvitationController.class, MyProgramController.class,
-        ActivityController.class, ActivityEvaluationController.class, SessionClosureController.class, QuestionnaireTemplateController.class, DiscProfileController.class, ContentAdministrationController.class, SurveyResultsController.class, ProgramReportController.class, EnrollmentAdministrationController.class, NotificationController.class, SessionScheduleController.class})
+        ActivityController.class, ParticipantFileController.class, ActivityEvaluationController.class, SessionClosureController.class, QuestionnaireTemplateController.class, DiscProfileController.class, ContentAdministrationController.class, SurveyResultsController.class, ProgramReportController.class, EnrollmentAdministrationController.class, NotificationController.class, SessionScheduleController.class})
 class EnrollmentErrorHandler {
+    @ExceptionHandler(com.reflejatuinterior.participation.application.ParticipantFileService.Missing.class)
+    ResponseEntity<ErrorResponse> fileMissing(HttpServletRequest request) { return error(request,404,"FILE_NOT_FOUND",List.of()); }
+
+    @ExceptionHandler(com.reflejatuinterior.participation.application.ParticipantFileService.LimitReached.class)
+    ResponseEntity<ErrorResponse> fileLimit(HttpServletRequest request) { return error(request,409,"FILE_LIMIT_REACHED",List.of()); }
+
+    @ExceptionHandler(com.reflejatuinterior.participation.application.ParticipantFileFormat.Invalid.class)
+    ResponseEntity<ErrorResponse> invalidFile(com.reflejatuinterior.participation.application.ParticipantFileFormat.Invalid exception,HttpServletRequest request) {
+        return error(request,400,"VALIDATION_ERROR",List.of(field(exception.field())));
+    }
+
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    ResponseEntity<ErrorResponse> oversizedFile(HttpServletRequest request) { return error(request,413,"FILE_TOO_LARGE",List.of()); }
+
     @ExceptionHandler(com.reflejatuinterior.participation.application.NotificationService.Missing.class)
     ResponseEntity<ErrorResponse> notificationMissing(HttpServletRequest request) { return error(request,404,"NOTIFICATION_NOT_FOUND",List.of()); }
 
@@ -123,7 +137,9 @@ class EnrollmentErrorHandler {
                 .map(e -> field(e.getField())).distinct().toList());
     }
 
-    @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class})
+    @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class,
+            org.springframework.web.bind.MissingServletRequestParameterException.class,
+            org.springframework.web.multipart.support.MissingServletRequestPartException.class})
     ResponseEntity<ErrorResponse> malformed(HttpServletRequest request) { return error(request, 400, "VALIDATION_ERROR", List.of()); }
 
     @ExceptionHandler(Exception.class)

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ParticipantFilesAction } from "./participant-files";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { AlertTriangle } from "lucide-react";
 import { fetchCurrentIdentity, IdentityRequestError, type CurrentIdentity } from "@/lib/auth/authenticated-api";
@@ -111,6 +112,8 @@ function EnrollmentContent({ organizationId, programId }: { organizationId: stri
           {enrollment.invitation?.expiresAt && <p className="text-sm text-muted-foreground">Vence: {enrollment.invitation.expiresAt}</p>}
           <DeliveryAction enrollment={enrollment} onSaved={deliveryDone} />
           <EnrollmentAdministration enrollment={enrollment} onSaved={saved=>refresh(page,saved)} />
+          <ParticipantFilesAction organizationId={organizationId} programId={programId} enrollmentId={enrollment.id}
+            name={[enrollment.participant.firstName,enrollment.participant.lastName].filter(Boolean).join(" ")||enrollment.participant.email}/>
         </li>)}</ul>
         <p className="mt-4 text-sm text-muted-foreground">{result.totalElements} personas · Página {result.page + 1} de {Math.max(1, result.totalPages)}</p>
         <div className="mt-3 flex flex-wrap gap-3">

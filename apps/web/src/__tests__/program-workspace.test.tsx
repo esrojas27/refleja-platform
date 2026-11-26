@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { ProgramWorkspace } from "@/components/programs/program-workspace";
 import { fetchCurrentIdentity } from "@/lib/auth/authenticated-api";
 import { getProgram } from "@/lib/programs/program-api";
@@ -23,6 +23,21 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.resetAllMocks();
+});
+
+it.each(["CONSULTANT","LEADER","COMPANY_ADMIN"])("offers file consultation to %s and marks the section active",async role=>{
+  vi.mocked(fetchCurrentIdentity).mockResolvedValue({cognitoSubject:"subject",user:{id:"u",email:"u@example.test",firstName:null,lastName:null},
+    organizations:[],activeOrganizationId:"org-a",roles:[role]});
+  usePathname.mockReturnValue("/organizations/org-a/programs/program-a/files");
+  render(<ProgramWorkspace organizationId="org-a" programId="program-a"><p>Archivos del programa</p></ProgramWorkspace>);
+  expect((await screen.findByRole("link",{name:"Archivos"})).getAttribute("aria-current")).toBe("page");
+});
+it.each([["COLLABORATOR","org-a"],["CONSULTANT","other-org"]])("hides management files for %s in %s",async(role,activeOrganizationId)=>{
+  vi.mocked(fetchCurrentIdentity).mockResolvedValue({cognitoSubject:"subject",user:{id:"u",email:"u@example.test",firstName:null,lastName:null},
+    organizations:[],activeOrganizationId,roles:[role]});
+  usePathname.mockReturnValue("/organizations/org-a/programs/program-a");
+  await act(async()=>{render(<ProgramWorkspace organizationId="org-a" programId="program-a"><p>Programa</p></ProgramWorkspace>);});
+  expect(screen.queryByRole("link",{name:"Archivos"})).toBeNull();
 });
 
 it("offers only implemented program destinations and marks the overview as active", () => {

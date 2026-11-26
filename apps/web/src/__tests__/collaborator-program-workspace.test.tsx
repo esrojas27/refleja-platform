@@ -32,6 +32,14 @@ it("keeps a pending session closure in the navigation after all activities were 
   expect(await screen.findByLabelText("1 pendiente entre actividades y cierres")).toBeTruthy();
 });
 
+it("offers personal files in the program workspace and preserves encoded program IDs",()=>{
+  usePathname.mockReturnValue("/my-programs/program%2Fa/files");
+  render(<CollaboratorProgramWorkspace programId="program/a"><p>Mis documentos</p></CollaboratorProgramWorkspace>);
+  const link=screen.getByRole("link",{name:"Archivos"});
+  expect(link.getAttribute("href")).toBe("/my-programs/program%2Fa/files");
+  expect(link.getAttribute("aria-current")).toBe("page");
+});
+
 it("offers a compact collaborator workspace and marks the summary as active", () => {
   usePathname.mockReturnValue("/my-programs/program-a");
   render(<CollaboratorProgramWorkspace programId="program-a"><p>Resumen real</p></CollaboratorProgramWorkspace>);

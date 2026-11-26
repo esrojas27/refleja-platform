@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpenText, CheckSquare2, ChevronLeft, CalendarDays } from "lucide-react";
+import { BookOpenText, CheckSquare2, ChevronLeft, CalendarDays, FolderOpen } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -25,6 +25,7 @@ export function CollaboratorProgramWorkspace({ programId, children }: { programI
     { href: summaryPath, label: "Resumen", icon: BookOpenText },
     { href: `${summaryPath}/agenda`, label: "Mi agenda", icon: CalendarDays },
     { href: `${summaryPath}/activities`, label: "Actividades", icon: CheckSquare2 },
+    { href: `${summaryPath}/files`, label: "Archivos", icon: FolderOpen },
   ];
 
   useEffect(() => {

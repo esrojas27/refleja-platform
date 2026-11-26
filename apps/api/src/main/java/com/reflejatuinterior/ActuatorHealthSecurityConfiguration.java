@@ -40,6 +40,16 @@ class ActuatorHealthSecurityConfiguration {
                         writeSecurityError(response, objectMapper, 403, "FORBIDDEN", "Access is denied.")))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(EndpointRequest.to("health")).permitAll()
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/v1/organizations/{org}/programs/{program}/files/participants",
+                                "/api/v1/organizations/{org}/programs/{program}/enrollments/{enrollment}/files",
+                                "/api/v1/organizations/{org}/programs/{program}/enrollments/{enrollment}/files/{file}/content",
+                                "/api/v1/me/programs/{program}/files",
+                                "/api/v1/me/programs/{program}/files/{file}/content").authenticated()
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/v1/organizations/{org}/programs/{program}/enrollments/{enrollment}/files").authenticated()
+                        .requestMatchers(HttpMethod.DELETE,
+                                "/api/v1/organizations/{org}/programs/{program}/enrollments/{enrollment}/files/{file}").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/me", "/api/v1/me/profile").authenticated()
                         .requestMatchers(HttpMethod.GET,"/api/v1/organizations/{org}/questionnaire-templates",
                                 "/api/v1/organizations/{org}/questionnaire-templates/{id}").authenticated()
@@ -146,7 +156,7 @@ class ActuatorHealthSecurityConfiguration {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(origins);
         configuration.setAllowedMethods(List.of(HttpMethod.GET.name(), HttpMethod.POST.name(), HttpMethod.PUT.name(),
-                HttpMethod.OPTIONS.name()));
+                HttpMethod.DELETE.name(), HttpMethod.OPTIONS.name()));
         configuration.setAllowedHeaders(List.of(HttpHeaders.AUTHORIZATION, HttpHeaders.CONTENT_TYPE));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

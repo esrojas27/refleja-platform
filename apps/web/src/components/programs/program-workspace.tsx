@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BarChart3, BookOpenText, BrainCircuit, CheckSquare2, ChevronLeft, ListTree, UsersRound, ChartNoAxesCombined, FileChartColumn, CalendarDays } from "lucide-react";
+import { BarChart3, BookOpenText, BrainCircuit, CheckSquare2, ChevronLeft, ListTree, UsersRound, ChartNoAxesCombined, FileChartColumn, CalendarDays, FolderOpen } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { fetchCurrentIdentity } from "@/lib/auth/authenticated-api";
@@ -25,16 +25,17 @@ export function ProgramWorkspace({
   children: ReactNode;
 }) {
   const pathname = usePathname();
-  const [permissions, setPermissions] = useState({ organizationId: "", disc: false, results: false });
+  const [permissions, setPermissions] = useState({ organizationId: "", disc: false, results: false, files: false });
   const programPath = `${programsPath(organizationId)}/${encodeURIComponent(programId)}`;
 
   useEffect(() => {
     const controller = new AbortController();
     fetchCurrentIdentity(organizationId, controller.signal)
       .then(identity => { if (!controller.signal.aborted) setPermissions({ organizationId,
+        files: identity.activeOrganizationId === organizationId && identity.roles.some(role => ["CONSULTANT","LEADER","COMPANY_ADMIN"].includes(role)),
         disc: identity.roles.some(role => role === "CONSULTANT" || role === "LEADER"),
         results: identity.activeOrganizationId === organizationId && identity.roles.includes("CONSULTANT") }); })
-      .catch(() => { if (!controller.signal.aborted) setPermissions({ organizationId, disc: false, results: false }); });
+      .catch(() => { if (!controller.signal.aborted) setPermissions({ organizationId, disc: false, results: false, files: false }); });
     return () => controller.abort();
   }, [organizationId]);
 
@@ -80,6 +81,9 @@ export function ProgramWorkspace({
       label: "Resultados de encuestas",
       icon: ChartNoAxesCombined,
       active: (current: string) => current === `${programPath}/survey-results`,
+    }] : []),
+    ...(permissions.organizationId === organizationId && permissions.files ? [{
+      href: `${programPath}/files`, label: "Archivos", icon: FolderOpen, active: (current: string) => current === `${programPath}/files`,
     }] : []),
     ...(permissions.organizationId === organizationId && permissions.disc ? [{
       href: `${programPath}/disc`,
