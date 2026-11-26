@@ -73,6 +73,20 @@ class QuestionnaireTemplateIntegrationTests extends PostgreSqlIntegrationTestSup
             .andExpect(status().isCreated()).andExpect(header().string("Cache-Control","no-store")).andExpect(header().exists("X-Request-ID")));
     }
 
+    @Test void tableTemplateCanBeReusedAcrossActivityAndSessionWithoutLosingHeaders() throws Exception {
+        var a = activity(org,program,session,1);
+        var options = List.of("TABLE_V1:1:2","Ámbito","Acción","Avance","Personal");
+        var form = tree(postAs(programBase(org,program)+"/activities/"+a.path("id").asText()+"/evaluation",consultant,
+            Map.of("title","Mi tabla","questions",List.of(Map.of("prompt","Mi plan","type","TABLE","position",1,"options",options))))
+            .andExpect(status().isCreated()));
+        var saved = saveTemplate(form,"Tabla reutilizable");
+        var definition = saved.path("definition");
+        var copied = tree(postAs(programBase(destination,otherProgram)+"/sessions/"+otherSession+"/survey",consultant,definition)
+            .andExpect(status().isOk()));
+        assertThat(copied.path("questions").get(0).path("type").asText()).isEqualTo("TABLE");
+        assertThat(copied.path("questions").get(0).path("options").toString()).isEqualTo(json.writeValueAsString(options));
+    }
+
     @Test void activityTemplateCanCreateSessionSurveyInAnotherOrganizationWithoutCopyingResponsesOrIdentifiers()throws Exception{
         tenant.activate(org);jdbcTemplate.update("update rti.programs set status='ACTIVE' where id=?",program);
         jdbcTemplate.update("insert into rti.enrollments(id,organization_id,program_id,participant_membership_id,status,created_at,updated_at,version) values(?,?,?,?,'ACTIVE',now(),now(),0)",enrollment,org,program,pm);

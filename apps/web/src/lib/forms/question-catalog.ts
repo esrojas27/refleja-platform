@@ -7,6 +7,7 @@ export const QUESTION_TYPE_LABELS = {
   EMOTION_MULTI_SELECT: "Emociones · Máximo 2",
   SINGLE_CHOICE_LETTERS: "Selección única · Lista con letras",
   IMAGE: "Imagen",
+  TABLE: "Tabla · Texto por celda",
   MULTIPLE_CHOICE_WORDS: "Selección múltiple · Palabras",
   SINGLE_CHOICE_WORDS: "Selección única · Palabras",
 } as const;

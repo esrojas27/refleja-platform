@@ -2,6 +2,7 @@
 
 import { useEffect,useRef,useState } from "react";
 import { LayoutTemplate,X } from "lucide-react";
+import { TablePreview } from "./table-question";
 import { QUESTION_TYPE_LABELS } from "@/lib/forms/question-catalog";
 import { getQuestionnaireTemplate,listQuestionnaireTemplates,questionnaireTemplateError,
   type QuestionnaireTemplate,type QuestionnaireTemplatePage } from "@/lib/forms/questionnaire-template-api";
@@ -53,7 +54,7 @@ function TemplateCatalog({organizationId,onSelect,onClose}:{organizationId:strin
       <p className="text-sm">Título: {selected.definition.title}</p>{selected.definition.instructions&&<p className="whitespace-pre-wrap text-sm text-muted-foreground">{selected.definition.instructions}</p>}
       <ol className="max-h-72 space-y-3 overflow-y-auto pr-1">{selected.definition.questions.map(q=><li key={q.position} className="text-sm">
         <p className="font-medium">{q.position}. {q.prompt}</p><p className="mt-1 text-xs text-muted-foreground">{QUESTION_TYPE_LABELS[q.type]}</p>
-        {!!q.options?.length&&<p className="mt-1 break-words text-xs text-muted-foreground">{q.options.join(" · ")}</p>}
+        {q.type === "TABLE" ? <TablePreview options={q.options} compact /> : !!q.options?.length&&<p className="mt-1 break-words text-xs text-muted-foreground">{q.options.join(" · ")}</p>}
       </li>)}</ol>
       <p className="rounded-xl bg-accent p-3 text-sm">Se reemplazarán el título, las indicaciones y las preguntas de este borrador. Podrás adaptarlos; no se guardarán hasta confirmar el formulario.</p>
       <button type="button" className="rti-button-primary" onClick={()=>onSelect(selected.definition)}>Usar esta plantilla</button>

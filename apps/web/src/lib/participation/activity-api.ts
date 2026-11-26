@@ -14,7 +14,7 @@ export type ActivityAssignee = {
   status: ActivityAssignmentStatus; responseText: string | null; submittedAt: string | null;
   reviewComment: string | null; reviewedAt: string | null; surveyStatus: ActivitySurveyStatus | "NOT_REQUIRED";
   completionPercentage: number; version: number; dueDate?: string | null;
-  answers?: Array<{ questionId: string; prompt: string; type: string; values: string[] }>;
+  answers?: Array<{ questionId: string; prompt: string; type: string; values: string[]; options?: string[] }>;
   sessionCompleted?: boolean; sessionProgressPercentage?: number;
 };
 export type ActivityAssignmentStatus = "ASSIGNED" | "SUBMITTED" | "CHANGES_REQUESTED" | "COMPLETED";

@@ -1,4 +1,5 @@
 "use client";
+import { TablePreview } from "@/components/forms/table-question";
 
 import { ActivityAnswerImage } from "@/components/forms/activity-answer-image";
 
@@ -393,7 +394,7 @@ function ReviewCard({ organizationId, programId, item, leaving, onReviewed }: {
 function ReviewedFormAnswers({ answers, organizationId, programId }: { answers: ActivityAssignee["answers"]; organizationId: string; programId: string }) {
   if (!answers?.length) return <p className="mt-3 text-muted-foreground">Sin formulario enviado.</p>;
   return <ol className="mt-3 space-y-3">{answers.map(answer => <li key={answer.questionId} className="rounded-xl bg-muted/40 p-3">
-    <p className="font-medium">{answer.prompt}</p>{answer.type === "IMAGE" && answer.values[0]
+    <p className="font-medium">{answer.prompt}</p>{answer.type === "TABLE" ? <TablePreview options={answer.options} values={answer.values} /> : answer.type === "IMAGE" && answer.values[0]
       ? <ActivityAnswerImage key={answer.values[0]} organizationId={organizationId} programId={programId} imageId={answer.values[0]} />
       : <p className="mt-1 whitespace-pre-wrap break-words">{answer.values.join(" · ")}</p>}
   </li>)}</ol>;

@@ -126,6 +126,6 @@ class ActivityEvaluationController {
     record SubmitSurveyRequest(@NotNull @Size(min = 1, max = 20) List<@NotNull @Valid SurveyAnswerRequest> answers,
                                @NotNull @PositiveOrZero Long version) {}
     record SurveyAnswerRequest(@NotNull UUID questionId,
-                               @NotNull @Size(max = 100) List<@NotBlank @Size(max = 5000) String> values) {}
+                               @NotNull @Size(max = 200) List<@NotBlank @Size(max = 5000) String> values) {}
     record EvaluationListResponse(List<ActivityEvaluations.Evaluation> items) {}
 }

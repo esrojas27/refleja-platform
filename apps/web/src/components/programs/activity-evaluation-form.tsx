@@ -13,7 +13,10 @@ import {
   EvaluationRequestError, LIKELIHOOD_OPTIONS, NUMERIC_SCALE_OPTIONS, saveSessionEvaluation, type ActivityEvaluation, type EvaluationQuestionType,
 } from "@/lib/participation/evaluation-api";
 
-type DraftQuestion = { key: number; prompt: string; type: EvaluationQuestionType; optionsText: string };
+import { TableDefinitionEditor, TablePreview } from "@/components/forms/table-question";
+import { tableDefinitionError } from "@/lib/forms/table-question";
+
+type DraftQuestion = { key: number; prompt: string; type: EvaluationQuestionType; optionsText: string; tableOptions?: string[] };
 
 export function ActivityEvaluationForm({ organizationId, programId, activityId, activityTitle, onSaved, initial, sessionId }: {
   organizationId: string; programId: string; activityId?: string; sessionId?: string; activityTitle: string;
@@ -26,7 +29,7 @@ export function ActivityEvaluationForm({ organizationId, programId, activityId, 
   const actionLabel=`${initial?"Editar":"Crear"} ${formLabel}`;
   const [title, setTitle] = useState(initial?.title ?? `${sessionId?"Encuesta de cierre":"Formulario"} · ${activityTitle}`);
   const [instructions, setInstructions] = useState(initial?.instructions ?? "");
-  const [questions, setQuestions] = useState<DraftQuestion[]>(initial ? [...initial.questions].sort((a, b) => a.position - b.position).map((q, key) => ({ key, prompt: q.prompt, type: q.type, optionsText: (q.options ?? []).join("\n") })) : [
+  const [questions, setQuestions] = useState<DraftQuestion[]>(initial ? [...initial.questions].sort((a, b) => a.position - b.position).map((q, key) => ({ key, prompt: q.prompt, type: q.type, optionsText: (q.options ?? []).join("\n"), tableOptions: q.type === "TABLE" ? q.options : undefined })) : [
     { key: 0, prompt: "", type: "AGREEMENT_SCALE", optionsText: "" },
   ]);
   const [invalid, setInvalid] = useState<string[]>([]);
@@ -43,7 +46,7 @@ export function ActivityEvaluationForm({ organizationId, programId, activityId, 
       return;
     }
     setTitle(definition.title);setInstructions(definition.instructions??"");
-    setQuestions([...definition.questions].sort((a,b)=>a.position-b.position).map(q=>({key:nextKey.current++,prompt:q.prompt,type:q.type,optionsText:(q.options??[]).join("\n")})));
+    setQuestions([...definition.questions].sort((a,b)=>a.position-b.position).map(q=>({key:nextKey.current++,prompt:q.prompt,type:q.type,optionsText:(q.options??[]).join("\n"),tableOptions:q.type==="TABLE"?q.options:undefined})));
     setInvalid([]);setOrderNotice("");setMessage("Plantilla cargada. Revisa las preguntas y guarda el formulario para aplicar los cambios.");
   }
 
@@ -96,6 +99,7 @@ export function ActivityEvaluationForm({ organizationId, programId, activityId, 
       ...(questions.length === 0 ? ["questions"] : []),
       ...questions.filter(question => !question.prompt.trim() || question.prompt.trim().length > 500)
         .map(question => `question-${question.key}`),
+      ...questions.filter(q => q.type === "TABLE" && tableDefinitionError(q.tableOptions)).map(q => `options-${q.key}`),
       ...questions.filter(question => hasCustomOptions(question.type) && questionOptionsError(parseQuestionOptions(question.optionsText), question.type))
         .map(question => `options-${question.key}`),
     ];
@@ -114,7 +118,7 @@ export function ActivityEvaluationForm({ organizationId, programId, activityId, 
         title: cleanTitle, instructions: cleanInstructions || null,
         questions: questions.map((question, index) => ({
           prompt: question.prompt.trim(), type: question.type, position: index + 1,
-          ...(hasCustomOptions(question.type) ? { options: parseQuestionOptions(question.optionsText) } : {}),
+          ...(question.type === "TABLE" ? { options: question.tableOptions } : hasCustomOptions(question.type) ? { options: parseQuestionOptions(question.optionsText) } : {}),
         })),
       };
       if(!sessionId&&!activityId)throw new EvaluationRequestError(0);
@@ -205,7 +209,11 @@ export function ActivityEvaluationForm({ organizationId, programId, activityId, 
               ? "El colaborador podrá elegir entre 3 y 8 opciones." : "El colaborador elegirá solo una."}</p>
             {invalid.includes(`options-${question.key}`) && <p id={`evaluation-question-${question.key}-options-error`} className="mt-1 text-sm text-destructive">{questionOptionsError(parseQuestionOptions(question.optionsText), question.type)}</p>}
           </div>}
-          <QuestionPreview type={question.type} options={parseQuestionOptions(question.optionsText)} />
+          {question.type === "TABLE" ? <TableDefinitionEditor key={`table-${question.key}`}
+            id={`evaluation-question-${question.key}-options`} options={question.tableOptions} disabled={pending || blocked}
+            invalid={invalid.includes(`options-${question.key}`)} initiallyOpen={!question.tableOptions}
+            onChange={tableOptions => updateQuestion(question.key, { tableOptions })} />
+            : <QuestionPreview type={question.type} options={parseQuestionOptions(question.optionsText)} />}
         </li>;
       })}</ol>
       <button id="evaluation-add-question" type="button" className="rti-button-secondary w-full sm:w-auto"
@@ -218,6 +226,7 @@ export function ActivityEvaluationForm({ organizationId, programId, activityId, 
 }
 
 export function QuestionPreview({ type, options: customOptions = [] }: { type: EvaluationQuestionType; options?: string[] }) {
+  if (type === "TABLE") return <TablePreview options={customOptions} compact />;
   if (hasCustomOptions(type)) return <div className="mt-4 rounded-xl border border-dashed border-border bg-muted/35 p-3">
     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vista para el colaborador · {type === "MULTIPLE_CHOICE_WORDS" ? "Selección múltiple" : "Selección única"}</p>
     {customOptions.length ? <SingleChoicePreview options={customOptions.slice(0, MAX_QUESTION_OPTIONS)} words={type !== "SINGLE_CHOICE_LETTERS"} />

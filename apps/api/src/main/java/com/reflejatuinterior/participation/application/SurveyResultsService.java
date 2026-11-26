@@ -155,7 +155,7 @@ public class SurveyResultsService {
                 .collect(java.util.stream.Collectors.groupingBy(Function.identity(), java.util.stream.Collectors.counting()));
         List<String> options = switch (q.type()) {
             case AGREEMENT_SCALE, LIKELIHOOD_SCALE, NUMERIC_SCALE -> List.of("1", "2", "3", "4", "5");
-            case EMOTION_MULTI_SELECT -> EMOTIONS; case OPEN_TEXT, IMAGE -> List.of();
+            case EMOTION_MULTI_SELECT -> EMOTIONS; case OPEN_TEXT, IMAGE, TABLE -> List.of();
             case SINGLE_CHOICE_LETTERS, SINGLE_CHOICE_WORDS, MULTIPLE_CHOICE_WORDS -> q.options();
         };
         var distribution = options.stream().map(value -> new SurveyResults.OptionCount(value, label(q.type(), value),
@@ -166,7 +166,7 @@ public class SurveyResultsService {
         boolean scale = q.type() == EvaluationQuestionType.AGREEMENT_SCALE || q.type() == EvaluationQuestionType.LIKELIHOOD_SCALE
                 || q.type() == EvaluationQuestionType.NUMERIC_SCALE;
         return new SurveyResults.Question(q.id(), q.prompt(), q.type(), q.position(), values.size(),
-                scale ? average(values.stream().flatMap(a -> a.values().stream()).map(Integer::parseInt).toList()) : null, distribution);
+                scale ? average(values.stream().flatMap(a -> a.values().stream()).map(Integer::parseInt).toList()) : null, distribution, q.options());
     }
     private static Double average(List<Integer> values) {
         return values.isEmpty() ? null : rounded(values.stream().mapToInt(Integer::intValue).average().orElseThrow());

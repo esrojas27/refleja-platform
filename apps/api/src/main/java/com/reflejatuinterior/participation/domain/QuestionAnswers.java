@@ -12,6 +12,11 @@ public final class QuestionAnswers {
     private QuestionAnswers() {}
     public static List<String> clean(EvaluationQuestionType type, List<String> options, List<String> input) {
         var values=input==null?List.<String>of():input.stream().map(v->v==null?"":v.trim()).toList();
+        if (type == EvaluationQuestionType.TABLE) {
+            var table = TableQuestionDefinition.from(options);
+            if (values.size() != table.cellCount() || values.stream().anyMatch(v -> v.isEmpty() || v.length() > 150)) invalid();
+            return values;
+        }
         if (type==null || new LinkedHashSet<>(values).size()!=values.size() || values.stream().anyMatch(String::isEmpty)) invalid();
         if (type == EvaluationQuestionType.IMAGE) {
             invalid(); // Images are accepted through the activity submission workflow.

@@ -1,4 +1,5 @@
 "use client";
+import { TablePreview } from "@/components/forms/table-question";
 
 import Link from "next/link";
 import { BarChart3, Download, RefreshCw } from "lucide-react";
@@ -176,7 +177,7 @@ function SurveyCard({ survey, expanded }: { survey: SurveyResult; expanded: bool
           const values = person.answers.find(a => a.questionId === q.id)?.values ?? [];
           const options = q.type === "AGREEMENT_SCALE" ? AGREEMENT_OPTIONS : q.type === "LIKELIHOOD_SCALE" ? LIKELIHOOD_OPTIONS : undefined;
           return <div key={q.id}><p className="text-sm font-medium">{q.position}. {q.prompt}</p>
-            <p className="mt-1 whitespace-pre-wrap break-words text-sm text-muted-foreground">{q.type === "IMAGE" ? (values.length ? "Imagen adjunta en la entrega" : "") : values.map(v => options ? `${v} · ${options[Number(v) - 1]}` : v).join(" · ")}</p></div>;
+            {q.type === "TABLE" ? <TablePreview options={q.options} values={values} /> : <p className="mt-1 whitespace-pre-wrap break-words text-sm text-muted-foreground">{q.type === "IMAGE" ? (values.length ? "Imagen adjunta en la entrega" : "") : values.map(v => options ? `${v} · ${options[Number(v) - 1]}` : v).join(" · ")}</p>}</div>;
         })}</div>} />
       </details>
     </div>
@@ -196,6 +197,7 @@ function Question({ question, respondents }: { question: SurveyQuestionResult; r
     {emotion && question.responseCount > 0 && <p className="mt-3 text-sm font-medium">Más seleccionadas: {question.distribution.filter(option => option.count === question.distribution[0]?.count).map(option => option.label).join(", ")}</p>}
     {open ? <Respondents key={question.id} people={respondents.filter(p => p.answers.some(a => a.questionId === question.id))}
       render={person => <p className="whitespace-pre-wrap break-words text-sm">{person.answers.find(a => a.questionId === question.id)?.values[0]}</p>} />
+      : question.type === "TABLE" ? <p className="mt-2 text-sm text-muted-foreground">Consulta las tablas completas por participante en las respuestas y en la exportación.</p>
       : question.type === "IMAGE" ? <p className="mt-2 text-sm text-muted-foreground">Consulta las imágenes en la revisión de entregas.</p>
       : <ol className="mt-4 space-y-3">{question.distribution.map(option => <li key={option.value}>
         <div className="flex items-start justify-between gap-3 text-sm"><span className="min-w-0 break-words">{(question.type === "AGREEMENT_SCALE" || question.type === "LIKELIHOOD_SCALE") && `${option.value}. `}{option.label}</span>

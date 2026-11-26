@@ -75,6 +75,39 @@ class ActivityIntegrationTests extends PostgreSqlIntegrationTestSupport {
         }
     }
 
+    @Test void tablePersistsTwoHundredCellsAndExportsTheirCoordinates() throws Exception {
+        var activity = createAdminActivity(true, 1);
+        var options = new java.util.ArrayList<String>(java.util.List.of("TABLE_V1:20:10", "Ámbito"));
+        for (int c=1;c<=10;c++) options.add("Columna " + c);
+        for (int r=1;r<=20;r++) options.add("Fila " + r);
+        var definition = java.util.Map.of("title","Plan de acción","questions",java.util.List.of(
+                java.util.Map.of("prompt","Mi plan","type","TABLE","position",1,"options",options)));
+        var created = mvc.perform(post(evaluationPath(activity)).header("Authorization",token(consultant))
+                .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(definition)))
+                .andExpect(status().isCreated()).andReturn().getResponse();
+        var question = json.readTree(created.getContentAsString()).path("questions").get(0).path("id").asText();
+        var values = new java.util.ArrayList<>(java.util.Collections.nCopies(200, "Respuesta repetida"));
+        values.set(199, "Última celda");
+        var input = java.util.Map.of("version",0,"answers",java.util.List.of(java.util.Map.of("questionId",question,"values",values)));
+        mvc.perform(post(surveyResponsePath(activity)).header("Authorization",token(otherCollaborator)).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(java.util.Map.of("version",0,"answers",java.util.List.of(
+                    java.util.Map.of("questionId",question,"values",java.util.List.of("Incompleta")))))))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post(surveyResponsePath(activity)).header("Authorization",token(collaborator)).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(input))).andExpect(status().isOk());
+        mvc.perform(get(collaboratorPath()).header("Authorization",token(collaborator))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].survey.questions[0].options[0]").value("TABLE_V1:20:10"))
+                .andExpect(jsonPath("$.items[0].answers[0].values.length()").value(200));
+        var csv = mvc.perform(get(resultsPath()+"/export").header("Authorization",token(consultant)))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(csv).contains("Fila 20 / Columna 10","Última celda","Fila 1 / Columna 1","Respuesta repetida");
+        mvc.perform(get(resultsPath()).header("Authorization",token(consultant))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.surveys[0].questions[0].options[0]").value("TABLE_V1:20:10"))
+                .andExpect(jsonPath("$.surveys[0].questions[0].distribution.length()").value(0));
+        assertThat(jdbcTemplate.queryForObject("select rti.valid_question_options('TABLE',ARRAY['TABLE_V1:1:1','Ámbito','Columna','Fila'])",Boolean.class)).isTrue();
+        assertThat(jdbcTemplate.queryForObject("select rti.valid_question_options('TABLE',ARRAY['TABLE_V1:21:1','Ámbito','Columna','Fila'])",Boolean.class)).isFalse();
+    }
+
     @Test void sessionObjectiveRemainsEditableInClosedProgramsWithVersionAndAccessChecks() throws Exception {
         var activity = createAdminActivity(true, 1);
         createAdminSurvey(activity);

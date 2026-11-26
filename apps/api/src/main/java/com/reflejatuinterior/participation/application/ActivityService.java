@@ -264,7 +264,7 @@ public class ActivityService {
             String lastName, String status, String responseText, Instant submittedAt,
             String reviewComment, Instant reviewedAt, String surveyStatus,
             int completionPercentage, long version, LocalDate dueDate,List<ReviewedAnswer> answers,boolean sessionCompleted,double sessionProgressPercentage) {}
-    public record ReviewedAnswer(UUID questionId,String prompt,String type,List<String> values){}
+    public record ReviewedAnswer(UUID questionId,String prompt,String type,List<String> values,List<String> options){}
     public record ActivityResponse(UUID id, UUID organizationId, UUID programId, UUID moduleId, UUID sessionId,
             String dimensionName, int dimensionPosition, String sessionName, int sessionPosition,
             String title, String instructions, String youtubeUrl,
@@ -288,6 +288,6 @@ public class ActivityService {
         var answer=evaluationResponses.findByAssignment(org,program,assignment.id());
         if(answer.isEmpty()||evaluation.isEmpty())return List.of();
         return evaluation.get().questions().stream().map(q->new ReviewedAnswer(q.id(),q.prompt(),q.type().name(),
-            answer.get().answers().stream().filter(a->a.questionId().equals(q.id())).findFirst().map(ActivityEvaluationResponses.Answer::values).orElse(List.of()))).toList();
+            answer.get().answers().stream().filter(a->a.questionId().equals(q.id())).findFirst().map(ActivityEvaluationResponses.Answer::values).orElse(List.of()), q.options())).toList();
     }
 }

@@ -17,7 +17,11 @@ public record SurveyResults(UUID programId, String programName, Instant generate
     public record Comparison(UUID id, String name, String context, Summary summary) {}
     public record OptionCount(String value, String label, int count, double percentage) {}
     public record Question(UUID id, String prompt, EvaluationQuestionType type, int position,
-            int responseCount, Double average, List<OptionCount> distribution) {}
+            int responseCount, Double average, List<OptionCount> distribution, List<String> options) {
+        public Question(UUID id, String prompt, EvaluationQuestionType type, int position, int responseCount, Double average, List<OptionCount> distribution) {
+            this(id, prompt, type, position, responseCount, average, distribution, List.of());
+        }
+    }
     public record Respondent(UUID responseId, UUID enrollmentId, String name, String email,
             Instant completedAt, List<ActivityEvaluationResponses.Answer> answers) {}
     public record Survey(UUID id, String title, ActivityOption activity, Summary summary,

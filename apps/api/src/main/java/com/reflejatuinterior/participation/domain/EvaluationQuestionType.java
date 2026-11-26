@@ -9,7 +9,8 @@ public enum EvaluationQuestionType {
     SINGLE_CHOICE_LETTERS,
     SINGLE_CHOICE_WORDS,
     MULTIPLE_CHOICE_WORDS,
-    IMAGE;
+    IMAGE,
+    TABLE;
 
     public boolean activityOnly() {
         return this == MULTIPLE_CHOICE_WORDS || this == IMAGE;

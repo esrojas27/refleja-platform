@@ -13,6 +13,7 @@ public final class QuestionOptions {
     public static List<String> clean(EvaluationQuestionType type, List<String> input) {
         var options = input == null ? List.<String>of() : input;
         if (type == null) throw new InvalidActivityEvaluation("type");
+        if (type == EvaluationQuestionType.TABLE) return TableQuestionDefinition.clean(options);
         if (!type.hasCustomOptions()) {
             if (!options.isEmpty()) throw new InvalidActivityEvaluation("options");
             return List.of();

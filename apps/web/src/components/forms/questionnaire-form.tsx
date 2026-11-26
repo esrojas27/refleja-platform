@@ -1,6 +1,8 @@
 "use client";
 import { useRef,useState,type FormEvent } from "react";
 import { ActivityAnswerImage, ActivityImageInput } from "./activity-answer-image";
+import { TablePreview } from "./table-question";
+import { tableAnswerError } from "@/lib/forms/table-question";
 import { SurveyQuestionInput } from "./survey-question-input";
 import { MIN_WORD_SELECTIONS, MAX_WORD_SELECTIONS, WORD_SELECTION_HELP, type FormQuestion } from "@/lib/forms/question-catalog";
 import type { ActivitySurveyAnswerInput } from "@/lib/participation/activity-api";
@@ -15,7 +17,8 @@ export function QuestionnaireForm({title,instructions,questions,initialAnswers=[
   const missing=questions.filter(q=>!images[q.id] && (!answers[q.id]?.length||answers[q.id].some(v=>!v.trim()))).map(q=>q.id);
   const outsideRange=questions.filter(q=>q.type==="MULTIPLE_CHOICE_WORDS" &&
     ((answers[q.id]?.length??0)<MIN_WORD_SELECTIONS || (answers[q.id]?.length??0)>MAX_WORD_SELECTIONS)).map(q=>q.id);
-  const invalidQuestions=[...new Set([...missing,...outsideRange])];
+  const invalidTables=questions.filter(q=>q.type==="TABLE" && tableAnswerError(q.options,answers[q.id]??[])).map(q=>q.id);
+  const invalidQuestions=[...new Set([...missing,...outsideRange,...invalidTables])];
   if(invalidQuestions.length){setInvalid(invalidQuestions);setMessage(outsideRange.length ? "Revisa las preguntas resaltadas antes de enviar." : "Responde todas las preguntas antes de enviar.");window.setTimeout(()=>document.getElementById(`survey-question-${invalidQuestions[0]}`)?.focus(),0);return;}
   const imageFiles = Object.values(images).filter((file): file is File => !!file);
   if (imageFiles.reduce((total, file) => total + file.size, 0) > 40 * 1024 * 1024) {
@@ -36,7 +39,7 @@ export function QuestionnaireForm({title,instructions,questions,initialAnswers=[
      onChange={image=>{setImages(current=>({...current,[q.id]:image}));setAnswers(current=>({...current,[q.id]:[]}));setInvalid(current=>current.filter(id=>id!==q.id));}}/>
      : <SurveyQuestionInput question={q} selected={answers[q.id]??[]} disabled={pending}
      onChange={values=>{setAnswers(current=>({...current,[q.id]:values}));setInvalid(current=>current.filter(id=>id!==q.id));}}/>}
-    {invalid.includes(q.id)&&<p id={`survey-error-${q.id}`} className="mt-2 text-sm text-destructive">{q.type === "MULTIPLE_CHOICE_WORDS" ? WORD_SELECTION_HELP : "Esta pregunta es obligatoria."}</p>}
+    {invalid.includes(q.id)&&<p id={`survey-error-${q.id}`} className="mt-2 text-sm text-destructive">{q.type === "TABLE" ? "Completa todas las celdas (máximo 150 caracteres por celda)." : q.type === "MULTIPLE_CHOICE_WORDS" ? WORD_SELECTION_HELP : "Esta pregunta es obligatoria."}</p>}
    </fieldset></li>)}</ol>
   {message&&<p role="status" className="mt-4 rounded-xl bg-muted p-3 text-sm">{message}</p>}
   <button className="rti-button-primary mt-5" disabled={pending||!questions.length}>{pending?"Enviando…":submitLabel}</button>
@@ -47,7 +50,7 @@ export function QuestionnaireAnswers({questions,answers,programId}:{questions:Fo
   const values = answers.find(a=>a.questionId===q.id)?.values;
   return <li key={q.id} className="rounded-xl border border-border p-3 text-sm">
   <p className="font-semibold">{q.position}. {q.prompt}</p>
-  {q.type === "IMAGE" && values?.[0] && programId
+  {q.type === "TABLE" ? <TablePreview options={q.options} values={values} /> : q.type === "IMAGE" && values?.[0] && programId
     ? <ActivityAnswerImage key={values[0]} programId={programId} imageId={values[0]} />
     : <p className="mt-2 whitespace-pre-wrap break-words">{q.type !== "IMAGE" && values?.join(" · ") || "Sin respuesta"}</p>}
  </li>;})}</ol>;

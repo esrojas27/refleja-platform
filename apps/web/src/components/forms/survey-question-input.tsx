@@ -1,5 +1,6 @@
 import { AGREEMENT_OPTIONS, EMOTION_OPTIONS, LIKELIHOOD_OPTIONS, NUMERIC_SCALE_OPTIONS,
   MAX_WORD_SELECTIONS, WORD_SELECTION_HELP, hasCustomOptions, type FormQuestion } from "@/lib/forms/question-catalog";
+import { TableAnswerInput } from "./table-question";
 import { SingleChoiceOptions } from "./single-choice-options";
 
 /** Shared answer controls; workflow/submission remains with the enclosing form. */
@@ -7,6 +8,7 @@ export function SurveyQuestionInput({ question, selected, disabled, onChange }: 
   question: FormQuestion; selected: string[]; disabled: boolean; onChange: (values: string[]) => void;
 }) {
   const id = `survey-question-${question.id}`;
+  if (question.type === "TABLE") return <TableAnswerInput id={id} prompt={question.prompt} options={question.options} values={selected} disabled={disabled} onChange={onChange} />;
   if (question.type === "OPEN_TEXT") return <textarea id={id} aria-label={`Respuesta a ${question.prompt}`}
     className="rti-field mt-3 min-h-28 resize-y" maxLength={5000} value={selected[0] ?? ""}
     onChange={event => onChange([event.target.value])} disabled={disabled} />;

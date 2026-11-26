@@ -74,6 +74,21 @@ class SessionClosureIntegrationTests extends PostgreSqlIntegrationTestSupport {
     private String ack(){return own()+"/sessions/"+session+"/closure-acknowledgement";}
     private String close(){return own()+"/sessions/"+session+"/closure-response";}
 
+    @Test void closingTableRequiresAllCellsAndKeepsTheSessionProgressRules() throws Exception {
+        var a=activity(1);var af=form(a);closing();
+        var options=List.of("TABLE_V1:1:2","Ámbito","Aprendizaje","Compromiso","Personal");
+        var cf=tree(postAs(base()+"/sessions/"+session+"/survey",consultant,
+            Map.of("version",0,"title","Cierre con tabla","questions",List.of(
+                Map.of("prompt","Mi cierre","type","TABLE","position",1,"options",options)))).andExpect(status().isOk()));
+        schedule().andExpect(status().isOk());submit(a,af,0,"Mi reflexión").andExpect(status().isOk());
+        postAs(ack(),person,Map.of()).andExpect(status().isOk());progress("PENDING",80);
+        postAs(close(),person,answers(cf,0,"Incompleta")).andExpect(status().isBadRequest());progress("PENDING",80);
+        postAs(close(),person,Map.of("answers",List.of(Map.of("questionId",cf.path("questions").get(0).path("id").asText(),
+            "values",List.of("He aprendido","Me comprometo"))))).andExpect(status().isOk());progress("COMPLETED",100);
+        state().andExpect(jsonPath("$.items[0].answers[0].values[1]").value("Me comprometo"))
+            .andExpect(jsonPath("$.items[0].survey.questions[0].options[0]").value("TABLE_V1:1:2"));
+    }
+
     @Test void schedulingRequiresEveryContentLayer()throws Exception{
         schedule().andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("SESSION_MISSING_ACTIVITIES"));
         var a=activity(1);

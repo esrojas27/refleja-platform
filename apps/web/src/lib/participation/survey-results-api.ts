@@ -11,7 +11,7 @@ export type SurveySummary = {
 export type SurveyActivityOption = { id: string; title: string; dimensionId: string; dimensionName: string; sessionId: string; sessionName: string };
 export type SurveyComparison = { id: string; name: string; context: string; summary: SurveySummary };
 export type SurveyQuestionResult = {
-  id: string; prompt: string; type: EvaluationQuestionType; position: number; responseCount: number; average: number | null;
+  id: string; prompt: string; type: EvaluationQuestionType; position: number; options?: string[]; responseCount: number; average: number | null;
   distribution: Array<{ value: string; label: string; count: number; percentage: number }>;
 };
 export type SurveyRespondent = { responseId: string; enrollmentId: string; name: string; email: string; completedAt: string;
