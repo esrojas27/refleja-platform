@@ -71,6 +71,8 @@ it("reports an expired session before fetching DISC data",async()=>{
  render(<ProgramDiscArea organizationId="org" programId="program"/>);
  expect(await screen.findByText(/Tu sesión no está disponible/)).toBeTruthy();
  expect(listProgramDiscProfiles).not.toHaveBeenCalled();
+ expect(screen.getByRole("link",{name:"Volver a Cuenta"}).getAttribute("href")).toBe("/account");
+ expect(screen.getByRole("link",{name:"Volver al programa"}).getAttribute("href")).toBe("/organizations/org/programs/program");
 });
 it("does not invent numbers for a qualitative legacy profile",async()=>{
  vi.mocked(listProgramDiscProfiles).mockResolvedValue({items:[{...person,profile:{...profile,dominant:null,influential:null,serene:null,conscientious:null,needsUpdate:true,version:3}}]});

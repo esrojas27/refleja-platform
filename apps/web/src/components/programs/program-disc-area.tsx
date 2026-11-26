@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import {useEffect,useRef,useState,type FormEvent} from "react";
 import {fetchCurrentIdentity,IdentityRequestError} from "@/lib/auth/authenticated-api";
 import {listProgramDiscProfiles,saveProgramDiscProfile,discErrorMessage,DiscRequestError,type ProgramDiscParticipant,type DiscProfileInput} from "@/lib/participation/disc-api";
@@ -67,6 +68,10 @@ function DiscArea({organizationId,programId}:{organizationId:string;programId:st
       </section>
     </>}
     <button type="button" className="rti-button-secondary mt-5" disabled={loading} onClick={refresh}>Actualizar fichas</button>
+    <nav aria-label="Navegación DISC" className="mt-8 flex flex-wrap gap-4 border-t border-border pt-6 text-sm">
+      <Link href={`/organizations/${encodeURIComponent(organizationId)}/programs/${encodeURIComponent(programId)}`} className="rti-link">Volver al programa</Link>
+      <Link href="/account" className="rti-link">Volver a Cuenta</Link>
+    </nav>
   </main>;
 }
 type Draft=Record<keyof DiscValues,string>;
